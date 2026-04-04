@@ -49,11 +49,7 @@ export function enumerateHouses(config: HousingConfig): EnumeratedHouse[] {
   return houses
 }
 
-export function countSharedFavorites(
-  nameA: string,
-  nameB: string,
-  data: PokemonData,
-): number {
+export function countSharedFavorites(nameA: string, nameB: string, data: PokemonData): number {
   const entryA = data[nameA]
   const entryB = data[nameB]
   if (!entryA || !entryB) return 0

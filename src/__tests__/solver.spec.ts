@@ -1,12 +1,5 @@
-import { describe, it, expect, beforeAll } from 'vitest'
-import {
-  enumerateHouses,
-  countSharedFavorites,
-  solve,
-  type PokemonData,
-  type HousingConfig,
-  type SolverResult,
-} from '../solver'
+import { describe, it, expect } from 'vitest'
+import { enumerateHouses, countSharedFavorites, solve, type PokemonData } from '../solver'
 
 const testData: PokemonData = {
   AlphaOne: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'] },
@@ -125,8 +118,8 @@ describe('solve', () => {
   }, 30_000)
 
   it('throws for unknown pokemon names', async () => {
-    await expect(
-      solve(['FakeMon'], { small: 1, medium: 0, large: 0 }, testData),
-    ).rejects.toThrow('Unknown pokemon: FakeMon')
+    await expect(solve(['FakeMon'], { small: 1, medium: 0, large: 0 }, testData)).rejects.toThrow(
+      'Unknown pokemon: FakeMon',
+    )
   })
 })

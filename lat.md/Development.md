@@ -70,3 +70,7 @@ Check code quality and style compliance using ESLint.
 ```sh
 npm run lint
 ```
+
+## Pre-commit Hook
+
+Formatting and linting run automatically on every commit via husky. The hook runs `npm run format` (oxfmt) then `npm run lint` (oxlint + ESLint). Both fix issues in place; the commit is blocked if unfixable errors remain.
