@@ -52,7 +52,7 @@ Run e2e tests using Playwright on Chromium to verify the full app works in a rea
 
 ```sh
 # Install Chromium for the first run
-npx playwright install chromium
+npm run playwright install chromium
 
 # Run e2e tests
 npm run test:e2e
