@@ -1,14 +1,32 @@
 import { init } from 'z3-solver'
 
+// In the browser, Vite resolves 'z3-solver' to its browser build (browser.js),
+// which reads globalThis.initZ3. The Emscripten pthreads require z3-built.js to
+// be loaded as a classic <script> tag so document.currentScript?.src resolves
+// correctly for the worker URL. The files are copied to public/ by postinstall.
+function loadZ3Script(): Promise<void> {
+  // In Node.js (vitest), z3-solver resolves to the node build which loads WASM
+  // directly via require(). Only load the script tag in a real browser.
+  if (
+    (typeof process !== 'undefined' && process.versions?.node) ||
+    (globalThis as Record<string, unknown>).initZ3
+  ) {
+    return Promise.resolve()
+  }
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = '/z3-built.js'
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Failed to load z3-built.js'))
+    document.head.appendChild(script)
+  })
+}
+
 export interface PokemonData {
   [name: string]: { image: string; favorites: string[] }
 }
 
-export interface HousingConfig {
-  small: number
-  medium: number
-  large: number
-}
+export type HousingConfig = Record<HouseSize, number>
 
 export interface HouseAssignment {
   houseIndex: number
@@ -22,7 +40,9 @@ export interface SolverResult {
   unhoused: string[]
 }
 
-const HOUSE_SIZES: Record<string, number> = {
+export type HouseSize = 'small' | 'medium' | 'large'
+
+const HOUSE_SIZES: Record<HouseSize, number> = {
   small: 1,
   medium: 2,
   large: 4,
@@ -59,7 +79,9 @@ export function countSharedFavorites(nameA: string, nameB: string, data: Pokemon
 
 let z3Promise: ReturnType<typeof init> | null = null
 function getZ3() {
-  if (!z3Promise) z3Promise = init()
+  if (!z3Promise) {
+    z3Promise = loadZ3Script().then(() => init())
+  }
   return z3Promise
 }
 
@@ -118,11 +140,19 @@ export async function solve(
   optimizer.minimize(Sum(unhousedTerms[0]!, ...unhousedTerms.slice(1)))
 
   // Objective 2: maximize shared favorites between housemates
-  // Precompute shared favorite counts and build pair bonus terms
+  // Precompute favorites sets to avoid rebuilding per pair
+  const favSets = new Map<string, Set<string>>()
+  for (const name of pokemonNames) {
+    const entry = pokemonData[name]
+    if (entry) favSets.set(name, new Set(entry.favorites))
+  }
+
   const pairTerms: ReturnType<typeof If>[] = []
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
-      const shared = countSharedFavorites(pokemonNames[i]!, pokemonNames[j]!, pokemonData)
+      const setA = favSets.get(pokemonNames[i]!)
+      const entryB = pokemonData[pokemonNames[j]!]
+      const shared = setA && entryB ? entryB.favorites.filter((f) => setA.has(f)).length : 0
       if (shared === 0) continue
       // Both assigned to the same house and neither is unhoused
       const sameHouse = assignments[i]!.eq(assignments[j]!).and(assignments[i]!.neq(0))

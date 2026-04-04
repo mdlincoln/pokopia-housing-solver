@@ -41,6 +41,18 @@ Domain bounds and per-house capacity limits enforce valid assignments.
 
 Two objectives in lexicographic order: first minimize unhoused count, then maximize total shared favorites between housemates. Pairs with zero shared favorites are pruned from the objective.
 
+## Browser Loading
+
+Z3's Emscripten pthreads need z3-built.js loaded as a classic script for correct worker URL resolution. Files are copied to `public/` by the `postinstall` script.
+
+At runtime, `solver.ts` dynamically inserts a `<script src="/z3-built.js">` tag before calling `init()`, setting `globalThis.initZ3` for the browser build. In Node.js (vitest), script loading is skipped.
+
+### Cross-Origin Isolation
+
+Z3's pthreads require `SharedArrayBuffer`, which is only available in cross-origin isolated contexts.
+
+The Vite dev and preview servers send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. Production deployments must set these same headers.
+
 ## Helpers
 
 Exported utility functions used internally and in tests.

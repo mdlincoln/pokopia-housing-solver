@@ -15,6 +15,7 @@
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
     "format": "oxfmt src/",
+    "postinstall": "cp node_modules/z3-solver/build/z3-built.js node_modules/z3-solver/build/z3-built.wasm public/",
     "prepare": "husky"
   },
   "dependencies": {

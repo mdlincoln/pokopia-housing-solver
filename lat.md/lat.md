@@ -2,3 +2,4 @@ This directory defines the high-level concepts, business logic, and architecture
 
 - [[Development]] — Development setup and project commands
 - [[solver]] — Z3-based pokemon housing optimization module
+- [[ui]] — Vue homepage UI for configuring and running the solver

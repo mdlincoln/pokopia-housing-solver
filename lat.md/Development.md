@@ -10,6 +10,10 @@ TypeScript cannot handle type information for `.vue` imports by default, so we r
 
 See [Vite Configuration Reference](https://vite.dev/config/).
 
+### Browser polyfills
+
+`vite.config.ts` defines `global: 'globalThis'` so that z3-solver (which references the Node.js `global` object) works in the browser.
+
 ## Project Setup
 
 Install project dependencies using npm.
@@ -44,23 +48,14 @@ npm run test:unit
 
 ### Run End-to-End Tests with [Playwright](https://playwright.dev)
 
-Run end-to-end tests using Playwright to verify full application workflows across browsers.
+Run e2e tests using Playwright on Chromium to verify the full app works in a real browser, including z3-solver WASM execution.
 
 ```sh
-# Install browsers for the first run
-npx playwright install
+# Install Chromium for the first run
+npx playwright install chromium
 
-# When testing on CI, must build the project first
-npm run build
-
-# Runs the end-to-end tests
+# Run e2e tests
 npm run test:e2e
-# Runs the tests only on Chromium
-npm run test:e2e -- --project=chromium
-# Runs the tests of a specific file
-npm run test:e2e -- tests/example.spec.ts
-# Runs the tests in debug mode
-npm run test:e2e -- --debug
 ```
 
 ### Lint with [ESLint](https://eslint.org/)
