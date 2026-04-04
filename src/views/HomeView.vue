@@ -81,7 +81,12 @@ async function onSubmit() {
         <h3>{{ house.size }} house #{{ house.houseIndex }}</h3>
         <p class="capacity">Capacity: {{ house.capacity }}</p>
         <ul v-if="house.pokemon.length">
-          <li v-for="name in house.pokemon" :key="name">{{ name }}</li>
+          <li v-for="name in house.pokemon" :key="name">
+            {{ name }}
+            <ul v-if="pokemonData?.[name]?.favorites.length" class="favorites">
+              <li v-for="fav in pokemonData[name]!.favorites" :key="fav">{{ fav }}</li>
+            </ul>
+          </li>
         </ul>
         <p v-else class="empty">Empty</p>
       </div>
@@ -198,6 +203,13 @@ button[type='submit']:disabled {
 
 .house-card li {
   font-size: 0.9rem;
+}
+
+.favorites {
+  margin: 0.15rem 0 0.25rem;
+  padding-left: 1.2rem;
+  color: #666;
+  font-size: 0.8rem;
 }
 
 .empty {

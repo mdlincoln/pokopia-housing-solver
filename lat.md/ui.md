@@ -12,7 +12,7 @@ Users set house counts via integer inputs and select pokemon with an autocomplet
 
 ### Results Display
 
-After solving, house assignments render as cards showing size, capacity, and assigned pokemon. Unhoused pokemon appear in a separate highlighted section. Error and loading states are handled inline.
+After solving, house cards show size, capacity, assigned pokemon, and each pokemon's favorites in a nested list. Unhoused pokemon appear in a separate highlighted section. Error and loading states are handled inline.
 
 ## PokemonSelect
 
