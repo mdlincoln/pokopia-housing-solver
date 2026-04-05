@@ -1,4 +1,7 @@
 import { init } from 'z3-solver'
+import { buildSubMatrix, greedyPreAssign, type AdjacencyData } from './heuristic'
+
+export type { AdjacencyData }
 
 // In the browser, Vite resolves 'z3-solver' to its browser build (browser.js),
 // which reads globalThis.initZ3. The Emscripten pthreads require z3-built.js to
@@ -104,6 +107,7 @@ export async function solve(
   pokemonNames: string[],
   housingConfig: HousingConfig,
   pokemonData: PokemonData,
+  adjacencyData?: AdjacencyData,
 ): Promise<SolverResult> {
   const houses = enumerateHouses(housingConfig)
   const numHouses = houses.length
@@ -128,6 +132,13 @@ export async function solve(
     return { houses: [], unhoused: [...pokemonNames] }
   }
 
+  // Greedy pre-assignment: collapse medium/large house slots before Z3
+  let preAssignments = new Map<string, number>()
+  if (adjacencyData) {
+    const subMatrix = buildSubMatrix(pokemonNames, adjacencyData)
+    preAssignments = greedyPreAssign(pokemonNames, houses, subMatrix)
+  }
+
   const { Context } = await getZ3()
   const ctx = new Context('pokemon')
   const { Optimize, Int, If, Sum } = ctx
@@ -142,6 +153,14 @@ export async function solve(
   for (const a of assignments) {
     optimizer.add(a.ge(0))
     optimizer.add(a.le(numHouses))
+  }
+
+  // Pre-assignment constraints: fix heuristically chosen pokemon to their houses
+  for (let i = 0; i < n; i++) {
+    const houseIdx = preAssignments.get(pokemonNames[i]!)
+    if (houseIdx !== undefined) {
+      optimizer.add(assignments[i]!.eq(houseIdx))
+    }
   }
 
   // Capacity constraints: for each house, count of assigned pokemon <= capacity
