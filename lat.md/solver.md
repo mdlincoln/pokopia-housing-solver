@@ -64,3 +64,7 @@ Flattens a `HousingConfig` into an ordered list of houses with indices and capac
 ### countSharedFavorites
 
 Returns the number of overlapping favorites between two pokemon. See [[src/solver.ts#countSharedFavorites]].
+
+### rankHouseFavorites
+
+Takes an array of favorite `Set<string>` values (one per pokemon) and returns a ranked list of `{ favorite, count }` objects sorted by overlap count descending. Only includes favorites shared by at least two pokemon. See [[src/solver.ts#rankHouseFavorites]].

@@ -14,6 +14,8 @@ Users set house counts via integer inputs and select pokemon with an autocomplet
 
 After solving, house cards show size, capacity, assigned pokemon, and each pokemon's favorites in a nested list. Unhoused pokemon appear in a separate highlighted section. Error and loading states are handled inline.
 
+Houses with 2+ residents also show a "Shared interests" section: a ranked list of favorites shared by multiple housemates, with the overlap count per favorite (e.g. "Berries ×3").
+
 ## PokemonSelect
 
 Reusable autocomplete multi-select component at `src/components/PokemonSelect.vue`.

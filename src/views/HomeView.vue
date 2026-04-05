@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
-import { solve, type PokemonData, type SolverResult } from '@/solver'
+import { solve, rankHouseFavorites, type PokemonData, type SolverResult } from '@/solver'
 
 const pokemonData = ref<PokemonData | null>(null)
 const pokemonNames = computed(() =>
@@ -22,6 +22,12 @@ onMounted(async () => {
   const data: PokemonData = await resp.json()
   pokemonData.value = data
 })
+
+function sharedFavoritesFor(pokemon: string[]): Array<{ favorite: string; count: number }> {
+  if (!pokemonData.value || pokemon.length < 2) return []
+  const sets = pokemon.map((name) => new Set(pokemonData.value![name]?.favorites ?? []))
+  return rankHouseFavorites(sets)
+}
 
 async function onSubmit() {
   if (!pokemonData.value) return
@@ -89,6 +95,14 @@ async function onSubmit() {
           </li>
         </ul>
         <p v-else class="empty">Empty</p>
+        <div v-if="sharedFavoritesFor(house.pokemon).length" class="shared-favorites">
+          <p class="shared-label">Shared interests</p>
+          <ul>
+            <li v-for="item in sharedFavoritesFor(house.pokemon)" :key="item.favorite">
+              {{ item.favorite }} ×{{ item.count }}
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
     <div v-if="result.unhoused.length" class="unhoused">
@@ -210,6 +224,29 @@ button[type='submit']:disabled {
   padding-left: 1.2rem;
   color: #666;
   font-size: 0.8rem;
+}
+
+.shared-favorites {
+  margin-top: 0.5rem;
+  border-top: 1px solid #eee;
+  padding-top: 0.4rem;
+}
+
+.shared-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #555;
+  margin: 0 0 0.25rem;
+}
+
+.shared-favorites ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.shared-favorites li {
+  font-size: 0.8rem;
+  color: #4f46e5;
 }
 
 .empty {

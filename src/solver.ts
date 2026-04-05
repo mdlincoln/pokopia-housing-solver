@@ -58,7 +58,7 @@ export function enumerateHouses(config: HousingConfig): EnumeratedHouse[] {
   const houses: EnumeratedHouse[] = []
   let idx = 1
   for (const [size, count] of Object.entries(config)) {
-    const capacity = HOUSE_SIZES[size]
+    const capacity = HOUSE_SIZES[size as HouseSize]
     if (capacity === undefined) {
       throw new Error(`Unknown house size: ${size}`)
     }
@@ -67,6 +67,21 @@ export function enumerateHouses(config: HousingConfig): EnumeratedHouse[] {
     }
   }
   return houses
+}
+
+export function rankHouseFavorites(
+  favoriteSets: Set<string>[],
+): Array<{ favorite: string; count: number }> {
+  const freq = new Map<string, number>()
+  for (const set of favoriteSets) {
+    for (const fav of set) {
+      freq.set(fav, (freq.get(fav) ?? 0) + 1)
+    }
+  }
+  return Array.from(freq.entries())
+    .filter(([, count]) => count >= 2)
+    .map(([favorite, count]) => ({ favorite, count }))
+    .sort((a, b) => b.count - a.count)
 }
 
 export function countSharedFavorites(nameA: string, nameB: string, data: PokemonData): number {
@@ -161,7 +176,8 @@ export async function solve(
   }
 
   if (pairTerms.length > 0) {
-    optimizer.maximize(Sum(pairTerms[0]!, ...pairTerms.slice(1)))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    optimizer.maximize(Sum(pairTerms[0]! as any, ...(pairTerms.slice(1) as any[])))
   }
 
   const result = await optimizer.check()
@@ -172,7 +188,8 @@ export async function solve(
   const model = optimizer.model()
 
   // Extract assignments from model
-  const assignmentValues = assignments.map((a) => Number(model.eval(a).value()))
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const assignmentValues = assignments.map((a) => Number((model.eval(a) as any).value()))
 
   // Build result
   const houseMap = new Map<number, string[]>()
