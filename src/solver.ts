@@ -1,5 +1,5 @@
 import { init } from 'z3-solver'
-import { buildSubMatrix, greedyPreAssign, type AdjacencyData } from './heuristic'
+import { buildSubMatrix, clusterPreAssign, type AdjacencyData } from './heuristic'
 
 export type { AdjacencyData }
 
@@ -136,7 +136,7 @@ export async function solve(
   let preAssignments = new Map<string, number>()
   if (adjacencyData) {
     const subMatrix = buildSubMatrix(pokemonNames, adjacencyData)
-    preAssignments = greedyPreAssign(pokemonNames, houses, subMatrix)
+    preAssignments = clusterPreAssign(pokemonNames, houses, subMatrix)
   }
 
   const { Context } = await getZ3()
