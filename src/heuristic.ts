@@ -40,7 +40,7 @@ export function buildSubMatrix(pokemonNames: string[], adjacency: AdjacencyData)
  *   3. Assign both to the house.
  *
  * Returns a Map from pokemon name to house index for pre-assigned pokemon.
- * Small houses (capacity 1) are skipped; they are left for Z3.
+ * Small houses (capacity 1) are skipped; they are left for the greedy tail fill.
  */
 export function greedyPreAssign(
   pokemonNames: string[],
@@ -263,7 +263,7 @@ export function greedyMaxWeightMatching(
  *
  * Phase 1: Agglomerative clustering fills large houses (capacity 4).
  * Phase 2: Greedy max-weight matching fills medium houses (capacity 2).
- * Small houses and remaining pokemon are left for Z3.
+ * Small houses and remaining pokemon are handled by the greedy tail fill.
  */
 export function clusterPreAssign(
   pokemonNames: string[],

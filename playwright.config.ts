@@ -12,7 +12,7 @@ import { defineConfig, devices } from '@playwright/test'
  */
 export default defineConfig({
   testDir: './e2e',
-  /* Maximum time one test can run for (z3 WASM init + solve can be slow). */
+  /* Maximum time one test can run for. */
   timeout: 60 * 1000,
   expect: {
     /**

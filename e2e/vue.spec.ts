@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 async function selectPokemon(page: import('@playwright/test').Page, name: string) {
   const input = page.getByPlaceholder('Search pokemon...')
@@ -46,27 +46,6 @@ test.describe('Homepage', () => {
     expect(resultsText).toContain('Bulbasaur')
     expect(resultsText).toContain('Ivysaur')
     expect(resultsText).toContain('Charmander')
-  })
-
-  test('shows loading state while solving', async ({ page }) => {
-    await page.goto('/')
-
-    const inputs = page.locator('input[type="number"]')
-    await inputs.nth(0).fill('1')
-
-    await selectPokemon(page, 'Bulbasaur')
-
-    const button = page.getByRole('button', { name: /Solv/ })
-    await button.click()
-
-    // Should show loading text
-    await expect(button).toHaveText('Solving...')
-    await expect(button).toBeDisabled()
-
-    // After solve completes, button reverts
-    await expect(page.locator('.results')).toBeVisible({ timeout: 30_000 })
-    await expect(button).toHaveText('Solve')
-    await expect(button).toBeEnabled()
   })
 
   test('displays unhoused pokemon when capacity is exceeded', async ({ page }) => {

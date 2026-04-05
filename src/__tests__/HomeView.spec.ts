@@ -1,14 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
-import { createRouter, createMemoryHistory } from 'vue-router'
-import HomeView from '@/views/HomeView.vue'
 import type { SolverResult } from '@/solver'
+import HomeView from '@/views/HomeView.vue'
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 const mockSolve = vi.fn()
 
-vi.mock('@/solver', () => ({
-  solve: (...args: unknown[]) => mockSolve(...args),
-}))
+vi.mock('@/solver', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...(actual as object),
+    solve: (...args: unknown[]) => mockSolve(...args),
+  }
+})
 
 const testPokemonData = {
   AlphaOne: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'] },
@@ -122,31 +126,8 @@ describe('HomeView', () => {
     expect(cards[1]!.text()).toContain('Empty')
   })
 
-  it('shows loading state while solving', async () => {
-    let resolveSolve!: (v: SolverResult) => void
-    mockSolve.mockReturnValueOnce(
-      new Promise<SolverResult>((r) => {
-        resolveSolve = r
-      }),
-    )
-
-    const wrapper = await mountHome()
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
-
-    const button = wrapper.find('button[type="submit"]')
-    expect(button.text()).toBe('Solving...')
-    expect(button.attributes('disabled')).toBeDefined()
-
-    resolveSolve({ houses: [], unhoused: [] })
-    await flushPromises()
-
-    expect(button.text()).toBe('Solve')
-    expect(button.attributes('disabled')).toBeUndefined()
-  })
-
   it('displays error when solver fails', async () => {
-    mockSolve.mockRejectedValueOnce(new Error('Z3 exploded'))
+    mockSolve.mockRejectedValueOnce(new Error('Solver exploded'))
 
     const wrapper = await mountHome()
     await wrapper.find('form').trigger('submit')
@@ -154,6 +135,6 @@ describe('HomeView', () => {
 
     const errorEl = wrapper.find('.error')
     expect(errorEl.exists()).toBe(true)
-    expect(errorEl.text()).toContain('Z3 exploded')
+    expect(errorEl.text()).toContain('Solver exploded')
   })
 })

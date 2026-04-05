@@ -35,10 +35,6 @@ coverage
 # Vitest
 __screenshots__/
 
-# z3-solver WASM files (copied from node_modules by postinstall)
-public/z3-built.js
-public/z3-built.wasm
-
 # Vite
 *.timestamp-*-*.mjs
 
