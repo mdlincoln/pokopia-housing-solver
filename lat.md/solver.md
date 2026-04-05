@@ -53,6 +53,10 @@ Z3's pthreads require `SharedArrayBuffer`, which is only available in cross-orig
 
 The Vite dev and preview servers send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. Production deployments must set these same headers.
 
+## Heuristic Pre-assignment
+
+Greedy pre-assignment reduces Z3's search space by fixing medium/large house slots before the solver runs. Implemented in [[src/heuristic.ts]].
+
 ## Helpers
 
 Exported utility functions used internally and in tests.
