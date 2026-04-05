@@ -1,29 +1,6 @@
-import { init } from 'z3-solver'
 import { buildSubMatrix, clusterPreAssign, type AdjacencyData } from './heuristic'
 
 export type { AdjacencyData }
-
-// In the browser, Vite resolves 'z3-solver' to its browser build (browser.js),
-// which reads globalThis.initZ3. The Emscripten pthreads require z3-built.js to
-// be loaded as a classic <script> tag so document.currentScript?.src resolves
-// correctly for the worker URL. The files are copied to public/ by postinstall.
-function loadZ3Script(): Promise<void> {
-  // In Node.js (vitest), z3-solver resolves to the node build which loads WASM
-  // directly via require(). Only load the script tag in a real browser.
-  if (
-    (typeof process !== 'undefined' && process.versions?.node) ||
-    (globalThis as Record<string, unknown>).initZ3
-  ) {
-    return Promise.resolve()
-  }
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script')
-    script.src = '/z3-built.js'
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Failed to load z3-built.js'))
-    document.head.appendChild(script)
-  })
-}
 
 export interface PokemonData {
   [name: string]: { image: string; favorites: string[] }
@@ -95,12 +72,60 @@ export function countSharedFavorites(nameA: string, nameB: string, data: Pokemon
   return entryB.favorites.filter((f) => setA.has(f)).length
 }
 
-let z3Promise: ReturnType<typeof init> | null = null
-function getZ3() {
-  if (!z3Promise) {
-    z3Promise = loadZ3Script().then(() => init())
+// @lat: [[lat.md/solver#Solver#Clustering Pre-assignment#greedyFillRemaining]]
+/**
+ * Greedy best-fit assignment for the remaining unassigned pokemon.
+ *
+ * Repeatedly picks the (pokemon, house) pair with the highest total shared
+ * favorites between the pokemon and the house's current occupants, then
+ * assigns it. Ties (including zero-score pairs) are broken by assigning to the
+ * house with the most remaining capacity. Pokemon that cannot be placed (no
+ * remaining capacity anywhere) are returned as unhoused.
+ */
+function greedyFillRemaining(
+  remaining: string[],
+  occupants: Map<number, string[]>,
+  remainingCapacity: Map<number, number>,
+  pokemonData: PokemonData,
+): Map<string, number> {
+  const result = new Map<string, number>()
+  const pool = new Set(remaining)
+
+  while (pool.size > 0) {
+    let bestScore = -1
+    let bestPokemon = ''
+    let bestHouse = -1
+    let bestHouseCapacity = -1
+
+    for (const name of pool) {
+      for (const [houseIdx, cap] of remainingCapacity) {
+        if (cap <= 0) continue
+        let score = 0
+        for (const occupant of occupants.get(houseIdx) ?? []) {
+          score += countSharedFavorites(name, occupant, pokemonData)
+        }
+        // Prefer higher score; break ties by larger remaining capacity
+        if (score > bestScore || (score === bestScore && cap > bestHouseCapacity)) {
+          bestScore = score
+          bestPokemon = name
+          bestHouse = houseIdx
+          bestHouseCapacity = cap
+        }
+      }
+    }
+
+    if (bestHouse === -1) break // No capacity remaining anywhere
+
+    result.set(bestPokemon, bestHouse)
+    pool.delete(bestPokemon)
+    occupants.get(bestHouse)!.push(bestPokemon)
+    remainingCapacity.set(bestHouse, remainingCapacity.get(bestHouse)! - 1)
+    if (remainingCapacity.get(bestHouse) === 0) {
+      remainingCapacity.delete(bestHouse)
+    }
   }
-  return z3Promise
+
+  return result
 }
 
 export async function solve(
@@ -132,103 +157,42 @@ export async function solve(
     return { houses: [], unhoused: [...pokemonNames] }
   }
 
-  // Greedy pre-assignment: collapse medium/large house slots before Z3
+  // Phase 1+2: Cluster-based pre-assignment for large and medium houses
   let preAssignments = new Map<string, number>()
   if (adjacencyData) {
     const subMatrix = buildSubMatrix(pokemonNames, adjacencyData)
     preAssignments = clusterPreAssign(pokemonNames, houses, subMatrix)
   }
 
-  const { Context } = await getZ3()
-  const ctx = new Context('pokemon')
-  const { Optimize, Int, If, Sum } = ctx
-
-  const optimizer = new Optimize()
-  const n = pokemonNames.length
-
-  // One integer variable per pokemon: 0 = unhoused, 1..numHouses = house index
-  const assignments = pokemonNames.map((name, i) => Int.const(`p_${i}_${name}`))
-
-  // Domain constraints: 0 <= assignment <= numHouses
-  for (const a of assignments) {
-    optimizer.add(a.ge(0))
-    optimizer.add(a.le(numHouses))
-  }
-
-  // Pre-assignment constraints: fix heuristically chosen pokemon to their houses
-  for (let i = 0; i < n; i++) {
-    const houseIdx = preAssignments.get(pokemonNames[i]!)
-    if (houseIdx !== undefined) {
-      optimizer.add(assignments[i]!.eq(houseIdx))
-    }
-  }
-
-  // Capacity constraints: for each house, count of assigned pokemon <= capacity
+  // Build occupants and remaining capacity from pre-assignments
+  const occupants = new Map<number, string[]>()
+  const remainingCapacity = new Map<number, number>()
   for (const house of houses) {
-    const counts = assignments.map((a) => If(a.eq(house.index), Int.val(1), Int.val(0)))
-    optimizer.add(Sum(counts[0]!, ...counts.slice(1)).le(house.capacity))
+    occupants.set(house.index, [])
+    remainingCapacity.set(house.index, house.capacity)
   }
-
-  // Objective 1 (highest priority): minimize unhoused count
-  const unhousedTerms = assignments.map((a) => If(a.eq(0), Int.val(1), Int.val(0)))
-  optimizer.minimize(Sum(unhousedTerms[0]!, ...unhousedTerms.slice(1)))
-
-  // Objective 2: maximize shared favorites between housemates
-  // Precompute favorites sets to avoid rebuilding per pair
-  const favSets = new Map<string, Set<string>>()
-  for (const name of pokemonNames) {
-    const entry = pokemonData[name]
-    if (entry) favSets.set(name, new Set(entry.favorites))
-  }
-
-  const pairTerms: ReturnType<typeof If>[] = []
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const setA = favSets.get(pokemonNames[i]!)
-      const entryB = pokemonData[pokemonNames[j]!]
-      const shared = setA && entryB ? entryB.favorites.filter((f) => setA.has(f)).length : 0
-      if (shared === 0) continue
-      // Both assigned to the same house and neither is unhoused
-      const sameHouse = assignments[i]!.eq(assignments[j]!).and(assignments[i]!.neq(0))
-      pairTerms.push(If(sameHouse, Int.val(shared), Int.val(0)))
+  for (const [name, houseIdx] of preAssignments) {
+    occupants.get(houseIdx)!.push(name)
+    remainingCapacity.set(houseIdx, remainingCapacity.get(houseIdx)! - 1)
+    if (remainingCapacity.get(houseIdx) === 0) {
+      remainingCapacity.delete(houseIdx)
     }
   }
 
-  if (pairTerms.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    optimizer.maximize(Sum(pairTerms[0]! as any, ...(pairTerms.slice(1) as any[])))
-  }
+  // Phase 3: Greedily fill remaining slots with unassigned pokemon
+  const assigned = new Set(preAssignments.keys())
+  const remaining = pokemonNames.filter((name) => !assigned.has(name))
+  const tailAssignments = greedyFillRemaining(remaining, occupants, remainingCapacity, pokemonData)
 
-  const result = await optimizer.check()
-  if (result !== 'sat') {
-    throw new Error(`Solver returned ${result}`)
-  }
-
-  const model = optimizer.model()
-
-  // Extract assignments from model
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const assignmentValues = assignments.map((a) => Number((model.eval(a) as any).value()))
-
-  // Build result
-  const houseMap = new Map<number, string[]>()
-  const unhoused: string[] = []
-
-  for (let i = 0; i < n; i++) {
-    const houseIdx = assignmentValues[i]!
-    if (houseIdx === 0) {
-      unhoused.push(pokemonNames[i]!)
-    } else {
-      if (!houseMap.has(houseIdx)) houseMap.set(houseIdx, [])
-      houseMap.get(houseIdx)!.push(pokemonNames[i]!)
-    }
-  }
+  // Merge all assignments
+  const allAssignments = new Map([...preAssignments, ...tailAssignments])
+  const unhoused = pokemonNames.filter((name) => !allAssignments.has(name))
 
   const houseAssignments: HouseAssignment[] = houses.map((h) => ({
     houseIndex: h.index,
     size: h.size,
     capacity: h.capacity,
-    pokemon: houseMap.get(h.index) ?? [],
+    pokemon: occupants.get(h.index) ?? [],
   }))
 
   return { houses: houseAssignments, unhoused }

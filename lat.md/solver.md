@@ -1,6 +1,6 @@
 # Solver
 
-Z3-based optimization module that assigns pokemon to houses, maximizing shared favorites between housemates.
+Pure greedy clustering module that assigns pokemon to houses, maximizing shared favorites between housemates. No external solver required.
 
 ## API
 
@@ -25,37 +25,25 @@ Returns a `SolverResult` with house assignments and any unhoused pokemon.
 
 Houses have fixed capacities: small (1 slot), medium (2 slots), large (4 slots).
 
-## Z3 Encoding
+## Three-Phase Assignment
 
-The solver uses Z3's `Optimize` class for multi-objective optimization.
+The solver runs three sequential phases, each handling a different tier of connectivity.
 
-### Variables
+### Phase 1: Agglomerative Clustering (large houses)
 
-One integer variable per pokemon: 0 means unhoused, 1..N maps to a specific house.
+Fills large houses (capacity 4) using [[lat.md/solver#Solver#Clustering Pre-assignment#agglomerativeCluster4]]. Only runs when `adjacencyData` is provided.
 
-### Constraints
+### Phase 2: Max-Weight Matching (medium houses)
 
-Domain bounds and per-house capacity limits enforce valid assignments.
+Fills medium houses (capacity 2) using [[lat.md/solver#Solver#Clustering Pre-assignment#greedyMaxWeightMatching]] on the pokemon remaining after Phase 1. Only runs when `adjacencyData` is provided.
 
-### Objectives
+### Phase 3: Greedy Tail Fill
 
-Two objectives in lexicographic order: first minimize unhoused count, then maximize total shared favorites between housemates. Pairs with zero shared favorites are pruned from the objective.
+Assigns all remaining unassigned pokemon to remaining slots via [[lat.md/solver#Solver#Clustering Pre-assignment#greedyFillRemaining]]. Runs for every call, regardless of whether `adjacencyData` was provided.
 
-## Browser Loading
+## Clustering Pre-assignment
 
-Z3's Emscripten pthreads need z3-built.js loaded as a classic script for correct worker URL resolution. Files are copied to `public/` by the `postinstall` script.
-
-At runtime, `solver.ts` dynamically inserts a `<script src="/z3-built.js">` tag before calling `init()`, setting `globalThis.initZ3` for the browser build. In Node.js (vitest), script loading is skipped.
-
-### Cross-Origin Isolation
-
-Z3's pthreads require `SharedArrayBuffer`, which is only available in cross-origin isolated contexts.
-
-The Vite dev and preview servers send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`. Production deployments must set these same headers.
-
-## Heuristic Pre-assignment
-
-Two-phase clustering reduces Z3's search space by fixing medium/large house slots before the solver runs. Implemented in [[src/heuristic.ts]].
+Two-phase clustering fills large and medium houses with the most highly-connected pokemon. Implemented in [[src/heuristic.ts]].
 
 ### AdjacencyData
 
@@ -69,9 +57,7 @@ Extracts an N×N sub-matrix for the input pokemon from the full adjacency data. 
 
 ### clusterPreAssign
 
-Orchestrates two-phase clustering to pre-assign pokemon to medium and large houses. See [[src/heuristic.ts#clusterPreAssign]].
-
-Phase 1 fills large houses using agglomerative clustering; phase 2 fills medium houses using greedy max-weight matching. Small houses and remaining pokemon are left for Z3.
+Orchestrates phases 1 and 2 to pre-assign pokemon to medium and large houses. See [[src/heuristic.ts#clusterPreAssign]].
 
 ### agglomerativeCluster4
 
@@ -91,9 +77,11 @@ Legacy single-phase heuristic, retained for comparison. See [[src/heuristic.ts#g
 
 For each medium/large house, picks an anchor (highest average connectivity across remaining pool) and its best-connected neighbor, assigns both to the house, and removes them from the pool.
 
-### Integration with Z3
+### greedyFillRemaining
 
-When `adjacencyData` is provided to `solve`, pre-assigned pokemon receive equality constraints (`assignment.eq(houseIndex)`) that collapse their variable domains before Z3 searches. Small houses and unassigned pokemon remain fully optimized by Z3.
+Greedy best-fit for the remaining unassigned pokemon after phases 1 and 2. See [[src/solver.ts#greedyFillRemaining]].
+
+Repeatedly picks the (pokemon, house) pair with the highest total shared favorites between the pokemon and the house's current occupants. Ties are broken by remaining capacity. Pokemon that cannot be placed become unhoused.
 
 ## Helpers
 
