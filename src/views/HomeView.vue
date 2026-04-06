@@ -10,6 +10,7 @@ import {
   BCol,
   BFormGroup,
   BFormInput,
+  BFormSelect,
   BListGroup,
   BRow,
   BSpinner,
@@ -31,6 +32,49 @@ const totalHouses = computed(() => small.value + medium.value + large.value)
 const loading = ref(false)
 const error = ref('')
 const result = ref<SolverResult | null>(null)
+
+interface SavedQuery {
+  timestamp: number
+  small: number
+  medium: number
+  large: number
+  pokemon: string[]
+}
+
+const STORAGE_KEY = 'pokehousing_saved_queries'
+
+function loadSavedQueries(): SavedQuery[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
+  } catch {
+    return []
+  }
+}
+
+const savedQueries = ref<SavedQuery[]>(loadSavedQueries())
+const selectedTimestamp = ref<number | null>(null)
+
+function saveQuery() {
+  const entry: SavedQuery = {
+    timestamp: Date.now(),
+    small: small.value,
+    medium: medium.value,
+    large: large.value,
+    pokemon: [...selectedPokemon.value],
+  }
+  savedQueries.value = [entry, ...savedQueries.value]
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(savedQueries.value))
+}
+
+watch(selectedTimestamp, (ts) => {
+  if (ts === null) return
+  const query = savedQueries.value.find((q) => q.timestamp === ts)
+  if (!query) return
+  small.value = query.small
+  medium.value = query.medium
+  large.value = query.large
+  selectedPokemon.value = [...query.pokemon]
+})
 
 onMounted(async () => {
   const resp = await fetch('/pokemon_favorites.json')
@@ -70,6 +114,8 @@ watch(
   },
   { deep: true },
 )
+
+defineExpose({ small, medium, large, selectedPokemon })
 </script>
 
 <template>
@@ -104,9 +150,33 @@ watch(
       </BCardBody>
     </BCard>
 
-    <BButton variant="outline-secondary" class="mb-2" :disabled="!pokemonData" @click="loadSample">
-      Show a sample island
-    </BButton>
+    <div class="d-flex gap-2 align-items-start flex-wrap mb-2">
+      <BButton variant="outline-secondary" :disabled="!pokemonData" @click="loadSample">
+        Show a sample island
+      </BButton>
+      <BButton variant="outline-primary" :disabled="!pokemonData" @click="saveQuery">
+        Save query
+      </BButton>
+    </div>
+
+    <BFormGroup
+      v-if="savedQueries.length"
+      label="Restore saved query"
+      label-for="saved-queries-select"
+      class="mb-2"
+    >
+      <BFormSelect
+        id="saved-queries-select"
+        v-model="selectedTimestamp"
+        :options="[
+          { value: null, text: 'Select a saved query…' },
+          ...savedQueries.map((q) => ({
+            value: q.timestamp,
+            text: new Date(q.timestamp).toLocaleString(),
+          })),
+        ]"
+      />
+    </BFormGroup>
 
     <BSpinner v-if="loading" class="my-2" />
   </div>

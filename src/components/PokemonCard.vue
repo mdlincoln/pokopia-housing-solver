@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BBadge, BCard } from 'bootstrap-vue-next'
+import { BBadge, BCard, type ColorVariant } from 'bootstrap-vue-next'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -11,7 +11,7 @@ const props = defineProps<{
 
 const imgURL = computed(() => `https://pokopia-roommate-matchmaker.netlify.app/${props.image}`)
 
-const HABITAT_VARIANT: Record<string, string> = {
+const HABITAT_VARIANT: Record<string, ColorVariant> = {
   Dark: 'dark',
   Bright: 'warning',
   Cool: 'info',

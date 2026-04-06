@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import PokemonCard from '@/components/PokemonCard.vue'
 import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/solver'
-import { BBadge, BCardGroup, BListGroupItem } from 'bootstrap-vue-next'
+import { BBadge, BCardGroup, BListGroupItem, type ColorVariant } from 'bootstrap-vue-next'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -15,7 +15,7 @@ const sharedFavorites = computed(() => {
   return rankHouseFavorites(sets)
 })
 
-const HABITAT_VARIANT: Record<string, string> = {
+const HABITAT_VARIANT: Record<string, ColorVariant> = {
   Dark: 'dark',
   Bright: 'warning',
   Cool: 'info',
