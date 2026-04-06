@@ -57,6 +57,7 @@ const savedQueries = ref<SavedQuery[]>(loadSavedQueries())
 const selectedTimestamp = ref<number | null>(null)
 const queryTitle = ref('')
 const showSaveModal = ref(false)
+const saveSuccess = ref(false)
 
 function openSaveModal() {
   queryTitle.value = ''
@@ -74,6 +75,10 @@ function confirmSave() {
   }
   savedQueries.value = [entry, ...savedQueries.value]
   localStorage.setItem(STORAGE_KEY, JSON.stringify(savedQueries.value))
+  saveSuccess.value = true
+  setTimeout(() => {
+    saveSuccess.value = false
+  }, 3000)
 }
 
 watch(selectedTimestamp, (ts) => {
@@ -169,13 +174,16 @@ defineExpose({ small, medium, large, selectedPokemon, queryTitle, confirmSave })
       </BButton>
     </div>
 
+    <BAlert v-if="saveSuccess" variant="success" :model-value="true" class="mb-2">
+      Query saved successfully.
+    </BAlert>
+
     <BModal v-model="showSaveModal" title="Save query" ok-title="Save" @ok="confirmSave">
       <BFormGroup label="Title (optional)" label-for="query-title-input">
         <BFormInput
           id="query-title-input"
           v-model="queryTitle"
           placeholder="e.g. My island layout"
-          autofocus
         />
       </BFormGroup>
     </BModal>

@@ -18,9 +18,17 @@ Pokemon data is fetched from `/pokemon_favorites.json` on mount. The solver runs
 
 Persists query configurations (house counts + selected pokemon) to `localStorage` (`pokehousing_saved_queries`) as a JSON array of `SavedQuery` objects. New entries are prepended so the most recent appears first.
 
-Clicking "Save query" opens a `BModal` prompting for an optional title. Confirming saves the entry; cancelling discards it. The `SavedQuery` object includes a `title: string` field alongside `timestamp`, `small`, `medium`, `large`, and `pokemon`.
+Clicking "Save query" opens a `BModal` prompting for an optional title. The modal uses `@shown` to focus the title input immediately on open. Confirming saves the entry; cancelling discards it. The `SavedQuery` object includes a `title: string` field alongside `timestamp`, `small`, `medium`, `large`, and `pokemon`. A temporary success `BAlert` is shown for 3 seconds after a query is saved.
 
 When saved queries exist, a `BFormSelect` dropdown appears. The timestamp is always shown. When an entry has a non-empty `title`, it is displayed first followed by the timestamp in parentheses (e.g. `My title (4/6/2026, 3:00:00 PM)`); untitled entries show only the timestamp. Selecting an entry restores all four fields into the reactive refs, triggering the solver watcher automatically.
+
+#### Focuses input on modal open
+
+Verifies that when the save modal is opened, the title input receives keyboard focus immediately so the user can start typing without clicking.
+
+#### Shows success alert after save
+
+Verifies that after confirming the save modal, a success alert appears and then disappears automatically after 3 seconds.
 
 #### Saves title with query
 
