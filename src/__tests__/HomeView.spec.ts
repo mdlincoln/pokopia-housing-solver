@@ -141,4 +141,38 @@ describe('HomeView', () => {
     expect(errorEl.exists()).toBe(true)
     expect(errorEl.text()).toContain('Solver exploded')
   })
+
+  // @lat: [[ui#HomeView#Saved Queries#Saves title with query]]
+  it('saves query with title to localStorage', async () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem')
+
+    const wrapper = await mountHome()
+    wrapper.vm.small = 1
+    wrapper.vm.selectedPokemon = ['AlphaOne']
+    wrapper.vm.queryTitle = 'My favourite island'
+    wrapper.vm.confirmSave()
+
+    expect(setItem).toHaveBeenCalledWith(
+      'pokehousing_saved_queries',
+      expect.stringContaining('"title":"My favourite island"'),
+    )
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#Shows title in restore dropdown]]
+  it('restores query showing title in dropdown', async () => {
+    const entry = {
+      title: 'Jungle paradise',
+      timestamp: 1700000000000,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['AlphaOne'],
+    }
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([entry]))
+
+    const wrapper = await mountHome()
+
+    const select = wrapper.find('#saved-queries-select')
+    expect(select.html()).toContain('Jungle paradise')
+  })
 })

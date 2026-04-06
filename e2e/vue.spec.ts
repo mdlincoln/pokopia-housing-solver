@@ -95,6 +95,51 @@ test.describe('Homepage', () => {
     await expect(habitatBadge).toBeVisible()
   })
 
+  test('saves query with title and shows it in restore dropdown', async ({ page }) => {
+    await page.goto('/')
+
+    const inputs = page.locator('input[type="number"]')
+    await inputs.nth(0).fill('1')
+
+    // Open the save modal
+    await page.getByRole('button', { name: 'Save query' }).click()
+    const modal = page.getByRole('dialog')
+    await expect(modal).toBeVisible()
+
+    // Enter a title and confirm
+    await modal.getByLabel('Title (optional)').fill('My test query')
+    await modal.getByRole('button', { name: 'Save' }).click()
+    await expect(modal).toBeHidden()
+
+    // Restore dropdown should show the title
+    const select = page.locator('#saved-queries-select')
+    await expect(select).toBeVisible()
+    await expect(select.locator('option', { hasText: 'My test query' })).toHaveCount(1)
+  })
+
+  test('saves query without title and shows timestamp fallback in dropdown', async ({ page }) => {
+    await page.goto('/')
+
+    const inputs = page.locator('input[type="number"]')
+    await inputs.nth(0).fill('1')
+
+    // Open the save modal and confirm without entering a title
+    await page.getByRole('button', { name: 'Save query' }).click()
+    const modal = page.getByRole('dialog')
+    await expect(modal).toBeVisible()
+    await modal.getByRole('button', { name: 'Save' }).click()
+    await expect(modal).toBeHidden()
+
+    // Restore dropdown should show a non-empty label that is not blank
+    const select = page.locator('#saved-queries-select')
+    await expect(select).toBeVisible()
+    // The second option (index 1) should be a timestamp string, not empty
+    const option = select.locator('option').nth(1)
+    const text = await option.textContent()
+    expect(text?.trim().length).toBeGreaterThan(0)
+    expect(text?.trim()).not.toBe('My test query')
+  })
+
   test('displays shared habitat badge on house card', async ({ page }) => {
     await page.goto('/')
 

@@ -12,6 +12,7 @@ import {
   BFormInput,
   BFormSelect,
   BListGroup,
+  BModal,
   BRow,
   BSpinner,
 } from 'bootstrap-vue-next'
@@ -34,6 +35,7 @@ const error = ref('')
 const result = ref<SolverResult | null>(null)
 
 interface SavedQuery {
+  title: string
   timestamp: number
   small: number
   medium: number
@@ -53,9 +55,17 @@ function loadSavedQueries(): SavedQuery[] {
 
 const savedQueries = ref<SavedQuery[]>(loadSavedQueries())
 const selectedTimestamp = ref<number | null>(null)
+const queryTitle = ref('')
+const showSaveModal = ref(false)
 
-function saveQuery() {
+function openSaveModal() {
+  queryTitle.value = ''
+  showSaveModal.value = true
+}
+
+function confirmSave() {
   const entry: SavedQuery = {
+    title: queryTitle.value.trim(),
     timestamp: Date.now(),
     small: small.value,
     medium: medium.value,
@@ -115,7 +125,7 @@ watch(
   { deep: true },
 )
 
-defineExpose({ small, medium, large, selectedPokemon })
+defineExpose({ small, medium, large, selectedPokemon, queryTitle, confirmSave })
 </script>
 
 <template>
@@ -154,10 +164,21 @@ defineExpose({ small, medium, large, selectedPokemon })
       <BButton variant="outline-secondary" :disabled="!pokemonData" @click="loadSample">
         Show a sample island
       </BButton>
-      <BButton variant="outline-primary" :disabled="!pokemonData" @click="saveQuery">
+      <BButton variant="outline-primary" :disabled="!pokemonData" @click="openSaveModal">
         Save query
       </BButton>
     </div>
+
+    <BModal v-model="showSaveModal" title="Save query" ok-title="Save" @ok="confirmSave">
+      <BFormGroup label="Title (optional)" label-for="query-title-input">
+        <BFormInput
+          id="query-title-input"
+          v-model="queryTitle"
+          placeholder="e.g. My island layout"
+          autofocus
+        />
+      </BFormGroup>
+    </BModal>
 
     <BFormGroup
       v-if="savedQueries.length"
@@ -172,7 +193,7 @@ defineExpose({ small, medium, large, selectedPokemon })
           { value: null, text: 'Select a saved query…' },
           ...savedQueries.map((q) => ({
             value: q.timestamp,
-            text: new Date(q.timestamp).toLocaleString(),
+            text: q.title || new Date(q.timestamp).toLocaleString(),
           })),
         ]"
       />

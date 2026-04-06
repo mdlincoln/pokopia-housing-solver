@@ -16,9 +16,19 @@ Pokemon data is fetched from `/pokemon_favorites.json` on mount. The solver runs
 
 ### Saved Queries
 
-A "Save query" button persists the current house counts and selected pokemon to `localStorage` (`pokehousing_saved_queries`) as a JSON array of `SavedQuery` objects. New entries are prepended so the most recent appears first.
+Persists query configurations (house counts + selected pokemon) to `localStorage` (`pokehousing_saved_queries`) as a JSON array of `SavedQuery` objects. New entries are prepended so the most recent appears first.
 
-When saved queries exist, a `BFormSelect` dropdown appears showing each entry's timestamp via `Date.toLocaleString()`. Selecting an entry restores all four fields into the reactive refs, triggering the solver watcher automatically.
+Clicking "Save query" opens a `BModal` prompting for an optional title. Confirming saves the entry; cancelling discards it. The `SavedQuery` object includes a `title: string` field alongside `timestamp`, `small`, `medium`, `large`, and `pokemon`.
+
+When saved queries exist, a `BFormSelect` dropdown appears. Each entry shows its `title` if non-empty, falling back to `Date.toLocaleString()` for untitled saves and for entries saved before this feature was added. Selecting an entry restores all four fields into the reactive refs, triggering the solver watcher automatically.
+
+#### Saves title with query
+
+Verifies that when the user provides a title in the save modal and confirms, the stored `SavedQuery` entry has the `title` field set to the provided value.
+
+#### Shows title in restore dropdown
+
+Verifies that when a saved query has a non-empty title, the restore dropdown option displays the title rather than the timestamp string.
 
 ### Results Display
 
