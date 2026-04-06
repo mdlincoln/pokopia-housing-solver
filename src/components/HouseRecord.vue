@@ -20,16 +20,6 @@ const sharedFavorites = computed(() => {
   <BListGroupItem data-testid="house-card">
     <h5 class="mb-1">{{ house.size }} house #{{ house.houseIndex }}</h5>
     <p class="text-muted mb-2">Capacity: {{ house.capacity }}</p>
-    <BCardGroup v-if="house.pokemon.length > 0">
-      <PokemonCard
-        v-for="name in house.pokemon"
-        :key="name"
-        :name="name"
-        :image="pokemonData[name]!.image"
-        :favorites="pokemonData[name]!.favorites"
-      />
-    </BCardGroup>
-    <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
     <div v-if="sharedFavorites.length" class="mt-2">
       <strong>Shared interests</strong>
       <div class="mt-1">
@@ -44,5 +34,15 @@ const sharedFavorites = computed(() => {
         </BBadge>
       </div>
     </div>
+    <BCardGroup v-if="house.pokemon.length > 0">
+      <PokemonCard
+        v-for="name in house.pokemon"
+        :key="name"
+        :name="name"
+        :image="pokemonData[name]!.image"
+        :favorites="pokemonData[name]!.favorites"
+      />
+    </BCardGroup>
+    <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
   </BListGroupItem>
 </template>

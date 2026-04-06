@@ -100,7 +100,7 @@ async function onSubmit() {
 
   <section v-if="result" data-testid="results" class="mt-4">
     <h2>Results</h2>
-    <BListGroup class="w-100">
+    <BListGroup class="w-100" flush>
       <HouseRecord
         v-for="house in result.houses"
         :key="house.houseIndex"
