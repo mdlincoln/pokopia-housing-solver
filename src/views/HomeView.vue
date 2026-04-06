@@ -4,6 +4,7 @@ import PokemonSelect from '@/components/PokemonSelect.vue'
 import { solve, type PokemonData, type SolverResult } from '@/solver'
 import {
   BAlert,
+  BButton,
   BCard,
   BCardBody,
   BCol,
@@ -36,6 +37,15 @@ onMounted(async () => {
   const data: PokemonData = await resp.json()
   pokemonData.value = data
 })
+
+function loadSample() {
+  small.value = 1
+  medium.value = 3
+  large.value = 2
+  const names = pokemonNames.value
+  const shuffled = [...names].sort(() => Math.random() - 0.5)
+  selectedPokemon.value = shuffled.slice(0, 13)
+}
 
 watch(
   [selectedPokemon, small, medium, large, pokemonData],
@@ -93,6 +103,10 @@ watch(
         <PokemonSelect v-model="selectedPokemon" :pokemon-names="pokemonNames" />
       </BCardBody>
     </BCard>
+
+    <BButton variant="outline-secondary" class="mb-2" :disabled="!pokemonData" @click="loadSample">
+      Show a sample island
+    </BButton>
 
     <BSpinner v-if="loading" class="my-2" />
   </div>

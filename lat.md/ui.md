@@ -4,11 +4,13 @@ Vue 3 homepage styled with Bootstrap Vue Next (`bootstrap-vue-next`) that lets u
 
 ## HomeView
 
-The main page at `/`, implemented in `src/views/HomeView.vue`. Uses Bootstrap Vue Next components (`BCard`, `BRow`/`BCol`, `BFormGroup`, `BFormInput`, `BAlert`, `BListGroup`) with no custom CSS.
+The main page at `/`, implemented in `src/views/HomeView.vue`. Uses Bootstrap Vue Next components (`BCard`, `BButton`, `BRow`/`BCol`, `BFormGroup`, `BFormInput`, `BAlert`, `BListGroup`) with no custom CSS.
 
 ### Form
 
 Users set house counts via `BFormInput` (type number) in a `BRow` grid and select pokemon with an autocomplete multi-select. Results update automatically via Vue `watch` whenever inputs change — there is no submit button.
+
+A "Show a sample island" button prefills the form with 1 small, 3 medium, 2 large houses and 13 randomly chosen pokemon. It is disabled until pokemon data has loaded.
 
 Pokemon data is fetched from `/pokemon_favorites.json` on mount. The solver runs whenever `pokemonData` is loaded and at least one house is configured; otherwise results are hidden.
 
