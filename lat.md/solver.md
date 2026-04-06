@@ -1,6 +1,6 @@
 # Solver
 
-Pure greedy clustering module that assigns pokemon to houses, maximizing shared favorites between housemates. No external solver required.
+Assigns pokemon to houses maximizing shared favorites between housemates using a three-phase clustering pipeline. All code lives in [[src/solver.ts]].
 
 ## API
 
@@ -8,11 +8,12 @@ The solver exposes a single async `solve` function and supporting types via [[sr
 
 ### Inputs
 
-The function accepts three arguments describing the optimization problem.
+The function accepts four arguments describing the optimization problem.
 
 - `pokemonNames: string[]` — names matching keys in `public/pokemon_favorites.json`
 - `housingConfig: HousingConfig` — `{ small: number, medium: number, large: number }` specifying house counts
 - `pokemonData: PokemonData` — the favorites dataset keyed by pokemon name
+- `adjacencyData?: AdjacencyData` — optional precomputed compatibility matrix; enables the clustering phases
 
 ### Outputs
 
@@ -25,25 +26,51 @@ Returns a `SolverResult` with house assignments and any unhoused pokemon.
 
 Houses have fixed capacities: small (1 slot), medium (2 slots), large (4 slots).
 
-## Three-Phase Assignment
+## Clustering Pipeline
 
-The solver runs three sequential phases, each handling a different tier of connectivity.
+The solver assigns pokemon through three sequential phases, each targeting a house-size tier. The strategy is to lock in the highest-value groupings first (where grouping matters most) and let the remaining pokemon fill the gaps.
+
+```
+                     Extract local N×N          Assign tightly-connected
+                     compatibility matrix       groups to multi-slot houses
+                     from full adjacency        ┌────────────────────────┐
+                            │                   │                        │
+adjacencyData ──► buildSubMatrix ──► clusterPreAssign ──┐                │
+                                        │                │               │
+                            agglomerativeCluster4   greedyMaxWeightMatching
+                            (large houses cap 4)    (medium houses cap 2)
+                                        │                │
+                                        └───────┬────────┘
+                                                ▼
+                                      greedyFillRemaining
+                                      Fill all remaining slots
+                                      one pokemon at a time
+                                                │
+                                                ▼
+                                          SolverResult
+```
 
 ### Phase 1: Agglomerative Clustering (large houses)
 
 Fills large houses (capacity 4) using [[lat.md/solver#Solver#Clustering Pre-assignment#agglomerativeCluster4]]. Only runs when `adjacencyData` is provided.
 
+Large houses benefit most from clustering because they have the most internal edges (6 pairwise connections). HAC with average-linkage naturally finds tightly-connected groups, and the size-4 cap prevents over-merging.
+
 ### Phase 2: Max-Weight Matching (medium houses)
 
 Fills medium houses (capacity 2) using [[lat.md/solver#Solver#Clustering Pre-assignment#greedyMaxWeightMatching]] on the pokemon remaining after Phase 1. Only runs when `adjacencyData` is provided.
+
+With only one internal edge per house, medium houses reduce to a maximum-weight matching problem. The greedy approach (sort edges, pick non-overlapping) is fast and produces near-optimal results.
 
 ### Phase 3: Greedy Tail Fill
 
 Assigns all remaining unassigned pokemon to remaining slots via [[lat.md/solver#Solver#Clustering Pre-assignment#greedyFillRemaining]]. Runs for every call, regardless of whether `adjacencyData` was provided.
 
+This phase handles small houses (capacity 1, no clustering benefit), any leftover slots in partially-filled houses, and the entire assignment when no adjacencyData is available.
+
 ## Clustering Pre-assignment
 
-Two-phase clustering fills large and medium houses with the most highly-connected pokemon. Implemented in [[src/heuristic.ts]].
+Functions that implement the clustering phases. All live in [[src/solver.ts]].
 
 ### AdjacencyData
 
@@ -61,33 +88,37 @@ Pokemon habitat values map to three axes: light (`Dark`/`Bright`), temperature (
 
 ### buildSubMatrix
 
-Extracts an N×N sub-matrix for the input pokemon from the full adjacency data. See [[src/heuristic.ts#buildSubMatrix]].
+Extracts an N×N sub-matrix for the selected pokemon from the full adjacency data. See [[src/solver.ts#buildSubMatrix]].
+
+Converts the global pokemon-index space into a compact local-index space that the clustering functions operate on. This avoids passing the full adjacency matrix (which covers all ~150 pokemon) into algorithms that only need the ~10–20 selected ones.
 
 ### clusterPreAssign
 
-Orchestrates phases 1 and 2 to pre-assign pokemon to medium and large houses. See [[src/heuristic.ts#clusterPreAssign]].
+Orchestrates phases 1 and 2: calls agglomerativeCluster4 then greedyMaxWeightMatching. See [[src/solver.ts#clusterPreAssign]].
+
+Separates houses by size, runs each clustering algorithm, and returns a Map from pokemon name → house index. Small houses are deliberately skipped — they have only one slot, so clustering adds no value.
 
 ### agglomerativeCluster4
 
-Size-constrained agglomerative clustering for large houses (capacity 4). See [[src/heuristic.ts#agglomerativeCluster4]].
+Hierarchical agglomerative clustering with average-linkage, capped at size 4. See [[src/solver.ts#agglomerativeCluster4]].
 
-Starts with each pokemon as a singleton cluster. Repeatedly merges the highest average-linkage pair, subject to merged size not exceeding 4. Clusters that reach size 4 are frozen as candidates and ranked by total internal pairwise weight.
+Starts with each pokemon as a singleton cluster. Repeatedly merges the highest average-linkage pair, subject to merged size not exceeding 4. Clusters that reach size 4 are frozen as candidates and ranked by total internal pairwise weight. The `available` set is not mutated — the caller tracks which indices are consumed.
 
 ### greedyMaxWeightMatching
 
-Greedy maximum weight matching for medium houses (capacity 2). See [[src/heuristic.ts#greedyMaxWeightMatching]].
+Greedy maximum-weight matching on the remaining available pokemon. See [[src/solver.ts#greedyMaxWeightMatching]].
 
-Collects all edges between available nodes, sorts by weight descending, and greedily picks non-overlapping edges. Returns up to the requested number of pairs.
+Collects all weighted edges between available nodes, sorts by weight descending, and greedily picks non-overlapping edges. Returns up to the requested number of pairs. Runs after agglomerativeCluster4 has already consumed the most tightly-connected groups.
 
 ### greedyFillRemaining
 
-Greedy best-fit for the remaining unassigned pokemon after phases 1 and 2. See [[src/solver.ts#greedyFillRemaining]].
+Greedy best-fit for all remaining unassigned pokemon. See [[src/solver.ts#greedyFillRemaining]].
 
-Repeatedly picks the (pokemon, house) pair with the highest total shared favorites between the pokemon and the house's current occupants. Ties are broken by remaining capacity. Pokemon that cannot be placed become unhoused. When `adjacencyData` is provided, uses precomputed scores (including habitat bonuses/penalties) and skips any house where an existing occupant has a negative adjacency score with the candidate, enforcing the hard incompatibility constraint.
+Repeatedly picks the (pokemon, house) pair with the highest total affinity between the pokemon and the house's current occupants. Ties are broken by remaining capacity. When `adjacencyData` is provided, uses precomputed scores (including habitat bonuses/penalties) and rejects any house where an existing occupant has a negative adjacency score with the candidate (hard incompatibility). Without adjacencyData, falls back to counting raw shared favorites on the fly.
 
 ## Helpers
 
-Exported utility functions used internally and in tests.
+Exported utility functions used internally and in the UI.
 
 ### enumerateHouses
 
@@ -97,6 +128,10 @@ Flattens a `HousingConfig` into an ordered list of houses with indices and capac
 
 Returns the number of overlapping favorites between two pokemon. See [[src/solver.ts#countSharedFavorites]].
 
+Used by greedyFillRemaining as the fallback scoring function when no precomputed adjacencyData is available.
+
 ### rankHouseFavorites
 
-Takes an array of favorite `Set<string>` values (one per pokemon) and returns a ranked list of `{ favorite, count }` objects sorted by overlap count descending. Only includes favorites shared by at least two pokemon. See [[src/solver.ts#rankHouseFavorites]].
+Ranks favorites by how many pokemon in a house share them. See [[src/solver.ts#rankHouseFavorites]].
+
+Takes an array of favorite `Set<string>` values (one per pokemon) and returns a ranked list of `{ favorite, count }` objects sorted by overlap count descending. Only includes favorites shared by at least two pokemon. Used by the UI to display house-level favorite summaries.
