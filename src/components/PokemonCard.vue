@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { BBadge, BCard, type ColorVariant } from 'bootstrap-vue-next'
+import {
+  BBadge,
+  BCard,
+  BCardBody,
+  BCardImg,
+  BCol,
+  BRow,
+  type ColorVariant,
+} from 'bootstrap-vue-next'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -26,18 +34,31 @@ const habitatVariant = computed(() =>
 </script>
 
 <template>
-  <BCard :title="name" :img-src="imgURL" style="max-width: 15rem"
-    ><template #footer>
-      <BBadge
-        v-if="habitat && habitatVariant"
-        :variant="habitatVariant"
-        pill
-        class="me-1 mb-1"
-        data-testid="habitat-badge"
-      >
-        {{ habitat }}
-      </BBadge>
-      <small v-for="fav in favorites" class="text-body-secondary" :key="fav">{{ fav }} </small>
-    </template>
+  <BCard no-body class="overflow-hidden">
+    <BRow class="g-0">
+      <BCol cols="auto">
+        <BCardImg :src="imgURL" :alt="name" class="rounded-0 m-2" style="width: 6rem" />
+      </BCol>
+      <BCol>
+        <BCardBody :title="name">
+          <div v-if="habitat && habitatVariant">
+            <BBadge :variant="habitatVariant" pill class="me-1 mb-1" data-testid="habitat-badge">
+              {{ habitat }}
+            </BBadge>
+          </div>
+          <div v-if="favorites">
+            <BBadge
+              v-for="fav in favorites"
+              :key="fav"
+              pill
+              class="me-1 mb-1"
+              data-testid="fave-badge"
+            >
+              {{ fav }}
+            </BBadge>
+          </div>
+        </BCardBody>
+      </BCol>
+    </BRow>
   </BCard>
 </template>

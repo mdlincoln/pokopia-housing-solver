@@ -120,9 +120,9 @@ defineExpose({ small, medium, large, selectedPokemon })
 
 <template>
   <div>
-    <BCard class="mb-3">
-      <BCardBody>
-        <h5 class="card-title">Houses</h5>
+    <BCard class="mb-1">
+      <BCardBody class="p-1">
+        <h5>Houses</h5>
         <BRow>
           <BCol sm="4">
             <BFormGroup label="Small (1 slot)" label-for="house-small">
@@ -140,13 +140,10 @@ defineExpose({ small, medium, large, selectedPokemon })
             </BFormGroup>
           </BCol>
         </BRow>
-      </BCardBody>
-    </BCard>
-
-    <BCard class="mb-3">
-      <BCardBody>
-        <h5 class="card-title">Pokemon</h5>
-        <PokemonSelect v-model="selectedPokemon" :pokemon-names="pokemonNames" />
+        <h5>Pokemon</h5>
+        <BRow>
+          <PokemonSelect v-model="selectedPokemon" :pokemon-names="pokemonNames" />
+        </BRow>
       </BCardBody>
     </BCard>
 
