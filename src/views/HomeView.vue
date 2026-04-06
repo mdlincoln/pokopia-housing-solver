@@ -4,18 +4,16 @@ import PokemonSelect from '@/components/PokemonSelect.vue'
 import { solve, type PokemonData, type SolverResult } from '@/solver'
 import {
   BAlert,
-  BButton,
   BCard,
   BCardBody,
   BCol,
-  BForm,
   BFormGroup,
   BFormInput,
   BListGroup,
   BRow,
   BSpinner,
 } from 'bootstrap-vue-next'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 const pokemonData = ref<PokemonData | null>(null)
 const pokemonNames = computed(() =>
@@ -27,6 +25,8 @@ const small = ref(0)
 const medium = ref(0)
 const large = ref(0)
 
+const totalHouses = computed(() => small.value + medium.value + large.value)
+
 const loading = ref(false)
 const error = ref('')
 const result = ref<SolverResult | null>(null)
@@ -37,27 +37,33 @@ onMounted(async () => {
   pokemonData.value = data
 })
 
-async function onSubmit() {
-  if (!pokemonData.value) return
-  loading.value = true
-  error.value = ''
-  result.value = null
-  try {
-    result.value = await solve(
-      selectedPokemon.value,
-      { small: small.value, medium: medium.value, large: large.value },
-      pokemonData.value,
-    )
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Solver failed'
-  } finally {
-    loading.value = false
-  }
-}
+watch(
+  [selectedPokemon, small, medium, large, pokemonData],
+  async () => {
+    if (!pokemonData.value || totalHouses.value === 0) {
+      result.value = null
+      return
+    }
+    loading.value = true
+    error.value = ''
+    try {
+      result.value = await solve(
+        selectedPokemon.value,
+        { small: small.value, medium: medium.value, large: large.value },
+        pokemonData.value,
+      )
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Solver failed'
+    } finally {
+      loading.value = false
+    }
+  },
+  { deep: true },
+)
 </script>
 
 <template>
-  <BForm @submit.prevent="onSubmit">
+  <div>
     <BCard class="mb-3">
       <BCardBody>
         <h5 class="card-title">Houses</h5>
@@ -88,11 +94,8 @@ async function onSubmit() {
       </BCardBody>
     </BCard>
 
-    <BButton type="submit" variant="primary" :disabled="loading">
-      <BSpinner v-if="loading" small class="me-1" />
-      {{ loading ? 'Solving...' : 'Solve' }}
-    </BButton>
-  </BForm>
+    <BSpinner v-if="loading" class="my-2" />
+  </div>
 
   <BAlert v-if="error" variant="danger" :model-value="true" data-testid="error" class="mt-3">
     {{ error }}

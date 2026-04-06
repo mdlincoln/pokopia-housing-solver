@@ -13,7 +13,6 @@ test.describe('Homepage', () => {
     await expect(page.locator('h1')).toHaveText('Pokemon Housing')
     await expect(page.locator('input[type="number"]')).toHaveCount(3)
     await expect(page.getByPlaceholder('Search pokemon...')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Solve' })).toBeVisible()
 
     await expect(page.getByTestId('results')).toBeHidden()
   })
@@ -30,9 +29,6 @@ test.describe('Homepage', () => {
     await selectPokemon(page, 'Bulbasaur')
     await selectPokemon(page, 'Ivysaur')
     await selectPokemon(page, 'Charmander')
-
-    // Solve
-    await page.getByRole('button', { name: 'Solve' }).click()
 
     // Wait for results
     await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
@@ -59,7 +55,6 @@ test.describe('Homepage', () => {
     await selectPokemon(page, 'Ivysaur')
     await selectPokemon(page, 'Venusaur')
 
-    await page.getByRole('button', { name: 'Solve' }).click()
     await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
 
     // Should have unhoused section with 2 pokemon
@@ -76,7 +71,6 @@ test.describe('Homepage', () => {
     await inputs.nth(0).fill('1')
     await inputs.nth(1).fill('1')
 
-    await page.getByRole('button', { name: 'Solve' }).click()
     await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
 
     // Houses should render but be empty
