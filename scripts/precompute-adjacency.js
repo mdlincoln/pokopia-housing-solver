@@ -20,6 +20,13 @@ const n = pokemon.length
 // Build favorite sets once
 const favSets = pokemon.map((name) => new Set(data[name].favorites))
 
+// Habitat opposites — pairs that can never be housed together
+const OPPOSITE = {
+  Dark: 'Bright', Bright: 'Dark',
+  Cool: 'Warm',   Warm: 'Cool',
+  Dry: 'Humid',   Humid: 'Dry',
+}
+
 // Dense N×N matrix, initialized to 0
 const matrix = Array.from({ length: n }, () => Array.from({ length: n }, () => 0))
 
@@ -28,6 +35,16 @@ for (let i = 0; i < n; i++) {
     let shared = 0
     for (const fav of favSets[i]) {
       if (favSets[j].has(fav)) shared++
+    }
+    const habA = data[pokemon[i]].habitat
+    const habB = data[pokemon[j]].habitat
+    if (habA && habB) {
+      if (habA === habB) {
+        shared += 1            // same habitat: bonus like a shared favorite
+      } else if (OPPOSITE[habA] === habB) {
+        shared = -1            // opposite axis: hard incompatibility
+      }
+      // different axes: neutral, no change
     }
     matrix[i][j] = shared
     matrix[j][i] = shared

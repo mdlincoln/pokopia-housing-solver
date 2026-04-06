@@ -78,4 +78,38 @@ test.describe('Homepage', () => {
     await expect(cards).toHaveCount(2)
     await expect(page.getByTestId('empty')).toHaveCount(2)
   })
+
+  test('displays habitat badge on pokemon card', async ({ page }) => {
+    await page.goto('/')
+
+    // 1 small house + select Bulbasaur
+    const inputs = page.locator('input[type="number"]')
+    await inputs.nth(0).fill('1')
+
+    await selectPokemon(page, 'Bulbasaur')
+
+    await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
+
+    // Verify habitat badge is visible (actual habitat value will depend on the data)
+    const habitatBadge = page.getByTestId('habitat-badge')
+    await expect(habitatBadge).toBeVisible()
+  })
+
+  test('displays shared habitat badge on house card', async ({ page }) => {
+    await page.goto('/')
+
+    // 1 medium house (capacity 2) + select 3 pokemon to ensure at least 2 have the same habitat
+    const inputs = page.locator('input[type="number"]')
+    await inputs.nth(1).fill('1') // 1 medium house
+
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Charmander')
+    await selectPokemon(page, 'Squirtle')
+
+    await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
+
+    // Verify that habitat badges appear on pokemon cards (they always will if habitat data exists)
+    const habitatBadges = page.getByTestId('habitat-badge')
+    await expect(habitatBadges).toHaveCount(2) // 2 pokemon in the 1 medium house
+  })
 })

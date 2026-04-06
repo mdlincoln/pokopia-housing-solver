@@ -3,7 +3,7 @@ import { buildSubMatrix, clusterPreAssign, type AdjacencyData } from './heuristi
 export type { AdjacencyData }
 
 export interface PokemonData {
-  [name: string]: { image: string; favorites: string[] }
+  [name: string]: { image: string; favorites: string[]; habitat?: string }
 }
 
 export type HousingConfig = Record<HouseSize, number>
@@ -81,15 +81,24 @@ export function countSharedFavorites(nameA: string, nameB: string, data: Pokemon
  * assigns it. Ties (including zero-score pairs) are broken by assigning to the
  * house with the most remaining capacity. Pokemon that cannot be placed (no
  * remaining capacity anywhere) are returned as unhoused.
+ *
+ * When adjacencyData is provided, uses precomputed scores (which include
+ * habitat bonuses/penalties) and skips any house where an existing occupant
+ * has a negative adjacency score with the candidate (hard incompatibility).
  */
 function greedyFillRemaining(
   remaining: string[],
   occupants: Map<number, string[]>,
   remainingCapacity: Map<number, number>,
   pokemonData: PokemonData,
+  adjacencyData?: AdjacencyData,
 ): Map<string, number> {
   const result = new Map<string, number>()
   const pool = new Set(remaining)
+
+  const nameToIdx = adjacencyData
+    ? new Map(adjacencyData.pokemon.map((name, i) => [name, i]))
+    : null
 
   while (pool.size > 0) {
     let bestScore = -1
@@ -98,12 +107,25 @@ function greedyFillRemaining(
     let bestHouseCapacity = -1
 
     for (const name of pool) {
+      const fullI = nameToIdx?.get(name)
       for (const [houseIdx, cap] of remainingCapacity) {
         if (cap <= 0) continue
         let score = 0
+        let incompatible = false
         for (const occupant of occupants.get(houseIdx) ?? []) {
-          score += countSharedFavorites(name, occupant, pokemonData)
+          if (adjacencyData && fullI !== undefined) {
+            const fullJ = nameToIdx!.get(occupant)
+            const val = fullJ !== undefined ? (adjacencyData.matrix[fullI]![fullJ] ?? 0) : 0
+            if (val < 0) {
+              incompatible = true
+              break
+            }
+            score += val
+          } else {
+            score += countSharedFavorites(name, occupant, pokemonData)
+          }
         }
+        if (incompatible) continue
         // Prefer higher score; break ties by larger remaining capacity
         if (score > bestScore || (score === bestScore && cap > bestHouseCapacity)) {
           bestScore = score
@@ -182,7 +204,13 @@ export async function solve(
   // Phase 3: Greedily fill remaining slots with unassigned pokemon
   const assigned = new Set(preAssignments.keys())
   const remaining = pokemonNames.filter((name) => !assigned.has(name))
-  const tailAssignments = greedyFillRemaining(remaining, occupants, remainingCapacity, pokemonData)
+  const tailAssignments = greedyFillRemaining(
+    remaining,
+    occupants,
+    remainingCapacity,
+    pokemonData,
+    adjacencyData,
+  )
 
   // Merge all assignments
   const allAssignments = new Map([...preAssignments, ...tailAssignments])
