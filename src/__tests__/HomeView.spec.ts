@@ -174,5 +174,6 @@ describe('HomeView', () => {
 
     const select = wrapper.find('#saved-queries-select')
     expect(select.html()).toContain('Jungle paradise')
+    expect(select.html()).toContain(new Date(entry.timestamp).toLocaleString())
   })
 })

@@ -20,7 +20,7 @@ Persists query configurations (house counts + selected pokemon) to `localStorage
 
 Clicking "Save query" opens a `BModal` prompting for an optional title. Confirming saves the entry; cancelling discards it. The `SavedQuery` object includes a `title: string` field alongside `timestamp`, `small`, `medium`, `large`, and `pokemon`.
 
-When saved queries exist, a `BFormSelect` dropdown appears. Each entry shows its `title` if non-empty, falling back to `Date.toLocaleString()` for untitled saves and for entries saved before this feature was added. Selecting an entry restores all four fields into the reactive refs, triggering the solver watcher automatically.
+When saved queries exist, a `BFormSelect` dropdown appears. The timestamp is always shown. When an entry has a non-empty `title`, it is displayed first followed by the timestamp in parentheses (e.g. `My title (4/6/2026, 3:00:00 PM)`); untitled entries show only the timestamp. Selecting an entry restores all four fields into the reactive refs, triggering the solver watcher automatically.
 
 #### Saves title with query
 
@@ -28,7 +28,7 @@ Verifies that when the user provides a title in the save modal and confirms, the
 
 #### Shows title in restore dropdown
 
-Verifies that when a saved query has a non-empty title, the restore dropdown option displays the title rather than the timestamp string.
+Verifies that when a saved query has a non-empty title, the restore dropdown option displays both the title and the timestamp string.
 
 ### Results Display
 

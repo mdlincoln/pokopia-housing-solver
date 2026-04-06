@@ -193,7 +193,9 @@ defineExpose({ small, medium, large, selectedPokemon, queryTitle, confirmSave })
           { value: null, text: 'Select a saved query…' },
           ...savedQueries.map((q) => ({
             value: q.timestamp,
-            text: q.title || new Date(q.timestamp).toLocaleString(),
+            text: q.title
+                ? `${q.title} (${new Date(q.timestamp).toLocaleString()})`
+                : new Date(q.timestamp).toLocaleString(),
           })),
         ]"
       />
