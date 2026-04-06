@@ -1,5 +1,20 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import {
+  BAlert,
+  BBadge,
+  BButton,
+  BCard,
+  BCardBody,
+  BCol,
+  BForm,
+  BFormGroup,
+  BFormInput,
+  BListGroup,
+  BListGroupItem,
+  BRow,
+  BSpinner,
+} from 'bootstrap-vue-next'
 import PokemonSelect from '@/components/PokemonSelect.vue'
 import { solve, rankHouseFavorites, type PokemonData, type SolverResult } from '@/solver'
 
@@ -49,226 +64,93 @@ async function onSubmit() {
 </script>
 
 <template>
-  <form class="solver-form" @submit.prevent="onSubmit">
-    <fieldset>
-      <legend>Houses</legend>
-      <div class="house-inputs">
-        <label>
-          Small (1 slot)
-          <input v-model.number="small" type="number" min="0" />
-        </label>
-        <label>
-          Medium (2 slots)
-          <input v-model.number="medium" type="number" min="0" />
-        </label>
-        <label>
-          Large (4 slots)
-          <input v-model.number="large" type="number" min="0" />
-        </label>
-      </div>
-    </fieldset>
+  <BForm @submit.prevent="onSubmit">
+    <BCard class="mb-3">
+      <BCardBody>
+        <h5 class="card-title">Houses</h5>
+        <BRow>
+          <BCol sm="4">
+            <BFormGroup label="Small (1 slot)" label-for="house-small">
+              <BFormInput id="house-small" v-model.number="small" type="number" min="0" />
+            </BFormGroup>
+          </BCol>
+          <BCol sm="4">
+            <BFormGroup label="Medium (2 slots)" label-for="house-medium">
+              <BFormInput id="house-medium" v-model.number="medium" type="number" min="0" />
+            </BFormGroup>
+          </BCol>
+          <BCol sm="4">
+            <BFormGroup label="Large (4 slots)" label-for="house-large">
+              <BFormInput id="house-large" v-model.number="large" type="number" min="0" />
+            </BFormGroup>
+          </BCol>
+        </BRow>
+      </BCardBody>
+    </BCard>
 
-    <fieldset>
-      <legend>Pokemon</legend>
-      <PokemonSelect v-model="selectedPokemon" :pokemon-names="pokemonNames" />
-    </fieldset>
+    <BCard class="mb-3">
+      <BCardBody>
+        <h5 class="card-title">Pokemon</h5>
+        <PokemonSelect v-model="selectedPokemon" :pokemon-names="pokemonNames" />
+      </BCardBody>
+    </BCard>
 
-    <button type="submit" :disabled="loading">
+    <BButton type="submit" variant="primary" :disabled="loading">
+      <BSpinner v-if="loading" small class="me-1" />
       {{ loading ? 'Solving...' : 'Solve' }}
-    </button>
-  </form>
+    </BButton>
+  </BForm>
 
-  <div v-if="error" class="error" role="alert">{{ error }}</div>
+  <BAlert v-if="error" variant="danger" :model-value="true" data-testid="error" class="mt-3">
+    {{ error }}
+  </BAlert>
 
-  <section v-if="result" class="results">
+  <section v-if="result" data-testid="results" class="mt-4">
     <h2>Results</h2>
-    <div class="houses">
-      <div v-for="house in result.houses" :key="house.houseIndex" class="house-card">
-        <h3>{{ house.size }} house #{{ house.houseIndex }}</h3>
-        <p class="capacity">Capacity: {{ house.capacity }}</p>
-        <ul v-if="house.pokemon.length">
-          <li v-for="name in house.pokemon" :key="name">
-            {{ name }}
-            <ul v-if="pokemonData?.[name]?.favorites.length" class="favorites">
-              <li v-for="fav in pokemonData[name]!.favorites" :key="fav">{{ fav }}</li>
-            </ul>
-          </li>
-        </ul>
-        <p v-else class="empty">Empty</p>
-        <div v-if="sharedFavoritesFor(house.pokemon).length" class="shared-favorites">
-          <p class="shared-label">Shared interests</p>
-          <ul>
-            <li v-for="item in sharedFavoritesFor(house.pokemon)" :key="item.favorite">
-              {{ item.favorite }} ×{{ item.count }}
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
-    <div v-if="result.unhoused.length" class="unhoused">
-      <h3>Unhoused</h3>
-      <ul>
+    <BRow>
+      <BCol v-for="house in result.houses" :key="house.houseIndex" sm="6" md="4" class="mb-3">
+        <BCard data-testid="house-card">
+          <BCardBody>
+            <h5 class="card-title">{{ house.size }} house #{{ house.houseIndex }}</h5>
+            <p class="text-muted mb-2">Capacity: {{ house.capacity }}</p>
+            <BListGroup v-if="house.pokemon.length" flush>
+              <BListGroupItem v-for="name in house.pokemon" :key="name">
+                <strong>{{ name }}</strong>
+                <ul v-if="pokemonData?.[name]?.favorites.length" class="mb-0 mt-1">
+                  <li v-for="fav in pokemonData[name]!.favorites" :key="fav">{{ fav }}</li>
+                </ul>
+              </BListGroupItem>
+            </BListGroup>
+            <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
+            <div v-if="sharedFavoritesFor(house.pokemon).length" class="mt-2">
+              <strong>Shared interests</strong>
+              <div class="mt-1">
+                <BBadge
+                  v-for="item in sharedFavoritesFor(house.pokemon)"
+                  :key="item.favorite"
+                  variant="info"
+                  pill
+                  class="me-1"
+                >
+                  {{ item.favorite }} &times;{{ item.count }}
+                </BBadge>
+              </div>
+            </div>
+          </BCardBody>
+        </BCard>
+      </BCol>
+    </BRow>
+
+    <BAlert
+      v-if="result.unhoused.length"
+      variant="warning"
+      :model-value="true"
+      data-testid="unhoused"
+    >
+      <h5 class="alert-heading">Unhoused</h5>
+      <ul class="mb-0">
         <li v-for="name in result.unhoused" :key="name">{{ name }}</li>
       </ul>
-    </div>
+    </BAlert>
   </section>
 </template>
-
-<style scoped>
-.solver-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-fieldset {
-  border: 1px solid #ddd;
-  border-radius: 0.5rem;
-  padding: 1rem;
-}
-
-legend {
-  font-weight: 600;
-}
-
-.house-inputs {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.house-inputs label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.9rem;
-}
-
-.house-inputs input {
-  width: 5rem;
-  padding: 0.4rem;
-  border: 1px solid #ccc;
-  border-radius: 0.25rem;
-  font-size: 0.9rem;
-}
-
-button[type='submit'] {
-  align-self: flex-start;
-  padding: 0.5rem 1.5rem;
-  background: #4f46e5;
-  color: white;
-  border: none;
-  border-radius: 0.25rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-button[type='submit']:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-
-.error {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  background: #fee2e2;
-  color: #b91c1c;
-  border-radius: 0.25rem;
-}
-
-.results {
-  margin-top: 1.5rem;
-}
-
-.results h2 {
-  font-size: 1.2rem;
-  margin-bottom: 0.75rem;
-}
-
-.houses {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.house-card {
-  border: 1px solid #ddd;
-  border-radius: 0.5rem;
-  padding: 0.75rem;
-  min-width: 150px;
-}
-
-.house-card h3 {
-  font-size: 0.95rem;
-  margin: 0 0 0.25rem;
-  text-transform: capitalize;
-}
-
-.capacity {
-  font-size: 0.8rem;
-  color: #666;
-  margin: 0 0 0.5rem;
-}
-
-.house-card ul {
-  margin: 0;
-  padding-left: 1.2rem;
-}
-
-.house-card li {
-  font-size: 0.9rem;
-}
-
-.favorites {
-  margin: 0.15rem 0 0.25rem;
-  padding-left: 1.2rem;
-  color: #666;
-  font-size: 0.8rem;
-}
-
-.shared-favorites {
-  margin-top: 0.5rem;
-  border-top: 1px solid #eee;
-  padding-top: 0.4rem;
-}
-
-.shared-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #555;
-  margin: 0 0 0.25rem;
-}
-
-.shared-favorites ul {
-  margin: 0;
-  padding-left: 1.2rem;
-}
-
-.shared-favorites li {
-  font-size: 0.8rem;
-  color: #4f46e5;
-}
-
-.empty {
-  font-style: italic;
-  color: #999;
-  margin: 0;
-}
-
-.unhoused {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  background: #fef3c7;
-  border-radius: 0.5rem;
-}
-
-.unhoused h3 {
-  margin: 0 0 0.5rem;
-  font-size: 0.95rem;
-}
-
-.unhoused ul {
-  margin: 0;
-  padding-left: 1.2rem;
-}
-</style>

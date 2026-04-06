@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { BBadge, BCloseButton, BFormInput, BListGroup, BListGroupItem } from 'bootstrap-vue-next'
 
 const props = defineProps<{
   pokemonNames: string[]
@@ -61,7 +62,6 @@ function onFocus() {
 }
 
 function onBlur() {
-  // Delay to allow click on dropdown items
   setTimeout(() => {
     isOpen.value = false
   }, 150)
@@ -69,17 +69,22 @@ function onBlur() {
 </script>
 
 <template>
-  <div class="pokemon-select">
-    <div v-if="modelValue.length" class="chips">
-      <span v-for="name in modelValue" :key="name" class="chip">
+  <div>
+    <div v-if="modelValue.length" class="d-flex flex-wrap gap-1 mb-2">
+      <BBadge
+        v-for="name in modelValue"
+        :key="name"
+        variant="primary"
+        pill
+        class="d-inline-flex align-items-center gap-1 pe-1"
+      >
         {{ name }}
-        <button type="button" class="chip-remove" @click="remove(name)">&times;</button>
-      </span>
+        <BCloseButton class="ms-1" @click="remove(name)" />
+      </BBadge>
     </div>
-    <div class="input-wrapper">
-      <input
+    <div class="position-relative">
+      <BFormInput
         v-model="query"
-        type="text"
         placeholder="Search pokemon..."
         autocomplete="off"
         @input="onInput"
@@ -87,91 +92,22 @@ function onBlur() {
         @focus="onFocus"
         @blur="onBlur"
       />
-      <ul v-if="isOpen && filtered.length" class="dropdown" role="listbox">
-        <li
+      <BListGroup
+        v-if="isOpen && filtered.length"
+        class="position-absolute w-100 overflow-auto"
+        style="max-height: 200px; z-index: 10"
+      >
+        <BListGroupItem
           v-for="(name, i) in filtered.slice(0, 50)"
           :key="name"
           role="option"
-          :class="{ highlighted: i === highlightIndex }"
+          :active="i === highlightIndex"
+          button
           @mousedown.prevent="select(name)"
         >
           {{ name }}
-        </li>
-      </ul>
+        </BListGroupItem>
+      </BListGroup>
     </div>
   </div>
 </template>
-
-<style scoped>
-.pokemon-select {
-  position: relative;
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-bottom: 0.5rem;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.2rem 0.5rem;
-  background: #e0e7ff;
-  border-radius: 1rem;
-  font-size: 0.85rem;
-}
-
-.chip-remove {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-  line-height: 1;
-  padding: 0;
-  color: #666;
-}
-
-.input-wrapper {
-  position: relative;
-}
-
-.input-wrapper input {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 0.25rem;
-  font-size: 0.9rem;
-  box-sizing: border-box;
-}
-
-.dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  max-height: 200px;
-  overflow-y: auto;
-  background: white;
-  border: 1px solid #ccc;
-  border-top: none;
-  border-radius: 0 0 0.25rem 0.25rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  z-index: 10;
-}
-
-.dropdown li {
-  padding: 0.4rem 0.5rem;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
-.dropdown li:hover,
-.dropdown li.highlighted {
-  background: #e0e7ff;
-}
-</style>

@@ -62,7 +62,7 @@ describe('HomeView', () => {
     const button = wrapper.find('button[type="submit"]')
     expect(button.text()).toBe('Solve')
 
-    expect(wrapper.find('.results').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="results"]').exists()).toBe(false)
   })
 
   it('displays results with all pokemon housed', async () => {
@@ -79,14 +79,14 @@ describe('HomeView', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const cards = wrapper.findAll('.house-card')
+    const cards = wrapper.findAll('[data-testid="house-card"]')
     expect(cards).toHaveLength(2)
 
     expect(cards[0]!.text()).toContain('AlphaOne')
     expect(cards[0]!.text()).toContain('AlphaTwo')
     expect(cards[1]!.text()).toContain('BetaOne')
 
-    expect(wrapper.find('.unhoused').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="unhoused"]').exists()).toBe(false)
   })
 
   it('displays unhoused pokemon section', async () => {
@@ -100,7 +100,7 @@ describe('HomeView', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const unhoused = wrapper.find('.unhoused')
+    const unhoused = wrapper.find('[data-testid="unhoused"]')
     expect(unhoused.exists()).toBe(true)
     expect(unhoused.text()).toContain('AlphaTwo')
     expect(unhoused.text()).toContain('BetaOne')
@@ -120,9 +120,9 @@ describe('HomeView', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const cards = wrapper.findAll('.house-card')
+    const cards = wrapper.findAll('[data-testid="house-card"]')
     expect(cards).toHaveLength(2)
-    expect(cards[1]!.find('.empty').exists()).toBe(true)
+    expect(cards[1]!.find('[data-testid="empty"]').exists()).toBe(true)
     expect(cards[1]!.text()).toContain('Empty')
   })
 
@@ -133,7 +133,7 @@ describe('HomeView', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
-    const errorEl = wrapper.find('.error')
+    const errorEl = wrapper.find('[data-testid="error"]')
     expect(errorEl.exists()).toBe(true)
     expect(errorEl.text()).toContain('Solver exploded')
   })
