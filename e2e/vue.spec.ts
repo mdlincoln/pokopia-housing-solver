@@ -15,7 +15,7 @@ test.describe('Homepage', () => {
     await expect(page.getByPlaceholder('Search pokemon...')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Solve' })).toBeVisible()
 
-    await expect(page.locator('.results')).toBeHidden()
+    await expect(page.getByTestId('results')).toBeHidden()
   })
 
   test('solves and displays results', async ({ page }) => {
@@ -35,14 +35,14 @@ test.describe('Homepage', () => {
     await page.getByRole('button', { name: 'Solve' }).click()
 
     // Wait for results
-    await expect(page.locator('.results')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
 
     // Verify house cards rendered
-    const cards = page.locator('.house-card')
+    const cards = page.getByTestId('house-card')
     await expect(cards).toHaveCount(2)
 
     // All 3 pokemon should appear somewhere in the results
-    const resultsText = await page.locator('.results').textContent()
+    const resultsText = await page.getByTestId('results').textContent()
     expect(resultsText).toContain('Bulbasaur')
     expect(resultsText).toContain('Ivysaur')
     expect(resultsText).toContain('Charmander')
@@ -60,10 +60,10 @@ test.describe('Homepage', () => {
     await selectPokemon(page, 'Venusaur')
 
     await page.getByRole('button', { name: 'Solve' }).click()
-    await expect(page.locator('.results')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
 
     // Should have unhoused section with 2 pokemon
-    const unhoused = page.locator('.unhoused')
+    const unhoused = page.getByTestId('unhoused')
     await expect(unhoused).toBeVisible()
     const unhousedItems = unhoused.locator('li')
     await expect(unhousedItems).toHaveCount(2)
@@ -77,11 +77,11 @@ test.describe('Homepage', () => {
     await inputs.nth(1).fill('1')
 
     await page.getByRole('button', { name: 'Solve' }).click()
-    await expect(page.locator('.results')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
 
     // Houses should render but be empty
-    const cards = page.locator('.house-card')
+    const cards = page.getByTestId('house-card')
     await expect(cards).toHaveCount(2)
-    await expect(page.locator('.empty')).toHaveCount(2)
+    await expect(page.getByTestId('empty')).toHaveCount(2)
   })
 })

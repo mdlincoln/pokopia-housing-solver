@@ -4,7 +4,7 @@ Vue 3 homepage styled with Bootstrap Vue Next (`bootstrap-vue-next`) that lets u
 
 ## HomeView
 
-The main page at `/`, implemented in `src/views/HomeView.vue`. Uses Bootstrap Vue Next components (`BCard`, `BForm`, `BRow`/`BCol`, `BFormGroup`, `BFormInput`, `BButton`, `BAlert`, `BListGroup`, `BBadge`) with no custom CSS.
+The main page at `/`, implemented in `src/views/HomeView.vue`. Uses Bootstrap Vue Next components (`BCard`, `BForm`, `BRow`/`BCol`, `BFormGroup`, `BFormInput`, `BButton`, `BAlert`, `BListGroup`) with no custom CSS.
 
 ### Form
 
@@ -14,9 +14,13 @@ Pokemon data is fetched from `/pokemon_favorites.json` on mount.
 
 ### Results Display
 
-After solving, `BCard` house cards show size, capacity, assigned pokemon, and each pokemon's favorites in a `BListGroup`. Unhoused pokemon appear in a `BAlert` warning. Error and loading states are handled inline with `BAlert` and `BSpinner`.
+After solving, a full-width `BListGroup` renders one [[ui#House]] item per assigned house. Unhoused pokemon appear in a `BAlert` warning. Error and loading states are handled inline with `BAlert` and `BSpinner`.
 
-Houses with 2+ residents also show a "Shared interests" section: `BBadge` pills with the overlap count per favorite (e.g. "Berries ×3").
+## House
+
+Reusable house display component in `src/components/House.vue`. Renders as a `BListGroupItem` with size/capacity, assigned `PokemonCard` entries, and a "Shared interests" `BBadge` section for favorites shared by 2+ residents.
+
+Shared favorites are computed internally via [[src/solver.ts#rankHouseFavorites]].
 
 ### Test Selectors
 

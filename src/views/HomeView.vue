@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import HouseRecord from '@/components/HouseRecord.vue'
+import PokemonSelect from '@/components/PokemonSelect.vue'
+import { solve, type PokemonData, type SolverResult } from '@/solver'
 import {
   BAlert,
-  BBadge,
   BButton,
   BCard,
   BCardBody,
@@ -11,12 +12,10 @@ import {
   BFormGroup,
   BFormInput,
   BListGroup,
-  BListGroupItem,
   BRow,
   BSpinner,
 } from 'bootstrap-vue-next'
-import PokemonSelect from '@/components/PokemonSelect.vue'
-import { solve, rankHouseFavorites, type PokemonData, type SolverResult } from '@/solver'
+import { computed, onMounted, ref } from 'vue'
 
 const pokemonData = ref<PokemonData | null>(null)
 const pokemonNames = computed(() =>
@@ -37,12 +36,6 @@ onMounted(async () => {
   const data: PokemonData = await resp.json()
   pokemonData.value = data
 })
-
-function sharedFavoritesFor(pokemon: string[]): Array<{ favorite: string; count: number }> {
-  if (!pokemonData.value || pokemon.length < 2) return []
-  const sets = pokemon.map((name) => new Set(pokemonData.value![name]?.favorites ?? []))
-  return rankHouseFavorites(sets)
-}
 
 async function onSubmit() {
   if (!pokemonData.value) return
@@ -107,39 +100,14 @@ async function onSubmit() {
 
   <section v-if="result" data-testid="results" class="mt-4">
     <h2>Results</h2>
-    <BRow>
-      <BCol v-for="house in result.houses" :key="house.houseIndex" sm="6" md="4" class="mb-3">
-        <BCard data-testid="house-card">
-          <BCardBody>
-            <h5 class="card-title">{{ house.size }} house #{{ house.houseIndex }}</h5>
-            <p class="text-muted mb-2">Capacity: {{ house.capacity }}</p>
-            <BListGroup v-if="house.pokemon.length" flush>
-              <BListGroupItem v-for="name in house.pokemon" :key="name">
-                <strong>{{ name }}</strong>
-                <ul v-if="pokemonData?.[name]?.favorites.length" class="mb-0 mt-1">
-                  <li v-for="fav in pokemonData[name]!.favorites" :key="fav">{{ fav }}</li>
-                </ul>
-              </BListGroupItem>
-            </BListGroup>
-            <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
-            <div v-if="sharedFavoritesFor(house.pokemon).length" class="mt-2">
-              <strong>Shared interests</strong>
-              <div class="mt-1">
-                <BBadge
-                  v-for="item in sharedFavoritesFor(house.pokemon)"
-                  :key="item.favorite"
-                  variant="info"
-                  pill
-                  class="me-1"
-                >
-                  {{ item.favorite }} &times;{{ item.count }}
-                </BBadge>
-              </div>
-            </div>
-          </BCardBody>
-        </BCard>
-      </BCol>
-    </BRow>
+    <BListGroup class="w-100">
+      <HouseRecord
+        v-for="house in result.houses"
+        :key="house.houseIndex"
+        :house="house"
+        :pokemon-data="pokemonData!"
+      />
+    </BListGroup>
 
     <BAlert
       v-if="result.unhoused.length"
