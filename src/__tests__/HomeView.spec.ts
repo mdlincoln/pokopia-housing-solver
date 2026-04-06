@@ -15,9 +15,9 @@ vi.mock('@/solver', async (importOriginal) => {
 })
 
 const testPokemonData = {
-  AlphaOne: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'] },
-  AlphaTwo: { image: '', favorites: ['A', 'B', 'C', 'D', 'F'] },
-  BetaOne: { image: '', favorites: ['X', 'Y', 'Z', 'W', 'V'] },
+  AlphaOne: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
+  AlphaTwo: { image: '', favorites: ['A', 'B', 'C', 'D', 'F'], habitat: 'Dark' },
+  BetaOne: { image: '', favorites: ['X', 'Y', 'Z', 'W', 'V'], habitat: 'Bright' },
 }
 
 function stubFetch() {
@@ -59,9 +59,6 @@ describe('HomeView', () => {
     const inputs = wrapper.findAll('input[type="number"]')
     expect(inputs).toHaveLength(3)
 
-    const button = wrapper.find('button[type="submit"]')
-    expect(button.text()).toBe('Solve')
-
     expect(wrapper.find('[data-testid="results"]').exists()).toBe(false)
   })
 
@@ -76,7 +73,10 @@ describe('HomeView', () => {
     mockSolve.mockResolvedValueOnce(solverResult)
 
     const wrapper = await mountHome()
-    await wrapper.find('form').trigger('submit')
+    // Directly set the reactive data to trigger the solver
+    wrapper.vm.medium = 1
+    wrapper.vm.small = 1
+    wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo', 'BetaOne']
     await flushPromises()
 
     const cards = wrapper.findAll('[data-testid="house-card"]')
@@ -97,7 +97,8 @@ describe('HomeView', () => {
     mockSolve.mockResolvedValueOnce(solverResult)
 
     const wrapper = await mountHome()
-    await wrapper.find('form').trigger('submit')
+    wrapper.vm.small = 1
+    wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo', 'BetaOne']
     await flushPromises()
 
     const unhoused = wrapper.find('[data-testid="unhoused"]')
@@ -117,7 +118,9 @@ describe('HomeView', () => {
     mockSolve.mockResolvedValueOnce(solverResult)
 
     const wrapper = await mountHome()
-    await wrapper.find('form').trigger('submit')
+    wrapper.vm.large = 1
+    wrapper.vm.small = 1
+    wrapper.vm.selectedPokemon = ['AlphaOne']
     await flushPromises()
 
     const cards = wrapper.findAll('[data-testid="house-card"]')
@@ -130,7 +133,8 @@ describe('HomeView', () => {
     mockSolve.mockRejectedValueOnce(new Error('Solver exploded'))
 
     const wrapper = await mountHome()
-    await wrapper.find('form').trigger('submit')
+    wrapper.vm.small = 1
+    wrapper.vm.selectedPokemon = ['AlphaOne']
     await flushPromises()
 
     const errorEl = wrapper.find('[data-testid="error"]')
