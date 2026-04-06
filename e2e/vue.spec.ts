@@ -95,6 +95,84 @@ test.describe('Homepage', () => {
     await expect(habitatBadge).toBeVisible()
   })
 
+  test('saves query with title and shows it in restore dropdown', async ({ page }) => {
+    test.setTimeout(5000)
+    await page.goto('/')
+
+    const inputs = page.locator('input[type="number"]')
+    await inputs.nth(0).fill('1')
+
+    // Open the save modal
+    await page.getByRole('button', { name: 'Save query' }).click()
+    const modal = page.getByRole('dialog')
+    await expect(modal).toBeVisible({ timeout: 2000 })
+
+    // Enter a title and confirm — wait for modal animation to settle before clicking
+    const saveBtn = modal.getByRole('button', { name: 'Save' })
+    await expect(saveBtn).toBeEnabled({ timeout: 2000 })
+    await modal.getByLabel('Title (optional)').fill('My test query')
+    await saveBtn.click()
+    await expect(modal).toBeHidden({ timeout: 2000 })
+
+    // Restore dropdown should show the title
+    const select = page.locator('#saved-queries-select')
+    await expect(select).toBeVisible({ timeout: 2000 })
+    await expect(select.locator('option', { hasText: 'My test query' })).toHaveCount(1)
+  })
+
+  test('saves query without title and shows timestamp fallback in dropdown', async ({ page }) => {
+    test.setTimeout(5000)
+    await page.goto('/')
+
+    const inputs = page.locator('input[type="number"]')
+    await inputs.nth(0).fill('1')
+
+    // Open the save modal and confirm without entering a title
+    await page.getByRole('button', { name: 'Save query' }).click()
+    const modal = page.getByRole('dialog')
+    await expect(modal).toBeVisible({ timeout: 2000 })
+
+    // Wait for modal animation to settle before clicking
+    const saveBtn = modal.getByRole('button', { name: 'Save' })
+    await expect(saveBtn).toBeEnabled({ timeout: 2000 })
+    await saveBtn.click()
+    await expect(modal).toBeHidden({ timeout: 2000 })
+
+    // Restore dropdown should show a non-empty label that is not blank
+    const select = page.locator('#saved-queries-select')
+    await expect(select).toBeVisible({ timeout: 2000 })
+    // The second option (index 1) should be a timestamp string, not empty
+    const option = select.locator('option').nth(1)
+    const text = await option.textContent()
+    expect(text?.trim().length).toBeGreaterThan(0)
+    expect(text?.trim()).not.toBe('My test query')
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#Shows success alert after save]]
+  test('shows success alert after saving a query', async ({ page }) => {
+    test.setTimeout(8000)
+    await page.goto('/')
+
+    const inputs = page.locator('input[type="number"]')
+    await inputs.nth(0).fill('1')
+
+    await page.getByRole('button', { name: 'Save query' }).click()
+    const modal = page.getByRole('dialog')
+    await expect(modal).toBeVisible({ timeout: 2000 })
+
+    // Wait for modal animation to settle before clicking
+    const saveBtn = modal.getByRole('button', { name: 'Save' })
+    await expect(saveBtn).toBeEnabled({ timeout: 2000 })
+    await saveBtn.click()
+    await expect(modal).toBeHidden({ timeout: 2000 })
+
+    // Success alert should appear
+    await expect(page.getByText('Query saved successfully.')).toBeVisible({ timeout: 2000 })
+
+    // Alert should disappear after 3 seconds
+    await expect(page.getByText('Query saved successfully.')).toBeHidden({ timeout: 5000 })
+  })
+
   test('displays shared habitat badge on house card', async ({ page }) => {
     await page.goto('/')
 

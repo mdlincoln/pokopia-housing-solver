@@ -42,6 +42,8 @@ Run unit tests using Vitest, a fast unit test framework.
 npm run test:unit
 ```
 
+ALWAYS run unit tests after updating anything.
+
 ### Run End-to-End Tests with [Playwright](https://playwright.dev)
 
 Run e2e tests using Playwright on Chromium to verify the full app works in a real browser.
@@ -53,6 +55,8 @@ npm run playwright install chromium
 # Run e2e tests
 npm run test:e2e
 ```
+
+ALWAYS run e2e tests after updating anything.
 
 ### Lint with [ESLint](https://eslint.org/)
 
