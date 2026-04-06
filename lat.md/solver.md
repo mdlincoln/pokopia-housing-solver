@@ -79,12 +79,6 @@ Greedy maximum weight matching for medium houses (capacity 2). See [[src/heurist
 
 Collects all edges between available nodes, sorts by weight descending, and greedily picks non-overlapping edges. Returns up to the requested number of pairs.
 
-### greedyPreAssign
-
-Legacy single-phase heuristic, retained for comparison. See [[src/heuristic.ts#greedyPreAssign]].
-
-For each medium/large house, picks an anchor (highest average connectivity across remaining pool) and its best-connected neighbor, assigns both to the house, and removes them from the pool.
-
 ### greedyFillRemaining
 
 Greedy best-fit for the remaining unassigned pokemon after phases 1 and 2. See [[src/solver.ts#greedyFillRemaining]].
