@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PokemonCard from '@/components/PokemonCard.vue'
-import { favoritesToItems } from '@/items'
+import { clusterItemsByFavorites } from '@/items'
 import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/solver'
 import { BBadge, BCardGroup, BListGroupItem, type ColorVariant } from 'bootstrap-vue-next'
 import { computed } from 'vue'
@@ -18,7 +18,7 @@ const sharedFavorites = computed(() => {
 
 const recommendedItems = computed(() => {
   if (sharedFavorites.value.length === 0) return []
-  return favoritesToItems(sharedFavorites.value).sort((a, b) => b.score - a.score)
+  return clusterItemsByFavorites(sharedFavorites.value.map((f) => f.favorite))
 })
 
 const HABITAT_VARIANT: Record<string, ColorVariant> = {
@@ -92,10 +92,13 @@ const sharedHabitats = computed(() => {
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
 
     <details v-if="recommendedItems.length" data-testid="recommended-items" class="mt-2">
-      <summary>Recommended items ({{ recommendedItems.length }})</summary>
+      <summary>Recommended items</summary>
       <ol data-testid="recommended-items-list">
-        <li v-for="entry in recommendedItems" :key="entry.item">
-          {{ entry.item }} <small class="text-muted">({{ entry.score }})</small>
+        <li v-for="(cluster, ci) in recommendedItems" :key="ci" data-testid="item-cluster">
+          {{ cluster.favorites.join(', ') }}
+          <ol>
+            <li v-for="item in cluster.items" :key="item">{{ item }}</li>
+          </ol>
         </li>
       </ol>
     </details>

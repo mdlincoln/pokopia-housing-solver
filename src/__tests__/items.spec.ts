@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { favoritesToItems, idealItems, type ItemScore } from '../items'
+import { clusterItemsByFavorites, favoritesToItems, idealItems, type ItemScore } from '../items'
 
 function scoreOf(results: ItemScore[], item: string): number | undefined {
   return results.find((r) => r.item === item)?.score
@@ -115,5 +115,68 @@ describe('favoritesToItems', () => {
   it('ignores favorites with count 0', () => {
     const result = favoritesToItems([{ favorite: 'Exercise', count: 0 }])
     expect(result).toEqual([])
+  })
+})
+
+// Replace the last test with:
+describe('clusterItemsByFavorites', () => {
+  it('returns empty array for empty input', () => {
+    const result = clusterItemsByFavorites([])
+    expect(result).toEqual([])
+  })
+
+  it('returns empty array for unknown favorite', () => {
+    const result = clusterItemsByFavorites(['Nonexistent Favorite'])
+    expect(result).toEqual([])
+  })
+
+  it('groups all items under one cluster for a single favorite', () => {
+    const result = clusterItemsByFavorites(['Exercise'])
+    expect(result).toHaveLength(1)
+    expect(result[0]!.favorites).toEqual(['Exercise'])
+    expect(result[0]!.items).toContain('Punching bag')
+  })
+
+  it('creates separate clusters for items fulfilling different favorite subsets', () => {
+    // "Bonfire" is in both Lots of Fire and Group Activities
+    // "Campfire" is only in Lots of Fire
+    const result = clusterItemsByFavorites(['Lots of Fire', 'Group Activities'])
+
+    expect(result.length).toBeGreaterThanOrEqual(2)
+
+    // The cluster with both favorites should appear first (2 > 1)
+    expect(result[0]!.favorites).toHaveLength(2)
+    expect(result[0]!.items).toContain('Bonfire')
+
+    // Campfire should be in a single-favorite cluster
+    const campfireCluster = result.find((c) => c.items.includes('Campfire'))
+    expect(campfireCluster).toBeDefined()
+    expect(campfireCluster!.favorites).toHaveLength(1)
+    expect(campfireCluster!.favorites).toContain('Lots of Fire')
+  })
+
+  it('ranks clusters by number of favorites descending', () => {
+    const result = clusterItemsByFavorites(['Lots of Fire', 'Group Activities', 'Stone Stuff'])
+    for (let i = 1; i < result.length; i++) {
+      expect(result[i]!.favorites.length).toBeLessThanOrEqual(result[i - 1]!.favorites.length)
+    }
+  })
+
+  it('deduplicates input favorites case-insensitively', () => {
+    const result = clusterItemsByFavorites(['Exercise', 'exercise', 'EXERCISE'])
+    expect(result).toHaveLength(1)
+    expect(result[0]!.items).toContain('Punching bag')
+  })
+
+  it('every item in a cluster fulfills all of that cluster favorites', () => {
+    // Verify the invariant: items in a cluster are interchangeable
+    const result = clusterItemsByFavorites(['Lots of Fire', 'Group Activities'])
+    // The 2-favorite cluster should only contain items in BOTH catalog entries
+    const topCluster = result[0]!
+    expect(topCluster.favorites).toHaveLength(2)
+    // Bonfire appears in both Lots of Fire and Group Activities
+    expect(topCluster.items).toContain('Bonfire')
+    // Torch only appears in Lots of Fire, not Group Activities — should NOT be here
+    expect(topCluster.items).not.toContain('Torch')
   })
 })

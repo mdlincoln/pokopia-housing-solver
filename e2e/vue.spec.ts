@@ -207,13 +207,13 @@ test.describe('Homepage', () => {
     const details = page.getByTestId('recommended-items')
     await expect(details).toBeVisible()
 
-    // Summary should show item count
+    // Summary should show "Recommended items"
     const summary = details.locator('summary')
     await expect(summary).toContainText('Recommended items')
 
-    // Items are in the DOM inside the details element
-    const listItems = page.getByTestId('recommended-items-list').locator('li')
-    const count = await listItems.count()
+    // Should have at least one cluster
+    const clusters = page.getByTestId('item-cluster')
+    const count = await clusters.count()
     expect(count).toBeGreaterThan(0)
   })
 })

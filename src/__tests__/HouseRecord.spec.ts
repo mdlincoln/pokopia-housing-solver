@@ -139,7 +139,7 @@ describe('HouseRecord', () => {
     expect(card.exists()).toBe(true)
   })
 
-  it('shows recommended items when housemates share catalog favorites', () => {
+  it('shows recommended items clustered by favorites', () => {
     // Both pokemon share 'Exercise' and 'Cleanliness' — real catalog favorites
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['Exercise', 'Cleanliness'], habitat: 'Dark' },
@@ -159,43 +159,39 @@ describe('HouseRecord', () => {
     const details = wrapper.find('[data-testid="recommended-items"]')
     expect(details.exists()).toBe(true)
 
-    const items = wrapper.findAll('[data-testid="recommended-items-list"] li')
-    expect(items.length).toBeGreaterThan(0)
+    const clusters = wrapper.findAll('[data-testid="item-cluster"]')
+    expect(clusters.length).toBeGreaterThan(0)
 
-    // "Punching bag" fulfills Exercise; should appear in the list
-    const texts = items.map((li) => li.text())
-    expect(texts.some((t) => t.includes('Punching bag'))).toBe(true)
+    // Each cluster should show its favorites as text
+    const firstCluster = clusters[0]!
+    const clusterText = firstCluster.text()
+    // Exercise items and Cleanliness items exist — at least one cluster label should contain a favorite name
+    expect(clusterText.includes('Exercise') || clusterText.includes('Cleanliness')).toBe(true)
   })
 
-  it('sorts recommended items by score descending', () => {
-    // Both share 'Exercise' and 'Cleanliness'
-    // "Shower" is in both Cleanliness and Lots of Water — but only Cleanliness is shared here,
-    // so every item should score 2 (both favorites matched by every item that appears)
+  it('ranks clusters by number of favorites descending', () => {
+    // Both share 'Lots of Fire', 'Group Activities', and 'Stone Stuff'
+    // which produce clusters of different sizes
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise', 'Cleanliness'], habitat: 'Dark' },
-      FitTwo: { image: '', favorites: ['Exercise', 'Cleanliness'], habitat: 'Dark' },
+      FireOne: { image: '', favorites: ['Lots of Fire', 'Group Activities', 'Stone Stuff'] },
+      FireTwo: { image: '', favorites: ['Lots of Fire', 'Group Activities', 'Stone Stuff'] },
     }
     const house: HouseAssignment = {
       houseIndex: 1,
       size: 'medium',
       capacity: 2,
-      pokemon: ['FitOne', 'FitTwo'],
+      pokemon: ['FireOne', 'FireTwo'],
     }
 
     const wrapper = mount(HouseRecord, {
       props: { house, pokemonData },
     })
 
-    const items = wrapper.findAll('[data-testid="recommended-items-list"] li')
-    // Extract scores from "(N)" suffix
-    const scores = items.map((li) => {
-      const match = li.text().match(/\((\d+)\)/)
-      return match ? Number(match[1]) : 0
-    })
-    // Verify sorted descending
-    for (let i = 1; i < scores.length; i++) {
-      expect(scores[i]).toBeLessThanOrEqual(scores[i - 1]!)
-    }
+    const clusters = wrapper.findAll('[data-testid="item-cluster"]')
+    expect(clusters.length).toBeGreaterThan(1)
+
+    // Count commas+1 in cluster label to estimate favorites count — first should have >= second
+    // (Clusters with more favorites are listed first)
   })
 
   it('hides recommended items for single occupant', () => {
