@@ -12,7 +12,7 @@ Users set house counts via `BFormInput` (type number) in a `BRow` grid and selec
 
 A "Show a sample island" button prefills the form with 1 small, 3 medium, 2 large houses and 13 randomly chosen pokemon. It is disabled until pokemon data has loaded.
 
-Pokemon data is fetched from `/pokemon_favorites.json` on mount. The solver runs whenever `pokemonData` is loaded and at least one house is configured; otherwise results are hidden.
+Pokemon data is fetched from `/pokemon_favorites.json` and adjacency data is fetched from `/pokemon_adjacency.json` on mount. The solver runs whenever both datasets are loaded and at least one house is configured; otherwise results are hidden.
 
 ### Saved Queries
 

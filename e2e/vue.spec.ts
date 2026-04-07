@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 
 async function selectPokemon(page: import('@playwright/test').Page, name: string) {
   const input = page.getByPlaceholder('Search pokemon...')
+  await expect(input).toBeVisible({ timeout: 10_000 })
   await input.fill(name.slice(0, 4))
   await page.getByRole('option', { name }).click()
 }
@@ -192,6 +193,7 @@ test.describe('Homepage', () => {
   })
 
   test('keeps bright and dark pokemon of the same medium house', async ({ page }) => {
+    test.setTimeout(15_000)
     await page.goto('/')
 
     const inputs = page.locator('input[type="number"]')

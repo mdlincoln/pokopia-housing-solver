@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import HouseRecord from '@/components/HouseRecord.vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
-import { solve, type PokemonData, type SolverResult } from '@/solver'
+import { solve, type AdjacencyData, type PokemonData, type SolverResult } from '@/solver'
 import {
   BAlert,
   BButton,
@@ -19,6 +19,7 @@ import {
 import { computed, onMounted, ref, watch } from 'vue'
 
 const pokemonData = ref<PokemonData | null>(null)
+const adjacencyData = ref<AdjacencyData | null>(null)
 const pokemonNames = computed(() =>
   pokemonData.value ? Object.keys(pokemonData.value).sort() : [],
 )
@@ -92,9 +93,14 @@ watch(selectedTimestamp, (ts) => {
 })
 
 onMounted(async () => {
-  const resp = await fetch('/pokemon_favorites.json')
-  const data: PokemonData = await resp.json()
+  const [favoritesResp, adjacencyResp] = await Promise.all([
+    fetch('/pokemon_favorites.json'),
+    fetch('/pokemon_adjacency.json'),
+  ])
+  const data: PokemonData = await favoritesResp.json()
+  const adjacency: AdjacencyData = await adjacencyResp.json()
   pokemonData.value = data
+  adjacencyData.value = adjacency
 })
 
 function loadSample() {
@@ -107,9 +113,9 @@ function loadSample() {
 }
 
 watch(
-  [selectedPokemon, small, medium, large, pokemonData],
+  [selectedPokemon, small, medium, large, pokemonData, adjacencyData],
   async () => {
-    if (!pokemonData.value || totalHouses.value === 0) {
+    if (!pokemonData.value || !adjacencyData.value || totalHouses.value === 0) {
       result.value = null
       return
     }
@@ -120,6 +126,7 @@ watch(
         selectedPokemon.value,
         { small: small.value, medium: medium.value, large: large.value },
         pokemonData.value,
+        adjacencyData.value,
       )
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Solver failed'
