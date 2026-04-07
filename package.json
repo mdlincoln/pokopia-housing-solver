@@ -15,7 +15,8 @@
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
     "format": "oxfmt src/",
-    "prepare": "husky"
+    "prepare": "husky",
+    "check": "run-s format lint type-check test:unit test:e2e"
   },
   "dependencies": {
     "bootstrap": "^5.3.8",
