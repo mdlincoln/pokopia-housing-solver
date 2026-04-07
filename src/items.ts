@@ -1,4 +1,4 @@
-import itemsByFavorite from '../public/items_by_favorite.json'
+import itemsByFavorite from '../src/items_by_favorite.json'
 
 const catalog: Record<string, string[]> = itemsByFavorite
 
