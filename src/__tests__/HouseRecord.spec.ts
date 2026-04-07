@@ -194,23 +194,26 @@ describe('HouseRecord', () => {
     // (Clusters with more favorites are listed first)
   })
 
-  it('hides recommended items for single occupant', () => {
+  it('shows recommended items for a single occupant when favorites map to catalog entries', () => {
     const house: HouseAssignment = {
       houseIndex: 1,
       size: 'small',
       capacity: 1,
-      pokemon: ['AlphaOne'],
+      pokemon: ['Solo'],
+    }
+
+    const pokemonData: PokemonData = {
+      Solo: { image: '', favorites: ['Exercise'] },
     }
 
     const wrapper = mount(HouseRecord, {
-      props: { house, pokemonData: testPokemonData },
+      props: { house, pokemonData },
     })
 
-    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
   })
 
-  it('hides recommended items when no favorites overlap', () => {
-    // These pokemon have completely different favorites, none in common
+  it('shows recommended items even when occupants have no shared favorites', () => {
     const pokemonData: PokemonData = {
       UniqueOne: { image: '', favorites: ['Exercise'] },
       UniqueTwo: { image: '', favorites: ['Cleanliness'] },
@@ -226,6 +229,47 @@ describe('HouseRecord', () => {
       props: { house, pokemonData },
     })
 
-    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
+  })
+
+  it('renders at most three recommended clusters with non-overlapping favorites', () => {
+    const pokemonData: PokemonData = {
+      PlannerOne: {
+        image: '',
+        favorites: ['Lots of Fire', 'Group Activities', 'Stone Stuff', 'Exercise', 'Cleanliness'],
+      },
+      PlannerTwo: {
+        image: '',
+        favorites: ['Lots of Fire', 'Group Activities', 'Stone Stuff', 'Exercise', 'Cleanliness'],
+      },
+    }
+    const house: HouseAssignment = {
+      houseIndex: 1,
+      size: 'medium',
+      capacity: 2,
+      pokemon: ['PlannerOne', 'PlannerTwo'],
+    }
+
+    const wrapper = mount(HouseRecord, {
+      props: { house, pokemonData },
+    })
+
+    const labels = wrapper.findAll('[data-testid="item-cluster-favorites"]')
+    expect(labels.length).toBeGreaterThan(0)
+    expect(labels.length).toBeLessThanOrEqual(3)
+
+    const seen = new Set<string>()
+    for (const label of labels) {
+      const favorites = label
+        .text()
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+      for (const favorite of favorites) {
+        const key = favorite.toLowerCase()
+        expect(seen.has(key)).toBe(false)
+        seen.add(key)
+      }
+    }
   })
 })

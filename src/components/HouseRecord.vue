@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PokemonCard from '@/components/PokemonCard.vue'
-import { clusterItemsByFavorites } from '@/items'
+import { clusterItemsByFavorites, selectTopNonOverlappingClusters } from '@/items'
 import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/solver'
 import { BBadge, BCardGroup, BListGroupItem, type ColorVariant } from 'bootstrap-vue-next'
 import { computed } from 'vue'
@@ -17,8 +17,18 @@ const sharedFavorites = computed(() => {
 })
 
 const recommendedItems = computed(() => {
-  if (sharedFavorites.value.length === 0) return []
-  return clusterItemsByFavorites(sharedFavorites.value.map((f) => f.favorite))
+  const favorites: string[] = []
+  const seen = new Set<string>()
+  for (const name of props.house.pokemon) {
+    for (const favorite of props.pokemonData[name]?.favorites ?? []) {
+      const lower = favorite.toLowerCase()
+      if (seen.has(lower)) continue
+      seen.add(lower)
+      favorites.push(favorite)
+    }
+  }
+  if (favorites.length === 0) return []
+  return selectTopNonOverlappingClusters(clusterItemsByFavorites(favorites), 3)
 })
 
 const HABITAT_VARIANT: Record<string, ColorVariant> = {
@@ -95,7 +105,7 @@ const sharedHabitats = computed(() => {
       <summary>Recommended items</summary>
       <ol data-testid="recommended-items-list">
         <li v-for="(cluster, ci) in recommendedItems" :key="ci" data-testid="item-cluster">
-          {{ cluster.favorites.join(', ') }}
+          <span data-testid="item-cluster-favorites">{{ cluster.favorites.join(', ') }}</span>
           <ol>
             <li v-for="item in cluster.items" :key="item">{{ item }}</li>
           </ol>

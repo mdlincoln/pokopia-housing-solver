@@ -56,6 +56,16 @@ export interface ItemCluster {
   items: string[]
 }
 
+function clusterKey(cluster: ItemCluster): string {
+  return [...cluster.favorites].sort((a, b) => a.localeCompare(b)).join('\0')
+}
+
+function compareClusters(a: ItemCluster, b: ItemCluster): number {
+  const coverageDiff = b.favorites.length - a.favorites.length
+  if (coverageDiff !== 0) return coverageDiff
+  return clusterKey(a).localeCompare(clusterKey(b))
+}
+
 /**
  * Groups items by the exact set of input favorites they fulfill.
  *
@@ -104,6 +114,63 @@ export function clusterItemsByFavorites(favorites: string[]): ItemCluster[] {
     group.items.push(item)
   }
 
-  // Rank by number of favorites covered (descending)
-  return Array.from(groups.values()).sort((a, b) => b.favorites.length - a.favorites.length)
+  // Rank by number of favorites covered (descending), then alphabetically by cluster key
+  return Array.from(groups.values()).sort(compareClusters)
+}
+
+/**
+ * Selects up to `limit` clusters with pairwise disjoint favorites while maximizing
+ * total covered favorites. Uses deterministic tie-breakers for stable output.
+ */
+export function selectTopNonOverlappingClusters(clusters: ItemCluster[], limit = 3): ItemCluster[] {
+  const sorted = [...clusters].sort(compareClusters)
+  let best: ItemCluster[] = []
+  let bestCoverage = -1
+  let bestSignature = ''
+
+  function evaluateSelection(selection: ItemCluster[]) {
+    const coverage = selection.reduce((sum, cluster) => sum + cluster.favorites.length, 0)
+    const signature = selection.map(clusterKey).join('||')
+    if (coverage > bestCoverage) {
+      bestCoverage = coverage
+      best = [...selection]
+      bestSignature = signature
+      return
+    }
+    if (coverage < bestCoverage) return
+    if (selection.length > best.length) {
+      best = [...selection]
+      bestSignature = signature
+      return
+    }
+    if (selection.length < best.length) return
+    if (signature.localeCompare(bestSignature) < 0) {
+      best = [...selection]
+      bestSignature = signature
+    }
+  }
+
+  function walk(index: number, selection: ItemCluster[], usedFavorites: Set<string>) {
+    if (selection.length === limit || index === sorted.length) {
+      evaluateSelection(selection)
+      return
+    }
+
+    walk(index + 1, selection, usedFavorites)
+
+    const candidate = sorted[index]!
+    const normalized = candidate.favorites.map((favorite) => favorite.toLowerCase())
+    if (normalized.some((favorite) => usedFavorites.has(favorite))) {
+      return
+    }
+
+    for (const favorite of normalized) usedFavorites.add(favorite)
+    selection.push(candidate)
+    walk(index + 1, selection, usedFavorites)
+    selection.pop()
+    for (const favorite of normalized) usedFavorites.delete(favorite)
+  }
+
+  walk(0, [], new Set<string>())
+  return best
 }

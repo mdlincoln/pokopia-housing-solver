@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { clusterItemsByFavorites, favoritesToItems, idealItems, type ItemScore } from '../items'
+import {
+  clusterItemsByFavorites,
+  favoritesToItems,
+  idealItems,
+  selectTopNonOverlappingClusters,
+  type ItemCluster,
+  type ItemScore,
+} from '../items'
 
 function scoreOf(results: ItemScore[], item: string): number | undefined {
   return results.find((r) => r.item === item)?.score
@@ -162,6 +169,13 @@ describe('clusterItemsByFavorites', () => {
     }
   })
 
+  it('uses alphabetical tie-break when coverage is equal', () => {
+    const result = clusterItemsByFavorites(['Exercise', 'Cleanliness'])
+    const singleFavoriteClusters = result.filter((cluster) => cluster.favorites.length === 1)
+    expect(singleFavoriteClusters[0]!.favorites).toEqual(['Cleanliness'])
+    expect(singleFavoriteClusters[1]!.favorites).toEqual(['Exercise'])
+  })
+
   it('deduplicates input favorites case-insensitively', () => {
     const result = clusterItemsByFavorites(['Exercise', 'exercise', 'EXERCISE'])
     expect(result).toHaveLength(1)
@@ -178,5 +192,60 @@ describe('clusterItemsByFavorites', () => {
     expect(topCluster.items).toContain('Bonfire')
     // Torch only appears in Lots of Fire, not Group Activities — should NOT be here
     expect(topCluster.items).not.toContain('Torch')
+  })
+})
+
+describe('selectTopNonOverlappingClusters', () => {
+  it('selects a non-overlapping set with the greatest total coverage', () => {
+    const clusters: ItemCluster[] = [
+      { favorites: ['A', 'B'], items: ['AB'] },
+      { favorites: ['A'], items: ['A'] },
+      { favorites: ['C', 'D'], items: ['CD'] },
+      { favorites: ['E'], items: ['E'] },
+    ]
+
+    const result = selectTopNonOverlappingClusters(clusters, 3)
+    expect(result.map((cluster) => cluster.favorites)).toEqual([['A', 'B'], ['C', 'D'], ['E']])
+  })
+
+  it('never returns overlapping favorites', () => {
+    const clusters: ItemCluster[] = [
+      { favorites: ['A', 'B'], items: ['AB'] },
+      { favorites: ['B', 'C'], items: ['BC'] },
+      { favorites: ['D'], items: ['D'] },
+    ]
+
+    const result = selectTopNonOverlappingClusters(clusters, 3)
+    const used = new Set<string>()
+    for (const cluster of result) {
+      for (const favorite of cluster.favorites) {
+        const key = favorite.toLowerCase()
+        expect(used.has(key)).toBe(false)
+        used.add(key)
+      }
+    }
+  })
+
+  it('returns at most limit clusters', () => {
+    const clusters: ItemCluster[] = [
+      { favorites: ['A'], items: ['A'] },
+      { favorites: ['B'], items: ['B'] },
+      { favorites: ['C'], items: ['C'] },
+      { favorites: ['D'], items: ['D'] },
+    ]
+
+    const result = selectTopNonOverlappingClusters(clusters, 3)
+    expect(result).toHaveLength(3)
+  })
+
+  it('is deterministic across equivalent coverage ties', () => {
+    const clusters: ItemCluster[] = [
+      { favorites: ['B'], items: ['B'] },
+      { favorites: ['A'], items: ['A'] },
+      { favorites: ['C'], items: ['C'] },
+    ]
+
+    const result = selectTopNonOverlappingClusters(clusters, 2)
+    expect(result.map((cluster) => cluster.favorites[0])).toEqual(['A', 'B'])
   })
 })
