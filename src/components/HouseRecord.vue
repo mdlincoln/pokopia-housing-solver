@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import PokemonCard from '@/components/PokemonCard.vue'
+import { favoritesToItems } from '@/items'
 import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/solver'
 import { BBadge, BCardGroup, BListGroupItem, type ColorVariant } from 'bootstrap-vue-next'
 import { computed } from 'vue'
@@ -13,6 +14,11 @@ const sharedFavorites = computed(() => {
   if (props.house.pokemon.length < 2) return []
   const sets = props.house.pokemon.map((name) => new Set(props.pokemonData[name]?.favorites ?? []))
   return rankHouseFavorites(sets)
+})
+
+const recommendedItems = computed(() => {
+  if (sharedFavorites.value.length === 0) return []
+  return favoritesToItems(sharedFavorites.value).sort((a, b) => b.score - a.score)
 })
 
 const HABITAT_VARIANT: Record<string, ColorVariant> = {
@@ -84,5 +90,14 @@ const sharedHabitats = computed(() => {
       />
     </BCardGroup>
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
+
+    <details v-if="recommendedItems.length" data-testid="recommended-items" class="mt-2">
+      <summary>Recommended items ({{ recommendedItems.length }})</summary>
+      <ol data-testid="recommended-items-list">
+        <li v-for="entry in recommendedItems" :key="entry.item">
+          {{ entry.item }} <small class="text-muted">({{ entry.score }})</small>
+        </li>
+      </ol>
+    </details>
   </BListGroupItem>
 </template>

@@ -2,4 +2,5 @@ This directory defines the high-level concepts, business logic, and architecture
 
 - [[Development]] — Development setup and project commands
 - [[solver]] — Greedy clustering pokemon housing optimization module
+- [[items]] — Item scoring for household favorites
 - [[ui]] — Vue homepage UI for configuring and running the solver

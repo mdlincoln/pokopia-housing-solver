@@ -190,4 +190,30 @@ test.describe('Homepage', () => {
     const habitatBadges = page.getByTestId('habitat-badge')
     await expect(habitatBadges).toHaveCount(2) // 2 pokemon in the 1 medium house
   })
+
+  test('displays recommended items for house with shared favorites', async ({ page }) => {
+    await page.goto('/')
+
+    // 1 medium house — Bulbasaur and Ivysaur share favorites (Lots of nature, Soft stuff, Cute stuff)
+    const inputs = page.locator('input[type="number"]')
+    await inputs.nth(1).fill('1') // 1 medium house
+
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Ivysaur')
+
+    await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
+
+    // The details element should exist with recommended items
+    const details = page.getByTestId('recommended-items')
+    await expect(details).toBeVisible()
+
+    // Summary should show item count
+    const summary = details.locator('summary')
+    await expect(summary).toContainText('Recommended items')
+
+    // Items are in the DOM inside the details element
+    const listItems = page.getByTestId('recommended-items-list').locator('li')
+    const count = await listItems.count()
+    expect(count).toBeGreaterThan(0)
+  })
 })

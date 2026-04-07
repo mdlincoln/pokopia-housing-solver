@@ -1,72 +1,119 @@
 import { describe, expect, it } from 'vitest'
-import { idealItems } from '../items'
+import { favoritesToItems, idealItems, type ItemScore } from '../items'
+
+function scoreOf(results: ItemScore[], item: string): number | undefined {
+  return results.find((r) => r.item === item)?.score
+}
 
 describe('idealItems', () => {
-  it('returns empty map for empty favorites list', () => {
+  it('returns empty array for empty favorites list', () => {
     const result = idealItems([])
-    expect(result.size).toBe(0)
+    expect(result).toEqual([])
   })
 
-  it('returns empty map for unknown favorite', () => {
+  it('returns empty array for unknown favorite', () => {
     const result = idealItems(['Nonexistent Favorite'])
-    expect(result.size).toBe(0)
+    expect(result).toEqual([])
   })
 
-  it('returns items for a single favorite with count 1', () => {
+  it('returns items for a single favorite with score 1', () => {
     const result = idealItems(['Exercise'])
     // Exercise has exactly one item: "Punching bag"
-    expect(result.size).toBe(1)
-    expect(result.get('Punching bag')).toBe(1)
+    expect(result).toHaveLength(1)
+    expect(scoreOf(result, 'Punching bag')).toBe(1)
   })
 
-  it('counts items that appear in multiple input favorites', () => {
+  it('scores items that appear in multiple input favorites', () => {
     // "Gaming bed" appears in both Colorful Stuff and Shiny Stuff
     const result = idealItems(['Colorful Stuff', 'Shiny Stuff'])
-    expect(result.get('Gaming bed')).toBe(2)
+    expect(scoreOf(result, 'Gaming bed')).toBe(2)
   })
 
-  it('returns count 1 for items unique to one favorite', () => {
+  it('returns score 1 for items unique to one favorite', () => {
     // "Stardust" is in Shiny Stuff but not in Colorful Stuff
     const result = idealItems(['Colorful Stuff', 'Shiny Stuff'])
-    expect(result.get('Stardust')).toBe(1)
+    expect(scoreOf(result, 'Stardust')).toBe(1)
   })
 
   it('ignores unknown favorites mixed with valid ones', () => {
     const result = idealItems(['Exercise', 'Not A Real Favorite'])
-    expect(result.size).toBe(1)
-    expect(result.get('Punching bag')).toBe(1)
+    expect(result).toHaveLength(1)
+    expect(scoreOf(result, 'Punching bag')).toBe(1)
   })
 
   it('returns all items from a multi-item favorite', () => {
     const result = idealItems(['Cleanliness'])
     // Cleanliness: Bathtime set, Cleaning supplies, Shower, Bathtub, Bouncy blue bathtub, Water basin
-    expect(result.size).toBe(6)
-    for (const [, count] of result) {
-      expect(count).toBe(1)
+    expect(result).toHaveLength(6)
+    for (const { score } of result) {
+      expect(score).toBe(1)
     }
   })
 
-  it('counts shared items across three favorites', () => {
+  it('scores shared items across three favorites', () => {
     // "Bonfire" appears in both Lots of Fire and Group Activities
     // "Campfire" appears in Lots of Fire and Stone Stuff
     const result = idealItems(['Lots of Fire', 'Group Activities', 'Stone Stuff'])
-    expect(result.get('Bonfire')).toBe(2)
-    expect(result.get('Campfire')).toBe(2)
+    expect(scoreOf(result, 'Bonfire')).toBe(2)
+    expect(scoreOf(result, 'Campfire')).toBe(2)
   })
 
-  it('multiplies counts when a favorite appears multiple times', () => {
+  it('multiplies scores when a favorite appears multiple times', () => {
     // Exercise has one item: "Punching bag"
-    // Passing Exercise twice should give Punching bag a count of 2
+    // Passing Exercise twice should give Punching bag a score of 2
     const result = idealItems(['Exercise', 'Exercise'])
-    expect(result.get('Punching bag')).toBe(2)
+    expect(scoreOf(result, 'Punching bag')).toBe(2)
   })
 
   it('stacks duplicates with cross-favorite overlap', () => {
     // "Gaming bed" is in both Colorful Stuff and Shiny Stuff
     // With Shiny Stuff listed twice: Gaming bed should score 3 (1 from Colorful + 2 from Shiny)
     const result = idealItems(['Colorful Stuff', 'Shiny Stuff', 'Shiny Stuff'])
-    expect(result.get('Gaming bed')).toBe(3)
+    expect(scoreOf(result, 'Gaming bed')).toBe(3)
     // Stardust is only in Shiny Stuff, so it scores 2
-    expect(result.get('Stardust')).toBe(2)
+    expect(scoreOf(result, 'Stardust')).toBe(2)
+  })
+})
+
+describe('favoritesToItems', () => {
+  it('returns empty array for empty input', () => {
+    const result = favoritesToItems([])
+    expect(result).toEqual([])
+  })
+
+  it('handles a single favorite with count 1', () => {
+    const result = favoritesToItems([{ favorite: 'Exercise', count: 1 }])
+    expect(result).toHaveLength(1)
+    expect(scoreOf(result, 'Punching bag')).toBe(1)
+  })
+
+  it('multiplies item scores by favorite count', () => {
+    // Exercise appears 3 times → Punching bag scores 3
+    const result = favoritesToItems([{ favorite: 'Exercise', count: 3 }])
+    expect(scoreOf(result, 'Punching bag')).toBe(3)
+  })
+
+  it('combines counts across multiple favorites', () => {
+    // Gaming bed is in both Colorful Stuff and Shiny Stuff
+    const result = favoritesToItems([
+      { favorite: 'Colorful Stuff', count: 1 },
+      { favorite: 'Shiny Stuff', count: 1 },
+    ])
+    expect(scoreOf(result, 'Gaming bed')).toBe(2)
+  })
+
+  it('stacks repeated favorites with cross-favorite overlap', () => {
+    // Shiny Stuff ×2 + Colorful Stuff ×1 → Gaming bed scores 3
+    const result = favoritesToItems([
+      { favorite: 'Colorful Stuff', count: 1 },
+      { favorite: 'Shiny Stuff', count: 2 },
+    ])
+    expect(scoreOf(result, 'Gaming bed')).toBe(3)
+    expect(scoreOf(result, 'Stardust')).toBe(2)
+  })
+
+  it('ignores favorites with count 0', () => {
+    const result = favoritesToItems([{ favorite: 'Exercise', count: 0 }])
+    expect(result).toEqual([])
   })
 })
