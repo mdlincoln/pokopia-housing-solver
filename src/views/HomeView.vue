@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import HouseRecord from '@/components/HouseRecord.vue'
+import { itemsForFavorite } from '@/items'
 import PokemonSelect from '@/components/PokemonSelect.vue'
 import { solve, type AdjacencyData, type PokemonData, type SolverResult } from '@/solver'
 import {
@@ -59,6 +60,10 @@ const selectedTimestamp = ref<number | null>(null)
 const queryTitle = ref('')
 const showSaveModal = ref(false)
 const saveSuccess = ref(false)
+const selectedFavorite = ref('')
+const showFavoriteItemsModal = ref(false)
+
+const selectedFavoriteItems = computed(() => itemsForFavorite(selectedFavorite.value))
 
 function openSaveModal() {
   queryTitle.value = ''
@@ -80,6 +85,11 @@ function confirmSave() {
   setTimeout(() => {
     saveSuccess.value = false
   }, 3000)
+}
+
+function openFavoriteItemsModal(favorite: string) {
+  selectedFavorite.value = favorite
+  showFavoriteItemsModal.value = true
 }
 
 watch(selectedTimestamp, (ts) => {
@@ -137,7 +147,17 @@ watch(
   { deep: true },
 )
 
-defineExpose({ small, medium, large, selectedPokemon, queryTitle, confirmSave })
+defineExpose({
+  small,
+  medium,
+  large,
+  selectedPokemon,
+  queryTitle,
+  confirmSave,
+  selectedFavorite,
+  selectedFavoriteItems,
+  showFavoriteItemsModal,
+})
 </script>
 
 <template>
@@ -228,6 +248,7 @@ defineExpose({ small, medium, large, selectedPokemon, queryTitle, confirmSave })
         :key="house.houseIndex"
         :house="house"
         :pokemon-data="pokemonData!"
+        @favorite-clicked="openFavoriteItemsModal"
       />
     </BListGroup>
 
@@ -243,4 +264,20 @@ defineExpose({ small, medium, large, selectedPokemon, queryTitle, confirmSave })
       </ul>
     </BAlert>
   </section>
+
+  <BModal
+    v-model="showFavoriteItemsModal"
+    :title="`Items for ${selectedFavorite}`"
+    ok-only
+    ok-title="Close"
+    data-testid="favorite-items-modal"
+  >
+    <p class="mb-2" data-testid="favorite-items-modal-title">{{ selectedFavorite }}</p>
+    <ul v-if="selectedFavoriteItems.length" class="mb-0" data-testid="favorite-items-list">
+      <li v-for="item in selectedFavoriteItems" :key="item">{{ item }}</li>
+    </ul>
+    <p v-else class="text-muted mb-0" data-testid="favorite-items-empty">
+      No items found for this favorite.
+    </p>
+  </BModal>
 </template>

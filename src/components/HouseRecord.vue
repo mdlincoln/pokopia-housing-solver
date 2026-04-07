@@ -10,6 +10,14 @@ const props = defineProps<{
   pokemonData: PokemonData
 }>()
 
+const emit = defineEmits<{
+  favoriteClicked: [favorite: string]
+}>()
+
+function handleFavoriteClick(favorite: string) {
+  emit('favoriteClicked', favorite)
+}
+
 const sharedFavorites = computed(() => {
   if (props.house.pokemon.length < 2) return []
   const sets = props.house.pokemon.map((name) => new Set(props.pokemonData[name]?.favorites ?? []))
@@ -83,6 +91,12 @@ const sharedHabitats = computed(() => {
           variant="info"
           pill
           class="me-1"
+          role="button"
+          tabindex="0"
+          data-testid="shared-favorite-badge"
+          @click="handleFavoriteClick(item.favorite)"
+          @keydown.enter.prevent="handleFavoriteClick(item.favorite)"
+          @keydown.space.prevent="handleFavoriteClick(item.favorite)"
         >
           {{ item.favorite }} &times;{{ item.count }}
         </BBadge>
@@ -97,6 +111,7 @@ const sharedHabitats = computed(() => {
         :image="pokemonData[name]!.image"
         :favorites="pokemonData[name]!.favorites"
         :habitat="pokemonData[name]?.habitat"
+        @favorite-clicked="handleFavoriteClick"
       />
     </BCardGroup>
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>

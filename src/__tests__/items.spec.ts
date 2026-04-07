@@ -3,6 +3,7 @@ import {
   clusterItemsByFavorites,
   favoritesToItems,
   idealItems,
+  itemsForFavorite,
   selectTopNonOverlappingClusters,
   type ItemCluster,
   type ItemScore,
@@ -11,6 +12,21 @@ import {
 function scoreOf(results: ItemScore[], item: string): number | undefined {
   return results.find((r) => r.item === item)?.score
 }
+
+describe('itemsForFavorite', () => {
+  it('returns items for a known favorite', () => {
+    const result = itemsForFavorite('Exercise')
+    expect(result).toContain('Punching bag')
+  })
+
+  it('is case-insensitive', () => {
+    expect(itemsForFavorite('exercise')).toEqual(itemsForFavorite('Exercise'))
+  })
+
+  it('returns empty list for unknown favorite', () => {
+    expect(itemsForFavorite('Not A Real Favorite')).toEqual([])
+  })
+})
 
 describe('idealItems', () => {
   it('returns empty array for empty favorites list', () => {

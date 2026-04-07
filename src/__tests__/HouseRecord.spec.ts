@@ -272,4 +272,45 @@ describe('HouseRecord', () => {
       }
     }
   })
+
+  it('emits favoriteClicked when a shared favorite badge is clicked', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+      FitTwo: { image: '', favorites: ['Exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseIndex: 1,
+      size: 'medium',
+      capacity: 2,
+      pokemon: ['FitOne', 'FitTwo'],
+    }
+
+    const wrapper = mount(HouseRecord, {
+      props: { house, pokemonData },
+    })
+
+    await wrapper.find('[data-testid="shared-favorite-badge"]').trigger('click')
+
+    expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise']])
+  })
+
+  it('emits favoriteClicked when a pokemon card favorite badge is clicked', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseIndex: 1,
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, {
+      props: { house, pokemonData },
+    })
+
+    await wrapper.find('[data-testid="fave-badge"]').trigger('click')
+
+    expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise']])
+  })
 })

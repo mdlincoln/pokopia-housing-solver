@@ -176,4 +176,71 @@ describe('HomeView', () => {
     expect(select.html()).toContain('Jungle paradise')
     expect(select.html()).toContain(new Date(entry.timestamp).toLocaleString())
   })
+
+  it('opens favorite items modal from shared favorite pill', async () => {
+    const sharedFavoriteData = {
+      FitOne: { image: '', favorites: ['Exercise'], habitat: 'Dark' },
+      FitTwo: { image: '', favorites: ['Exercise'], habitat: 'Dark' },
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(sharedFavoriteData),
+        }),
+      ),
+    )
+
+    const solverResult: SolverResult = {
+      houses: [{ houseIndex: 1, size: 'medium', capacity: 2, pokemon: ['FitOne', 'FitTwo'] }],
+      unhoused: [],
+    }
+    mockSolve.mockResolvedValueOnce(solverResult)
+
+    const wrapper = await mountHome()
+    wrapper.vm.medium = 1
+    wrapper.vm.selectedPokemon = ['FitOne', 'FitTwo']
+    await flushPromises()
+
+    await wrapper.find('[data-testid="shared-favorite-badge"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.showFavoriteItemsModal).toBe(true)
+    expect(wrapper.vm.selectedFavorite).toBe('Exercise')
+    expect(wrapper.vm.selectedFavoriteItems).toContain('Punching bag')
+  })
+
+  it('opens favorite items modal from pokemon card favorite pill', async () => {
+    const cardFavoriteData = {
+      Solo: { image: '', favorites: ['Exercise'], habitat: 'Dark' },
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(cardFavoriteData),
+        }),
+      ),
+    )
+
+    const solverResult: SolverResult = {
+      houses: [{ houseIndex: 1, size: 'small', capacity: 1, pokemon: ['Solo'] }],
+      unhoused: [],
+    }
+    mockSolve.mockResolvedValueOnce(solverResult)
+
+    const wrapper = await mountHome()
+    wrapper.vm.small = 1
+    wrapper.vm.selectedPokemon = ['Solo']
+    await flushPromises()
+
+    await wrapper.find('[data-testid="fave-badge"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.showFavoriteItemsModal).toBe(true)
+    expect(wrapper.vm.selectedFavorite).toBe('Exercise')
+    expect(wrapper.vm.selectedFavoriteItems).toContain('Punching bag')
+  })
 })

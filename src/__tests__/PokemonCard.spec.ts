@@ -74,4 +74,32 @@ describe('PokemonCard', () => {
     // bootstrap-vue-next uses 'rounded-pill' class for pill style
     expect(badge.classes()).toContain('rounded-pill')
   })
+
+  it('emits favoriteClicked when a favorite badge is clicked', async () => {
+    const wrapper = mount(PokemonCard, {
+      props: {
+        name: 'TestMon',
+        image: 'test.png',
+        favorites: ['Exercise'],
+      },
+    })
+
+    await wrapper.find('[data-testid="fave-badge"]').trigger('click')
+
+    expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise']])
+  })
+
+  it('emits favoriteClicked when Enter is pressed on a favorite badge', async () => {
+    const wrapper = mount(PokemonCard, {
+      props: {
+        name: 'TestMon',
+        image: 'test.png',
+        favorites: ['Exercise'],
+      },
+    })
+
+    await wrapper.find('[data-testid="fave-badge"]').trigger('keydown.enter')
+
+    expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise']])
+  })
 })

@@ -8,6 +8,12 @@ Maps a household's shared favorites to the best furniture items. See [[src/items
 
 Given a `string[]` of favorites, looks up every item in `public/items_by_favorite.json` that fulfills at least one of those favorites and returns an `{item, score}[]` array where score is the number of input favorites fulfilled. Duplicate favorites in the input multiply item scores. Items fulfilling zero input favorites are omitted.
 
+## itemsForFavorite
+
+Looks up the catalog entries for one favorite name using a case-insensitive key. See [[src/items.ts#itemsForFavorite]].
+
+This helper returns a `string[]` list of items in catalog order and is used by the UI modal that opens from favorite pills.
+
 ## clusterItemsByFavorites
 
 Builds interchangeable item clusters keyed by the exact favorites each item fulfills. See [[src/items.ts#clusterItemsByFavorites]].

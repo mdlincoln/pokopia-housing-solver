@@ -14,6 +14,14 @@ export interface ItemScore {
 }
 
 /**
+ * Returns catalog items that fulfill a single favorite.
+ * Lookup is case-insensitive and preserves catalog order.
+ */
+export function itemsForFavorite(favorite: string): string[] {
+  return [...(catalogByLower.get(favorite.toLowerCase()) ?? [])]
+}
+
+/**
  * Given a list of pokemon favorites for a household, returns an array of
  * items with the number of input favorites each item fulfills.
  * Duplicate favorites in the input count each fulfilling item again,

@@ -17,6 +17,14 @@ const props = defineProps<{
   habitat?: string
 }>()
 
+const emit = defineEmits<{
+  favoriteClicked: [favorite: string]
+}>()
+
+function handleFavoriteClick(favorite: string) {
+  emit('favoriteClicked', favorite)
+}
+
 const imgURL = computed(() => `https://pokopia-roommate-matchmaker.netlify.app/${props.image}`)
 
 const HABITAT_VARIANT: Record<string, ColorVariant> = {
@@ -53,6 +61,11 @@ const habitatVariant = computed(() =>
               pill
               class="me-1 mb-1"
               data-testid="fave-badge"
+              role="button"
+              tabindex="0"
+              @click="handleFavoriteClick(fav)"
+              @keydown.enter.prevent="handleFavoriteClick(fav)"
+              @keydown.space.prevent="handleFavoriteClick(fav)"
             >
               {{ fav }}
             </BBadge>
