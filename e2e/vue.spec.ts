@@ -191,6 +191,28 @@ test.describe('Homepage', () => {
     await expect(habitatBadges).toHaveCount(2) // 2 pokemon in the 1 medium house
   })
 
+  test('keeps bright and dark pokemon of the same medium house', async ({ page }) => {
+    await page.goto('/')
+
+    const inputs = page.locator('input[type="number"]')
+    await inputs.nth(0).fill('1') // 1 small house
+    await inputs.nth(1).fill('1') // 1 medium house
+
+    await selectPokemon(page, 'Venonat')
+    await selectPokemon(page, 'Weezing')
+
+    await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
+
+    const mediumHouse = page.getByTestId('house-card').filter({
+      has: page.getByRole('heading', { name: 'medium house #2' }),
+    })
+    await expect(mediumHouse).toHaveCount(1)
+
+    const weezingInMedium = (await mediumHouse.getByText('Weezing', { exact: true }).count()) > 0
+    const venonatInMedium = (await mediumHouse.getByText('Venonat', { exact: true }).count()) > 0
+    expect(weezingInMedium && venonatInMedium).toBe(false)
+  })
+
   test('displays recommended items for house with shared favorites', async ({ page }) => {
     await page.goto('/')
 

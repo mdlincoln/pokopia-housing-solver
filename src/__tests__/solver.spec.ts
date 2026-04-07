@@ -59,19 +59,19 @@ describe('buildSubMatrix', () => {
 })
 
 // 6-pokemon fixture for clustering tests
-// Cluster1: E,F,G,H form a tight clique (weight 5 between all pairs)
-// Cluster2: I,J are connected (weight 3)
-// Cross-cluster connections are weak (weight 1)
+// Cluster1: E,F,G,H form a tight clique (weight 5 between all pairs), habitat: Cool
+// Cluster2: I,J are connected (weight 3), habitat: Warm
+// Cross-cluster connections are null (habitat-incompatible: Cool ↔ Warm)
 const clusterFixture: AdjacencyData = {
   pokemon: ['E', 'F', 'G', 'H', 'I', 'J'],
   matrix: [
-    //  E  F  G  H  I  J
-    [0, 5, 5, 5, 1, 0], // E
-    [5, 0, 5, 5, 0, 1], // F
-    [5, 5, 0, 5, 1, 0], // G
-    [5, 5, 5, 0, 0, 1], // H
-    [1, 0, 1, 0, 0, 3], // I
-    [0, 1, 0, 1, 3, 0], // J
+    //     E     F     G     H     I     J
+    [0, 5, 5, 5, null, null], // E (Cool)
+    [5, 0, 5, 5, null, null], // F (Cool)
+    [5, 5, 0, 5, null, null], // G (Cool)
+    [5, 5, 5, 0, null, null], // H (Cool)
+    [null, null, null, null, 0, 3], // I (Warm)
+    [null, null, null, null, 3, 0], // J (Warm)
   ],
 }
 
@@ -179,11 +179,40 @@ describe('clusterPreAssign', () => {
 })
 
 const testData: PokemonData = {
-  AlphaOne: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'] },
-  AlphaTwo: { image: '', favorites: ['A', 'B', 'C', 'D', 'F'] }, // 4 shared with AlphaOne
-  BetaOne: { image: '', favorites: ['X', 'Y', 'Z', 'W', 'V'] }, // 0 shared with Alphas
-  BetaTwo: { image: '', favorites: ['X', 'Y', 'Z', 'W', 'U'] }, // 4 shared with BetaOne
-  Loner: { image: '', favorites: ['Q', 'R', 'S', 'T', 'P'] }, // 0 shared with anyone
+  AlphaOne: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Cool' },
+  AlphaTwo: { image: '', favorites: ['A', 'B', 'C', 'D', 'F'], habitat: 'Cool' }, // 4 shared with AlphaOne
+  BetaOne: { image: '', favorites: ['X', 'Y', 'Z', 'W', 'V'], habitat: 'Dry' }, // 0 shared with Alphas
+  BetaTwo: { image: '', favorites: ['X', 'Y', 'Z', 'W', 'U'], habitat: 'Dry' }, // 4 shared with BetaOne
+  Loner: { image: '', favorites: ['Q', 'R', 'S', 'T', 'P'] }, // 0 shared with anyone, no habitat
+  ClashCool: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Cool' },
+  ClashWarm: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Warm' }, // opposite Cool on temperature axis
+  NeutralDark: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' }, // different axis, no conflict
+}
+
+// Explicit adjacency fixture matching testData order.
+// Includes habitat effects: same-habitat bonus (+1), opposite-axis exclusions (null).
+const testDataFixture: AdjacencyData = {
+  pokemon: [
+    'AlphaOne',
+    'AlphaTwo',
+    'BetaOne',
+    'BetaTwo',
+    'Loner',
+    'ClashCool',
+    'ClashWarm',
+    'NeutralDark',
+  ],
+  matrix: [
+    // AlphaOne  AlphaTwo BetaOne BetaTwo Loner ClashCool ClashWarm NeutralDark
+    [0, 5, 0, 0, 0, 6, null, 5],
+    [5, 0, 0, 0, 0, 5, null, 4],
+    [0, 0, 0, 5, 0, 0, 0, 0],
+    [0, 0, 5, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [6, 5, 0, 0, 0, 0, null, 5],
+    [null, null, 0, 0, 0, null, 0, 5],
+    [5, 4, 0, 0, 0, 5, 5, 0],
+  ],
 }
 
 describe('enumerateHouses', () => {
@@ -218,7 +247,12 @@ describe('countSharedFavorites', () => {
 
 describe('solve', () => {
   it('places 1 pokemon in 1 small house', async () => {
-    const result = await solve(['AlphaOne'], { small: 1, medium: 0, large: 0 }, testData)
+    const result = await solve(
+      ['AlphaOne'],
+      { small: 1, medium: 0, large: 0 },
+      testData,
+      testDataFixture,
+    )
     expect(result.unhoused).toEqual([])
     expect(result.houses[0]!.pokemon).toEqual(['AlphaOne'])
   }, 30_000)
@@ -228,13 +262,14 @@ describe('solve', () => {
       ['AlphaOne', 'AlphaTwo'],
       { small: 1, medium: 0, large: 0 },
       testData,
+      testDataFixture,
     )
     expect(result.houses[0]!.pokemon).toHaveLength(1)
     expect(result.unhoused).toHaveLength(1)
   }, 30_000)
 
   it('returns empty result for no pokemon', async () => {
-    const result = await solve([], { small: 1, medium: 0, large: 0 }, testData)
+    const result = await solve([], { small: 1, medium: 0, large: 0 }, testData, testDataFixture)
     expect(result.unhoused).toEqual([])
     expect(result.houses[0]!.pokemon).toEqual([])
   })
@@ -244,6 +279,7 @@ describe('solve', () => {
       ['AlphaOne', 'AlphaTwo'],
       { small: 0, medium: 0, large: 0 },
       testData,
+      testDataFixture,
     )
     expect(result.houses).toEqual([])
     expect(result.unhoused).toHaveLength(2)
@@ -254,6 +290,7 @@ describe('solve', () => {
       ['AlphaOne', 'AlphaTwo', 'BetaOne'],
       { small: 0, medium: 0, large: 1 },
       testData,
+      testDataFixture,
     )
     expect(result.unhoused).toEqual([])
     expect(result.houses[0]!.pokemon).toHaveLength(3)
@@ -266,6 +303,7 @@ describe('solve', () => {
       ['AlphaOne', 'AlphaTwo', 'BetaOne'],
       { small: 1, medium: 1, large: 0 },
       testData,
+      testDataFixture,
     )
     expect(result.unhoused).toEqual([])
 
@@ -280,6 +318,7 @@ describe('solve', () => {
       ['AlphaOne', 'AlphaTwo', 'BetaOne', 'BetaTwo'],
       { small: 0, medium: 2, large: 0 },
       testData,
+      testDataFixture,
     )
     expect(result.unhoused).toEqual([])
 
@@ -295,8 +334,106 @@ describe('solve', () => {
   }, 30_000)
 
   it('throws for unknown pokemon names', async () => {
-    await expect(solve(['FakeMon'], { small: 1, medium: 0, large: 0 }, testData)).rejects.toThrow(
-      'Unknown pokemon: FakeMon',
-    )
+    await expect(
+      solve(['FakeMon'], { small: 1, medium: 0, large: 0 }, testData, testDataFixture),
+    ).rejects.toThrow('Unknown pokemon: FakeMon')
   })
+})
+
+describe('habitat incompatibility', () => {
+  it('prevents opposite-habitat pokemon from sharing a medium house', async () => {
+    const result = await solve(
+      ['ClashCool', 'ClashWarm'],
+      { small: 0, medium: 1, large: 0 },
+      testData,
+      testDataFixture,
+    )
+
+    // They share 5 favorites but are habitat-incompatible — only one can be housed
+    expect(result.houses[0]!.pokemon).toHaveLength(1)
+    expect(result.unhoused).toHaveLength(1)
+  }, 30_000)
+
+  it('places opposite-habitat pokemon in separate small houses', async () => {
+    const result = await solve(
+      ['ClashCool', 'ClashWarm'],
+      { small: 2, medium: 0, large: 0 },
+      testData,
+      testDataFixture,
+    )
+
+    expect(result.unhoused).toEqual([])
+    expect(result.houses[0]!.pokemon).toHaveLength(1)
+    expect(result.houses[1]!.pokemon).toHaveLength(1)
+  }, 30_000)
+
+  it('excludes opposite-habitat pokemon from same large house', async () => {
+    // ClashCool + NeutralDark are compatible; ClashWarm opposes ClashCool
+    const result = await solve(
+      ['ClashCool', 'ClashWarm', 'NeutralDark'],
+      { small: 0, medium: 0, large: 1 },
+      testData,
+      testDataFixture,
+    )
+
+    // Large house seats 4, but ClashCool and ClashWarm can't cohabit
+    const housed = result.houses[0]!.pokemon
+    expect(housed).toHaveLength(2)
+    expect(result.unhoused).toHaveLength(1)
+    // The two that ARE housed must not be the incompatible pair
+    expect(housed).not.toEqual(expect.arrayContaining(['ClashCool', 'ClashWarm']))
+  }, 30_000)
+
+  it('allows different-axis habitats to share a house', async () => {
+    // Cool ↔ Dark are on different axes — no conflict
+    const result = await solve(
+      ['ClashCool', 'NeutralDark'],
+      { small: 0, medium: 1, large: 0 },
+      testData,
+      testDataFixture,
+    )
+
+    expect(result.unhoused).toEqual([])
+    expect(result.houses[0]!.pokemon.sort()).toEqual(['ClashCool', 'NeutralDark'])
+  }, 30_000)
+
+  it('prevents clustering of opposite-habitat pokemon into a medium house', async () => {
+    // 1 Cool pokemon + 1 Warm: the Warm one has identical favorites to the Cool one
+    // but must not be clustered with them in a house
+    const result = await solve(
+      ['ClashCool', 'ClashWarm'],
+      { small: 1, medium: 1, large: 0 },
+      testData,
+      testDataFixture,
+    )
+
+    // Find the medium house
+    const mediumHouse = result.houses.find((h) => h.size === 'medium')!
+    // ClashWarm must not be in the same house as any Cool pokemon.
+    const warmInMedium = mediumHouse.pokemon.includes('ClashWarm')
+    const coolInMedium = ['ClashCool', 'AlphaOne', 'AlphaTwo'].some((name) =>
+      mediumHouse.pokemon.includes(name),
+    )
+    expect(warmInMedium && coolInMedium).toBe(false)
+  }, 30_000)
+
+  it('prevents clustering of opposite-habitat pokemon into a large house', async () => {
+    // 4 Cool pokemon + 1 Warm: the Warm one has identical favorites to the Cool ones
+    // but must not be clustered with them in a large house
+    const result = await solve(
+      ['AlphaOne', 'AlphaTwo', 'ClashCool', 'ClashWarm', 'NeutralDark'],
+      { small: 1, medium: 0, large: 1 },
+      testData,
+      testDataFixture,
+    )
+
+    // Find the large house
+    const largeHouse = result.houses.find((h) => h.size === 'large')!
+    // ClashWarm must not be in the same house as any Cool pokemon.
+    const warmInLarge = largeHouse.pokemon.includes('ClashWarm')
+    const coolInLarge = ['ClashCool', 'AlphaOne', 'AlphaTwo'].some((name) =>
+      largeHouse.pokemon.includes(name),
+    )
+    expect(warmInLarge && coolInLarge).toBe(false)
+  }, 30_000)
 })

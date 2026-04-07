@@ -21,7 +21,7 @@
 
 export interface AdjacencyData {
   pokemon: string[]
-  matrix: number[][]
+  matrix: (number | null)[][]
 }
 
 /**
@@ -32,10 +32,15 @@ export interface AdjacencyData {
  * subMatrix[i][j] = adjacency score between pokemonNames[i] and pokemonNames[j].
  * Pokemon not found in adjacency data get 0 for all their connections.
  */
-export function buildSubMatrix(pokemonNames: string[], adjacency: AdjacencyData): number[][] {
+export function buildSubMatrix(
+  pokemonNames: string[],
+  adjacency: AdjacencyData,
+): (number | null)[][] {
   const nameToIdx = new Map(adjacency.pokemon.map((name, i) => [name, i]))
   const n = pokemonNames.length
-  const matrix: number[][] = Array.from({ length: n }, () => Array.from({ length: n }, () => 0))
+  const matrix: (number | null)[][] = Array.from({ length: n }, () =>
+    Array.from({ length: n }, (): number | null => 0),
+  )
 
   for (let i = 0; i < n; i++) {
     const fullI = nameToIdx.get(pokemonNames[i]!)
@@ -67,7 +72,7 @@ export function buildSubMatrix(pokemonNames: string[], adjacency: AdjacencyData)
  */
 export function agglomerativeCluster4(
   available: Set<number>,
-  subMatrix: number[][],
+  subMatrix: (number | null)[][],
   count: number,
 ): number[][] {
   if (count === 0 || available.size < 4) return []
@@ -81,18 +86,28 @@ export function agglomerativeCluster4(
 
   // Precompute average-linkage distances between all cluster pairs
   // avgLink[idA][idB] = sum of weights between members / (|A| * |B|)
+  // A null entry between any cross-cluster pair forbids the merge entirely.
   const avgLink = new Map<number, Map<number, number>>()
   for (const [idA, membersA] of clusters) {
     const row = new Map<number, number>()
     for (const [idB, membersB] of clusters) {
       if (idA >= idB) continue
       let total = 0
+      let forbidden = false
       for (const a of membersA) {
         for (const b of membersB) {
-          total += subMatrix[a]![b] ?? 0
+          const val = subMatrix[a]![b]
+          if (val === null) {
+            forbidden = true
+            break
+          }
+          total += val ?? 0
         }
+        if (forbidden) break
       }
-      row.set(idB, total / (membersA.length * membersB.length))
+      if (!forbidden) {
+        row.set(idB, total / (membersA.length * membersB.length))
+      }
     }
     avgLink.set(idA, row)
   }
@@ -151,10 +166,24 @@ export function agglomerativeCluster4(
     for (const [idC, membersC] of clusters) {
       if (idC === bestA) continue
       let total = 0
+      let forbidden = false
       for (const a of merged) {
         for (const c of membersC) {
-          total += subMatrix[a]![c] ?? 0
+          const val = subMatrix[a]![c]
+          if (val === null) {
+            forbidden = true
+            break
+          }
+          total += val ?? 0
         }
+        if (forbidden) break
+      }
+      if (forbidden) {
+        // Remove any existing linkage — merge is structurally forbidden
+        const lo = Math.min(bestA, idC)
+        const hi = Math.max(bestA, idC)
+        avgLink.get(lo)?.delete(hi)
+        continue
       }
       const score = total / (merged.length * membersC.length)
       // Store in canonical order (lower id first)
@@ -170,7 +199,8 @@ export function agglomerativeCluster4(
     let total = 0
     for (let i = 0; i < members.length; i++) {
       for (let j = i + 1; j < members.length; j++) {
-        total += subMatrix[members[i]!]![members[j]!] ?? 0
+        const val = subMatrix[members[i]!]![members[j]!]
+        total += val ?? 0
       }
     }
     return { members, score: total }
@@ -195,18 +225,18 @@ export function agglomerativeCluster4(
  */
 export function greedyMaxWeightMatching(
   available: Set<number>,
-  subMatrix: number[][],
+  subMatrix: (number | null)[][],
   count: number,
 ): number[][] {
   if (count === 0 || available.size < 2) return []
 
-  // Collect all weighted edges
+  // Collect all weighted edges (skip null = incompatible)
   const edges: { i: number; j: number; w: number }[] = []
   const avail = [...available]
   for (let a = 0; a < avail.length; a++) {
     for (let b = a + 1; b < avail.length; b++) {
-      const w = subMatrix[avail[a]!]![avail[b]!] ?? 0
-      if (w > 0) edges.push({ i: avail[a]!, j: avail[b]!, w })
+      const w = subMatrix[avail[a]!]![avail[b]!]
+      if (w != null && w > 0) edges.push({ i: avail[a]!, j: avail[b]!, w })
     }
   }
 
@@ -243,7 +273,7 @@ export function greedyMaxWeightMatching(
 export function clusterPreAssign(
   pokemonNames: string[],
   houses: EnumeratedHouse[],
-  subMatrix: number[][],
+  subMatrix: (number | null)[][],
 ): Map<string, number> {
   const available = new Set(pokemonNames.map((_, i) => i))
   const result = new Map<string, number>()
@@ -361,8 +391,8 @@ export function countSharedFavorites(nameA: string, nameB: string, data: Pokemon
  *   3. Assign the pokemon and update occupants/capacity.
  *
  * When adjacencyData is available, uses precomputed scores (including habitat
- * bonuses) and rejects any house where an existing occupant has a negative
- * adjacency score with the candidate (hard incompatibility). Without
+ * bonuses) and rejects any house where an existing occupant has a null
+ * adjacency entry with the candidate (structural incompatibility). Without
  * adjacencyData, falls back to counting raw shared favorites on the fly.
  */
 function greedyFillRemaining(
@@ -394,8 +424,8 @@ function greedyFillRemaining(
         for (const occupant of occupants.get(houseIdx) ?? []) {
           if (adjacencyData && fullI !== undefined) {
             const fullJ = nameToIdx!.get(occupant)
-            const val = fullJ !== undefined ? (adjacencyData.matrix[fullI]![fullJ] ?? 0) : 0
-            if (val < 0) {
+            const val = fullJ !== undefined ? adjacencyData.matrix[fullI]![fullJ] : 0
+            if (val === null || val === undefined) {
               incompatible = true
               break
             }
