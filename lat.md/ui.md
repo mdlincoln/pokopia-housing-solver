@@ -16,6 +16,8 @@ The main page at `/` in `src/views/HomeView.vue`, built with Bootstrap Vue Next 
 
 Users set house counts via `BFormInput` (type number) in a `BRow` grid and select pokemon with an autocomplete multi-select. Results update automatically via Vue `watch` whenever inputs change — there is no submit button.
 
+Asset URLs are constructed by the shared helper `src/assetPath.ts` (`assetPath(fileName)` returns `BASE_URL + fileName`). Both `HomeView` and `PokemonCard` import from this module.
+
 A "Show a sample island" button prefills the form with 1 small, 3 medium, 2 large houses and 13 randomly chosen pokemon. It is disabled until pokemon data has loaded.
 
 Pokemon data is fetched from `${import.meta.env.BASE_URL}pokemon_favorites.json` and adjacency data is fetched from `${import.meta.env.BASE_URL}pokemon_adjacency.json` on mount so subpath deployments can still resolve the static files. The solver runs whenever both datasets are loaded and at least one house is configured; otherwise results are hidden.
@@ -60,9 +62,11 @@ Shared favorites are computed internally via [[src/solver.ts#rankHouseFavorites]
 
 Each `PokemonCard` receives the pokemon's `habitat` prop, which it renders as a colored `BBadge` pill (`data-testid="habitat-badge"`). The card uses a horizontal layout (`BCard` with `no-body`, `BRow`/`BCol`, `BCardImg`, `BCardBody`) with the image on the left and name + badges on the right.
 
+Habitat-to-badge-variant mappings for both `HouseRecord` and `PokemonCard` come from the shared constant `HABITAT_VARIANT` in `src/habitats.ts`.
+
 Shared favorite pills and pokemon-card favorite pills are interactive and emit a favorite-selection event to HomeView, which opens the item lookup modal.
 
-House recommendations use all favorites from pokemon assigned to that house (not only shared favorites). The recommendation list shows up to three item-category clusters selected by [[items#selectTopNonOverlappingClusters]], ensuring selected clusters do not overlap favorites while maximizing total favorites covered.
+House recommendations use all favorites from pokemon assigned to that house (not only shared favorites). The recommendation list shows up to three item-category clusters selected by [[items#selectTopNonOverlappingClusters]], ensuring selected clusters do not overlap favorites while maximizing total favorites covered. Favorites are passed directly to `clusterItemsByFavorites`, which handles deduplication internally.
 
 ### Test Selectors
 

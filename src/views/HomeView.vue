@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import HouseRecord from '@/components/HouseRecord.vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
+import { assetPath } from '@/assetPath'
 import { favoritesForItem, itemsForFavorite } from '@/items'
 import { solve, type AdjacencyData, type PokemonData, type SolverResult } from '@/solver'
 import {
@@ -74,8 +75,6 @@ const selectedFavoriteItemRows = computed(() => {
     ),
   }))
 })
-const assetPath = (fileName: string) => `${import.meta.env.BASE_URL}${fileName}`
-
 function openSaveModal() {
   queryTitle.value = ''
   showSaveModal.value = true

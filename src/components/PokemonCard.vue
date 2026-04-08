@@ -1,13 +1,7 @@
 <script setup lang="ts">
-import {
-  BBadge,
-  BCard,
-  BCardBody,
-  BCardImg,
-  BCol,
-  BRow,
-  type ColorVariant,
-} from 'bootstrap-vue-next'
+import { HABITAT_VARIANT } from '@/habitats'
+import { assetPath } from '@/assetPath'
+import { BBadge, BCard, BCardBody, BCardImg, BCol, BRow } from 'bootstrap-vue-next'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -25,16 +19,7 @@ function handleFavoriteClick(favorite: string) {
   emit('favoriteClicked', favorite)
 }
 
-const imgURL = computed(() => `${import.meta.env.BASE_URL}${props.image}`)
-
-const HABITAT_VARIANT: Record<string, ColorVariant> = {
-  Dark: 'dark',
-  Bright: 'warning',
-  Cool: 'info',
-  Warm: 'danger',
-  Dry: 'secondary',
-  Humid: 'success',
-}
+const imgURL = computed(() => assetPath(props.image))
 
 const habitatVariant = computed(() =>
   props.habitat ? (HABITAT_VARIANT[props.habitat] ?? 'light') : null,
