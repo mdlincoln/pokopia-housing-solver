@@ -3,15 +3,18 @@ import { expect, test } from '@playwright/test'
 async function selectPokemon(page: import('@playwright/test').Page, name: string) {
   const input = page.getByPlaceholder('Search pokemon...')
   await expect(input).toBeVisible({ timeout: 10_000 })
-  await input.fill(name.slice(0, 4))
-  await page.getByRole('option', { name }).click()
+  await input.fill(name)
+  const option = page.locator('.tropical-dropdown').getByRole('option', { name, exact: true })
+  await expect(option).toBeVisible({ timeout: 10_000 })
+  await option.dispatchEvent('mousedown')
+  await expect(page.locator('.pokemon-select .favorite-pill', { hasText: name }).first()).toBeVisible()
 }
 
 test.describe('Homepage', () => {
   test('renders the form', async ({ page }) => {
     await page.goto('/')
 
-    await expect(page.locator('h1')).toHaveText('Pokemon Housing')
+    await expect(page.locator('h1')).toHaveText('Pokopia Housing Solver')
     await expect(page.locator('input[type="number"]')).toHaveCount(3)
     await expect(page.getByPlaceholder('Search pokemon...')).toBeVisible()
 

@@ -175,7 +175,7 @@ body {
 
 .config-card {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .config-card::before {
@@ -289,6 +289,11 @@ body {
 
 .pokemon-select-wrap {
   z-index: 20;
+  overflow: visible;
+}
+
+.pokemon-select {
+  overflow: visible;
 }
 
 .results-section {

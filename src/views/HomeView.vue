@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import HouseRecord from "@/components/HouseRecord.vue";
-import PokemonSelect from "@/components/PokemonSelect.vue";
-import { itemsForFavorite } from "@/items";
-import { solve, type AdjacencyData, type PokemonData, type SolverResult } from "@/solver";
+import HouseRecord from '@/components/HouseRecord.vue'
+import PokemonSelect from '@/components/PokemonSelect.vue'
+import { itemsForFavorite } from '@/items'
+import { solve, type AdjacencyData, type PokemonData, type SolverResult } from '@/solver'
 import {
   BAlert,
   BButton,
@@ -16,58 +16,58 @@ import {
   BModal,
   BRow,
   BSpinner,
-} from "bootstrap-vue-next";
-import { computed, onMounted, ref, watch } from "vue";
+} from 'bootstrap-vue-next'
+import { computed, onMounted, ref, watch } from 'vue'
 
-const pokemonData = ref<PokemonData | null>(null);
-const adjacencyData = ref<AdjacencyData | null>(null);
+const pokemonData = ref<PokemonData | null>(null)
+const adjacencyData = ref<AdjacencyData | null>(null)
 const pokemonNames = computed(() =>
   pokemonData.value ? Object.keys(pokemonData.value).sort() : [],
-);
-const selectedPokemon = ref<string[]>([]);
+)
+const selectedPokemon = ref<string[]>([])
 
-const small = ref(0);
-const medium = ref(0);
-const large = ref(0);
+const small = ref(0)
+const medium = ref(0)
+const large = ref(0)
 
-const totalHouses = computed(() => small.value + medium.value + large.value);
+const totalHouses = computed(() => small.value + medium.value + large.value)
 
-const loading = ref(false);
-const error = ref("");
-const result = ref<SolverResult | null>(null);
+const loading = ref(false)
+const error = ref('')
+const result = ref<SolverResult | null>(null)
 
 interface SavedQuery {
-  title: string;
-  timestamp: number;
-  small: number;
-  medium: number;
-  large: number;
-  pokemon: string[];
+  title: string
+  timestamp: number
+  small: number
+  medium: number
+  large: number
+  pokemon: string[]
 }
 
-const STORAGE_KEY = "pokehousing_saved_queries";
+const STORAGE_KEY = 'pokehousing_saved_queries'
 
 function loadSavedQueries(): SavedQuery[] {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
   } catch {
-    return [];
+    return []
   }
 }
 
-const savedQueries = ref<SavedQuery[]>(loadSavedQueries());
-const selectedTimestamp = ref<number | null>(null);
-const queryTitle = ref("");
-const showSaveModal = ref(false);
-const saveSuccess = ref(false);
-const selectedFavorite = ref("");
-const showFavoriteItemsModal = ref(false);
+const savedQueries = ref<SavedQuery[]>(loadSavedQueries())
+const selectedTimestamp = ref<number | null>(null)
+const queryTitle = ref('')
+const showSaveModal = ref(false)
+const saveSuccess = ref(false)
+const selectedFavorite = ref('')
+const showFavoriteItemsModal = ref(false)
 
-const selectedFavoriteItems = computed(() => itemsForFavorite(selectedFavorite.value));
+const selectedFavoriteItems = computed(() => itemsForFavorite(selectedFavorite.value))
 
 function openSaveModal() {
-  queryTitle.value = "";
-  showSaveModal.value = true;
+  queryTitle.value = ''
+  showSaveModal.value = true
 }
 
 function confirmSave() {
@@ -78,74 +78,74 @@ function confirmSave() {
     medium: medium.value,
     large: large.value,
     pokemon: [...selectedPokemon.value],
-  };
-  savedQueries.value = [entry, ...savedQueries.value];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(savedQueries.value));
-  saveSuccess.value = true;
+  }
+  savedQueries.value = [entry, ...savedQueries.value]
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(savedQueries.value))
+  saveSuccess.value = true
   setTimeout(() => {
-    saveSuccess.value = false;
-  }, 3000);
+    saveSuccess.value = false
+  }, 3000)
 }
 
 function openFavoriteItemsModal(favorite: string) {
-  selectedFavorite.value = favorite;
-  showFavoriteItemsModal.value = true;
+  selectedFavorite.value = favorite
+  showFavoriteItemsModal.value = true
 }
 
 watch(selectedTimestamp, (ts) => {
-  if (ts === null) return;
-  const query = savedQueries.value.find((q) => q.timestamp === ts);
-  if (!query) return;
-  small.value = query.small;
-  medium.value = query.medium;
-  large.value = query.large;
-  selectedPokemon.value = [...query.pokemon];
-});
+  if (ts === null) return
+  const query = savedQueries.value.find((q) => q.timestamp === ts)
+  if (!query) return
+  small.value = query.small
+  medium.value = query.medium
+  large.value = query.large
+  selectedPokemon.value = [...query.pokemon]
+})
 
 onMounted(async () => {
   const [favoritesResp, adjacencyResp] = await Promise.all([
-    fetch("/pokemon_favorites.json"),
-    fetch("/pokemon_adjacency.json"),
-  ]);
-  const data: PokemonData = await favoritesResp.json();
-  const adjacency: AdjacencyData = await adjacencyResp.json();
-  pokemonData.value = data;
-  adjacencyData.value = adjacency;
-});
+    fetch('/pokemon_favorites.json'),
+    fetch('/pokemon_adjacency.json'),
+  ])
+  const data: PokemonData = await favoritesResp.json()
+  const adjacency: AdjacencyData = await adjacencyResp.json()
+  pokemonData.value = data
+  adjacencyData.value = adjacency
+})
 
 function loadSample() {
-  small.value = 1;
-  medium.value = 3;
-  large.value = 2;
-  const names = pokemonNames.value;
-  const shuffled = [...names].sort(() => Math.random() - 0.5);
-  selectedPokemon.value = shuffled.slice(0, 13);
+  small.value = 1
+  medium.value = 3
+  large.value = 2
+  const names = pokemonNames.value
+  const shuffled = [...names].sort(() => Math.random() - 0.5)
+  selectedPokemon.value = shuffled.slice(0, 13)
 }
 
 watch(
   [selectedPokemon, small, medium, large, pokemonData, adjacencyData],
   async () => {
     if (!pokemonData.value || !adjacencyData.value || totalHouses.value === 0) {
-      result.value = null;
-      return;
+      result.value = null
+      return
     }
-    loading.value = true;
-    error.value = "";
+    loading.value = true
+    error.value = ''
     try {
       result.value = await solve(
         selectedPokemon.value,
         { small: small.value, medium: medium.value, large: large.value },
         pokemonData.value,
         adjacencyData.value,
-      );
+      )
     } catch (e) {
-      error.value = e instanceof Error ? e.message : "Solver failed";
+      error.value = e instanceof Error ? e.message : 'Solver failed'
     } finally {
-      loading.value = false;
+      loading.value = false
     }
   },
   { deep: true },
-);
+)
 
 defineExpose({
   small,
@@ -157,7 +157,7 @@ defineExpose({
   selectedFavorite,
   selectedFavoriteItems,
   showFavoriteItemsModal,
-});
+})
 </script>
 
 <template>

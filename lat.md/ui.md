@@ -2,6 +2,10 @@
 
 Vue 3 homepage styled with Bootstrap Vue Next (`bootstrap-vue-next`) that lets users configure pokemon housing scenarios and view solver results.
 
+## App Shell
+
+`src/App.vue` provides the page shell and intro copy, including the primary heading text "Pokopia Housing Solver" above the routed HomeView content.
+
 ## HomeView
 
 The main page at `/` in `src/views/HomeView.vue`, built with Bootstrap Vue Next components and a global pastel tropical theme from `src/styles/tropical-theme.css`.
@@ -73,6 +77,8 @@ Global visual theming is implemented in `src/styles/tropical-theme.css`, importe
 The theme defines pastel tropical color tokens, updates Bootstrap color variables, styles cards/pills/forms/dropdowns, and adds subtle entrance/hover motion with a reduced-motion fallback.
 
 A micro-polish layer adds decorative heading marks, playful badge/button treatments, and modal/dropdown accents while keeping selectors and component behavior unchanged.
+
+PokemonSelect's dropdown is allowed to overflow the configuration card bounds so long option lists are fully visible and not clipped by the card container.
 
 ### Behavior
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BContainer } from "bootstrap-vue-next";
+import { BContainer } from 'bootstrap-vue-next'
 </script>
 
 <template>
@@ -13,9 +13,9 @@ import { BContainer } from "bootstrap-vue-next";
       <p>
         I had found several tools for finding highly-ranked roommates for an individual Pokémon, but
         nothing that would optimize arrangements of an entire set of Pokémon into available housing.
-        This approaches uses agglomerative network clustering to cheaply lump together Pokémon with
-        multiple overlapping favorties, while keeping Pokémon with diverging habitat preferences
-        (e.g. <strong>Bright</strong> vs. <strong>Dark</strong>) under different roofs.
+        This approaches uses agglomerative clustering to cheaply lump together Pokémon with multiple
+        overlapping favorties, while keeping Pokémon with diverging habitat preferences (e.g.
+        <strong>Bright</strong> vs. <strong>Dark</strong>) under different roofs.
       </p>
       <p>
         Made for fun by <a href="https://matthewlincoln.net">Matt Lincoln</a>, drawing on crucial
