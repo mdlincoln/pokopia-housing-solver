@@ -56,6 +56,16 @@ describe('buildSubMatrix', () => {
       [0, 0],
     ])
   })
+
+  it('preserves null entries for habitat-incompatible pairs', () => {
+    const result = buildSubMatrix(['E', 'F', 'I'], clusterFixture)
+    // E-F: 5 (same Cool habitat), E-I: null (Cool↔Warm), F-I: null (Cool↔Warm)
+    expect(result).toEqual([
+      [0, 5, null],
+      [5, 0, null],
+      [null, null, 0],
+    ])
+  })
 })
 
 // 6-pokemon fixture for clustering tests
@@ -435,5 +445,40 @@ describe('habitat incompatibility', () => {
       largeHouse.pokemon.includes(name),
     )
     expect(warmInLarge && coolInLarge).toBe(false)
+  }, 30_000)
+
+  it('prevents opposite-habitat pokemon from being pulled together via mutual neutral friends', async () => {
+    // Regression: buildSubMatrix must preserve null entries so clustering
+    // cannot merge Cool↔Warm pokemon through shared high-scoring neutral friends.
+    // X (Cool) and Y (Warm) are incompatible, but both score highly with N1, N2 (Dark).
+    // Without null preservation, clustering sees 0 instead of null for X↔Y
+    // and merges all four into a single large-house cluster.
+    const bridgeData: PokemonData = {
+      X: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Cool' },
+      Y: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Warm' },
+      N1: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
+      N2: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
+    }
+    const bridgeAdj: AdjacencyData = {
+      pokemon: ['X', 'Y', 'N1', 'N2'],
+      matrix: [
+        //   X     Y     N1    N2
+        [0, null, 5, 5], // X (Cool)
+        [null, 0, 5, 5], // Y (Warm)
+        [5, 5, 0, 6], // N1 (Dark)
+        [5, 5, 6, 0], // N2 (Dark)
+      ],
+    }
+    const result = await solve(
+      ['X', 'Y', 'N1', 'N2'],
+      { small: 1, medium: 0, large: 1 },
+      bridgeData,
+      bridgeAdj,
+    )
+
+    const largeHouse = result.houses.find((h) => h.size === 'large')!
+    const hasX = largeHouse.pokemon.includes('X')
+    const hasY = largeHouse.pokemon.includes('Y')
+    expect(hasX && hasY).toBe(false)
   }, 30_000)
 })

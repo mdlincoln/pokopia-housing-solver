@@ -92,7 +92,7 @@ The opposite-axis pairings are defined in the adjacency precompute step in `scri
 
 Extracts an N×N sub-matrix for the selected pokemon from the full adjacency data. See [[src/solver.ts#buildSubMatrix]].
 
-Converts the global pokemon-index space into a compact local-index space that the clustering functions operate on. This avoids passing the full adjacency matrix (which covers all ~150 pokemon) into algorithms that only need the ~10–20 selected ones.
+Converts the global pokemon-index space into a compact local-index space that the clustering functions operate on. This avoids passing the full adjacency matrix (which covers all ~150 pokemon) into algorithms that only need the ~10–20 selected ones. Preserves `null` entries so that habitat exclusions propagate into clustering and matching phases.
 
 ### clusterPreAssign
 
