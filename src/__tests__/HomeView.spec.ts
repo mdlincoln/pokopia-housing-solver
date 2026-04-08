@@ -250,4 +250,22 @@ describe('HomeView', () => {
     expect(wrapper.vm.selectedFavorite).toBe('Exercise')
     expect(wrapper.vm.selectedFavoriteItems).toContain('Punching bag')
   })
+
+  it('shows related favorite pills for items in favorite modal', async () => {
+    const wrapper = await mountHome()
+
+    wrapper.vm.selectedFavorite = 'Shiny Stuff'
+    wrapper.vm.showFavoriteItemsModal = true
+    await flushPromises()
+
+    const gamingBedRow = wrapper.vm.selectedFavoriteItemRows.find(
+      (row: { item: string; otherFavorites: string[] }) => row.item === 'Gaming bed',
+    )
+    expect(gamingBedRow).toBeDefined()
+    if (!gamingBedRow) {
+      throw new Error('Expected Gaming bed row to be present in selectedFavoriteItemRows')
+    }
+    expect(gamingBedRow.otherFavorites).toContain('Colorful Stuff')
+    expect(gamingBedRow.otherFavorites).not.toContain('Shiny Stuff')
+  })
 })

@@ -8,6 +8,24 @@ for (const [key, items] of Object.entries(catalog)) {
   catalogByLower.set(key.toLowerCase(), items)
 }
 
+// Build once at module load so item->favorites lookups are O(1) at runtime.
+const favoritesByItemLower = new Map<string, string[]>()
+for (const [favorite, items] of Object.entries(catalog)) {
+  for (const item of items) {
+    const itemKey = item.toLowerCase()
+    let favorites = favoritesByItemLower.get(itemKey)
+    if (!favorites) {
+      favorites = []
+      favoritesByItemLower.set(itemKey, favorites)
+    }
+    favorites.push(favorite)
+  }
+}
+
+for (const favorites of favoritesByItemLower.values()) {
+  favorites.sort((a, b) => a.localeCompare(b))
+}
+
 export interface ItemScore {
   item: string
   score: number
@@ -19,6 +37,14 @@ export interface ItemScore {
  */
 export function itemsForFavorite(favorite: string): string[] {
   return [...(catalogByLower.get(favorite.toLowerCase()) ?? [])]
+}
+
+/**
+ * Returns all favorites that the given item fulfills.
+ * Lookup is case-insensitive and output is alphabetically sorted.
+ */
+export function favoritesForItem(item: string): string[] {
+  return [...(favoritesByItemLower.get(item.toLowerCase()) ?? [])]
 }
 
 /**

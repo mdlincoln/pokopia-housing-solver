@@ -14,6 +14,12 @@ Looks up the catalog entries for one favorite name using a case-insensitive key.
 
 This helper returns a `string[]` list of items in catalog order and is used by the UI modal that opens from favorite pills.
 
+## favoritesForItem
+
+Returns all favorites fulfilled by one item using a precomputed reverse index. See [[src/items.ts#favoritesForItem]].
+
+At module load, the catalog is inverted once into an item-to-favorites map so UI lookups avoid rebuilding relationships per interaction. Lookup is case-insensitive and output favorites are alphabetically sorted.
+
 ## clusterItemsByFavorites
 
 Builds interchangeable item clusters keyed by the exact favorites each item fulfills. See [[src/items.ts#clusterItemsByFavorites]].

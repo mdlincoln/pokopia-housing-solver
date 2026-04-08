@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   clusterItemsByFavorites,
+  favoritesForItem,
   favoritesToItems,
   idealItems,
   itemsForFavorite,
@@ -25,6 +26,22 @@ describe('itemsForFavorite', () => {
 
   it('returns empty list for unknown favorite', () => {
     expect(itemsForFavorite('Not A Real Favorite')).toEqual([])
+  })
+})
+
+describe('favoritesForItem', () => {
+  it('returns all favorites fulfilled by a known item', () => {
+    const result = favoritesForItem('Gaming bed')
+    expect(result).toContain('Colorful Stuff')
+    expect(result).toContain('Shiny Stuff')
+  })
+
+  it('is case-insensitive', () => {
+    expect(favoritesForItem('gaming bed')).toEqual(favoritesForItem('Gaming bed'))
+  })
+
+  it('returns empty list for unknown item', () => {
+    expect(favoritesForItem('Not A Real Item')).toEqual([])
   })
 })
 

@@ -48,6 +48,8 @@ After solving, a full-width `BListGroup` renders one [[ui#House]] item per assig
 
 Clicking a favorite pill from either shared house favorites or a pokemon card opens a modal showing catalog items for that exact favorite, sourced from [[items#itemsForFavorite]].
 
+Each modal item row also shows pill badges for other favorites that same item fulfills, sourced from [[items#favoritesForItem]]. The reverse mapping is precomputed once at app load in `src/items.ts`.
+
 ## House
 
 Reusable house display component in `src/components/HouseRecord.vue`. Renders as a `BListGroupItem` with size/capacity, assigned `PokemonCard` entries, a "Shared habitats" badge section, and a "Shared interests" badge section.
@@ -64,7 +66,7 @@ House recommendations use all favorites from pokemon assigned to that house (not
 
 Test selectors use `data-testid` attributes so tests do not depend on Bootstrap CSS classes.
 
-Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, and `favorite-items-list`.
+Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, and `favorite-item-related-favorite-pill`.
 
 ## PokemonSelect
 

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import HouseRecord from '@/components/HouseRecord.vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
-import { itemsForFavorite } from '@/items'
+import { favoritesForItem, itemsForFavorite } from '@/items'
 import { solve, type AdjacencyData, type PokemonData, type SolverResult } from '@/solver'
 import {
   BAlert,
+  BBadge,
   BButton,
   BCard,
   BCardBody,
@@ -64,6 +65,15 @@ const selectedFavorite = ref('')
 const showFavoriteItemsModal = ref(false)
 
 const selectedFavoriteItems = computed(() => itemsForFavorite(selectedFavorite.value))
+const selectedFavoriteItemRows = computed(() => {
+  const selected = selectedFavorite.value.toLowerCase()
+  return selectedFavoriteItems.value.map((item) => ({
+    item,
+    otherFavorites: favoritesForItem(item).filter(
+      (favorite) => favorite.toLowerCase() !== selected,
+    ),
+  }))
+})
 const assetPath = (fileName: string) => `${import.meta.env.BASE_URL}${fileName}`
 
 function openSaveModal() {
@@ -157,6 +167,7 @@ defineExpose({
   confirmSave,
   selectedFavorite,
   selectedFavoriteItems,
+  selectedFavoriteItemRows,
   showFavoriteItemsModal,
 })
 </script>
@@ -293,7 +304,26 @@ defineExpose({
   >
     <p class="mb-2" data-testid="favorite-items-modal-title">{{ selectedFavorite }}</p>
     <ul v-if="selectedFavoriteItems.length" class="mb-0" data-testid="favorite-items-list">
-      <li v-for="item in selectedFavoriteItems" :key="item">{{ item }}</li>
+      <li v-for="row in selectedFavoriteItemRows" :key="row.item" class="d-flex gap-2 flex-wrap">
+        <span>{{ row.item }}</span>
+        <span
+          v-if="row.otherFavorites.length"
+          class="d-inline-flex gap-1 flex-wrap"
+          data-testid="favorite-item-related-favorites"
+        >
+          (also fulfills
+          <BBadge
+            v-for="favorite in row.otherFavorites"
+            :key="`${row.item}-${favorite}`"
+            variant="secondary"
+            pill
+            data-testid="favorite-item-related-favorite-pill"
+          >
+            {{ favorite }}
+          </BBadge>
+          )
+        </span>
+      </li>
     </ul>
     <p v-else class="text-muted mb-0" data-testid="favorite-items-empty">
       No items found for this favorite.
