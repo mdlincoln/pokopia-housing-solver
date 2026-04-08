@@ -64,6 +64,7 @@ const selectedFavorite = ref('')
 const showFavoriteItemsModal = ref(false)
 
 const selectedFavoriteItems = computed(() => itemsForFavorite(selectedFavorite.value))
+const assetPath = (fileName: string) => `${import.meta.env.BASE_URL}${fileName}`
 
 function openSaveModal() {
   queryTitle.value = ''
@@ -104,8 +105,8 @@ watch(selectedTimestamp, (ts) => {
 
 onMounted(async () => {
   const [favoritesResp, adjacencyResp] = await Promise.all([
-    fetch('/pokemon_favorites.json'),
-    fetch('/pokemon_adjacency.json'),
+    fetch(assetPath('pokemon_favorites.json')),
+    fetch(assetPath('pokemon_adjacency.json')),
   ])
   const data: PokemonData = await favoritesResp.json()
   const adjacency: AdjacencyData = await adjacencyResp.json()

@@ -62,6 +62,13 @@ describe('HomeView', () => {
     expect(wrapper.find('[data-testid="results"]').exists()).toBe(false)
   })
 
+  it('loads data files from the configured base path', async () => {
+    await mountHome()
+
+    expect(fetch).toHaveBeenNthCalledWith(1, `${import.meta.env.BASE_URL}pokemon_favorites.json`)
+    expect(fetch).toHaveBeenNthCalledWith(2, `${import.meta.env.BASE_URL}pokemon_adjacency.json`)
+  })
+
   it('displays results with all pokemon housed', async () => {
     const solverResult: SolverResult = {
       houses: [
