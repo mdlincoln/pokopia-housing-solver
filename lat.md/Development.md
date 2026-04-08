@@ -68,7 +68,9 @@ npm run lint
 
 ## Pre-commit Hook
 
-Formatting and linting run automatically on every commit via husky. The hook runs `npm run format` (oxfmt) then `npm run lint` (oxlint + ESLint). Both fix issues in place; the commit is blocked if unfixable errors remain.
+Formatting and linting run automatically on every commit via husky.
+
+The hook runs `npm run format` (oxfmt) and aborts if formatting modified any files so the user must stage those edits before retrying. After that it runs `npm run lint` (oxlint + ESLint).
 
 ## Continuous Integration
 
