@@ -82,7 +82,7 @@ Reusable autocomplete multi-select component at `src/components/PokemonSelect.vu
 
 Global visual theming is implemented in `src/styles/tropical-theme.css`, imported after Bootstrap styles in `src/main.ts` so overrides apply consistently.
 
-The theme defines pastel tropical color tokens, updates Bootstrap color variables, styles cards/pills/forms/dropdowns, and adds subtle entrance/hover motion with a reduced-motion fallback.
+The theme defines pastel tropical color tokens, updates Bootstrap color variables, styles cards/pills/forms/dropdowns, and adds subtle entrance/hover motion with a reduced-motion fallback. All buttons throughout the application—including action buttons and modal confirmation buttons—use consistent tropical styling with rounded borders, gradient backgrounds, and smooth hover/active animations.
 
 A micro-polish layer adds decorative heading marks, playful badge/button treatments, and modal/dropdown accents while keeping selectors and component behavior unchanged.
 

@@ -462,9 +462,57 @@ body {
   color: #624e1f;
 }
 
+.modal-footer .btn {
+  border-width: 2px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border-radius: 999px;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.modal-footer .btn-primary {
+  border-color: rgb(47 143 111 / 60%);
+  color: #1f7358;
+  background: rgb(158 232 201 / 26%);
+}
+
+.modal-footer .btn-primary:hover:not(:disabled),
+.modal-footer .btn-primary:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: var(--trop-shadow-mid);
+}
+
+.modal-footer .btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--trop-shadow-press);
+}
+
+.modal-footer .btn-secondary {
+  border-color: rgb(43 169 190 / 55%);
+  color: #1e6c83;
+  background: rgb(232 251 255 / 72%);
+}
+
+.modal-footer .btn-secondary:hover:not(:disabled),
+.modal-footer .btn-secondary:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: var(--trop-shadow-mid);
+}
+
+.modal-footer .btn-secondary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--trop-shadow-press);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .beach-button,
-  .favorite-pill {
+  .favorite-pill,
+  .modal-footer .btn {
     transition: none;
   }
 }
