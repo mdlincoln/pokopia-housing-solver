@@ -68,10 +68,9 @@ const sharedHabitats = computed(() => {
 </script>
 
 <template>
-  <BListGroupItem data-testid="house-card">
-    <h5 class="mb-1">{{ house.size }} house #{{ house.houseIndex }}</h5>
-    <p class="text-muted mb-2">
-      <span>Capacity: {{ house.capacity }}</span>
+  <BListGroupItem class="house-card" data-testid="house-card">
+    <h5 class="mb-1 house-title">{{ house.size }} house #{{ house.houseIndex }}</h5>
+    <p class="text-muted mb-2 house-meta">
       <span v-if="sharedHabitats.length" class="mt-2" data-testid="shared-habitats">
         <BBadge
           v-for="item in sharedHabitats"
@@ -90,7 +89,7 @@ const sharedHabitats = computed(() => {
           :key="item.favorite"
           variant="info"
           pill
-          class="me-1"
+          class="me-1 favorite-pill"
           role="button"
           tabindex="0"
           data-testid="shared-favorite-badge"
@@ -116,7 +115,11 @@ const sharedHabitats = computed(() => {
     </BCardGroup>
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
 
-    <details v-if="recommendedItems.length" data-testid="recommended-items" class="mt-2">
+    <details
+      v-if="recommendedItems.length"
+      data-testid="recommended-items"
+      class="mt-3 house-recommendations"
+    >
       <summary>Recommended items</summary>
       <ol data-testid="recommended-items-list">
         <li v-for="(cluster, ci) in recommendedItems" :key="ci" data-testid="item-cluster">

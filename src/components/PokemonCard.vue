@@ -42,13 +42,18 @@ const habitatVariant = computed(() =>
 </script>
 
 <template>
-  <BCard no-body class="overflow-hidden">
+  <BCard no-body class="overflow-hidden pokemon-card">
     <BRow class="g-0">
       <BCol cols="auto">
-        <BCardImg :src="imgURL" :alt="name" class="rounded-0 m-2" style="width: 6rem" />
+        <BCardImg
+          :src="imgURL"
+          :alt="name"
+          class="rounded-0 m-2 pokemon-avatar"
+          style="width: 6rem"
+        />
       </BCol>
       <BCol>
-        <BCardBody :title="name">
+        <BCardBody :title="name" class="pokemon-card-body">
           <div v-if="habitat && habitatVariant">
             <BBadge :variant="habitatVariant" pill class="me-1 mb-1" data-testid="habitat-badge">
               {{ habitat }}
@@ -59,7 +64,7 @@ const habitatVariant = computed(() =>
               v-for="fav in favorites"
               :key="fav"
               pill
-              class="me-1 mb-1"
+              class="me-1 mb-1 favorite-pill"
               data-testid="fave-badge"
               role="button"
               tabindex="0"

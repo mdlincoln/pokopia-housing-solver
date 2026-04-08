@@ -1,0 +1,458 @@
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@400;500;700;800&display=swap');
+
+:root {
+  --trop-sand-50: #fff7ea;
+  --trop-sand-100: #ffeccf;
+  --trop-sky-100: #e8fbff;
+  --trop-sky-200: #c5f2ff;
+  --trop-ocean-300: #7cd8e8;
+  --trop-ocean-500: #2ba9be;
+  --trop-mint-300: #9ee8c9;
+  --trop-palm-600: #2f8f6f;
+  --trop-coral-300: #ffb3a8;
+  --trop-coral-500: #ff7f72;
+  --trop-sun-300: #ffd97a;
+  --trop-night-700: #24506b;
+  --trop-text: #2a4c5b;
+  --trop-heading-font: 'Baloo 2', 'Trebuchet MS', 'Verdana', sans-serif;
+  --trop-body-font: 'Nunito', 'Avenir Next', 'Segoe UI', sans-serif;
+  --space-1: 0.5rem;
+  --space-2: 0.75rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2rem;
+  --trop-shadow-soft: 0 8px 20px rgb(22 86 104 / 10%);
+  --trop-shadow-mid: 0 14px 28px rgb(22 86 104 / 14%);
+  --trop-shadow-press: 0 4px 10px rgb(22 86 104 / 12%);
+
+  --bs-body-bg: var(--trop-sand-50);
+  --bs-body-color: var(--trop-text);
+  --bs-primary: var(--trop-ocean-500);
+  --bs-primary-rgb: 43, 169, 190;
+  --bs-secondary: #5ea7b9;
+  --bs-secondary-rgb: 94, 167, 185;
+  --bs-success: var(--trop-palm-600);
+  --bs-success-rgb: 47, 143, 111;
+  --bs-info: #58bfd2;
+  --bs-info-rgb: 88, 191, 210;
+  --bs-warning: var(--trop-sun-300);
+  --bs-warning-rgb: 255, 217, 122;
+  --bs-danger: var(--trop-coral-500);
+  --bs-danger-rgb: 255, 127, 114;
+  --bs-light: #fefcf6;
+  --bs-light-rgb: 254, 252, 246;
+  --bs-dark: var(--trop-night-700);
+  --bs-dark-rgb: 36, 80, 107;
+  --bs-border-color: #cfe6ea;
+}
+
+body {
+  min-height: 100vh;
+  font-family: var(--trop-body-font);
+  font-size: 1rem;
+  line-height: 1.45;
+  background:
+    radial-gradient(circle at 8% 15%, rgb(255 255 255 / 55%) 0, transparent 25%),
+    radial-gradient(circle at 88% 12%, rgb(255 179 168 / 35%) 0, transparent 28%),
+    repeating-linear-gradient(
+      -35deg,
+      rgb(255 255 255 / 0%) 0,
+      rgb(255 255 255 / 0%) 22px,
+      rgb(255 255 255 / 20%) 22px,
+      rgb(255 255 255 / 20%) 24px
+    ),
+    linear-gradient(
+      165deg,
+      var(--trop-sky-100) 0%,
+      var(--trop-sand-50) 45%,
+      var(--trop-sand-100) 100%
+    );
+}
+
+.app-shell {
+  max-width: 980px;
+}
+
+.page-main {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.page-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(
+    90deg,
+    rgb(124 216 232 / 25%) 0%,
+    rgb(158 232 201 / 28%) 52%,
+    rgb(255 217 122 / 24%) 100%
+  );
+  box-shadow: var(--trop-shadow-mid);
+}
+
+.page-hero::before,
+.page-hero::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.page-hero::before {
+  top: -1.4rem;
+  right: -1.2rem;
+  width: 7rem;
+  height: 7rem;
+  background: radial-gradient(circle, rgb(255 255 255 / 55%) 0%, rgb(255 255 255 / 0%) 72%);
+}
+
+.page-hero::after {
+  bottom: -1.6rem;
+  left: -0.8rem;
+  width: 6rem;
+  height: 6rem;
+  background: radial-gradient(circle, rgb(255 217 122 / 35%) 0%, rgb(255 217 122 / 0%) 70%);
+}
+
+.page-title {
+  margin: 0;
+  color: #19647a;
+  font-family: var(--trop-heading-font);
+  font-size: clamp(1.9rem, 2.1vw + 1rem, 2.6rem);
+  letter-spacing: 0.02em;
+  font-weight: 800;
+  line-height: 1.05;
+  text-shadow: 0 1px 0 rgb(255 255 255 / 55%);
+}
+
+.home-theme .shell-card,
+.house-card,
+.pokemon-card,
+.modal-content {
+  border: 1px solid rgb(94 167 185 / 30%);
+  border-radius: 0.9rem;
+  background: rgb(255 255 255 / 82%);
+  box-shadow: var(--trop-shadow-soft);
+}
+
+.section-heading {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--trop-heading-font);
+  font-size: 1.22rem;
+  color: #1f7892;
+  font-weight: 700;
+  margin-bottom: var(--space-2);
+  text-wrap: balance;
+}
+
+.section-heading::before {
+  content: '*';
+  font-size: 0.82em;
+  color: #36a1b9;
+  transform: translateY(-0.04em);
+}
+
+.section-heading::after {
+  content: '';
+  position: absolute;
+  left: 1.25rem;
+  right: -0.2rem;
+  bottom: -0.28rem;
+  height: 0.22rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgb(124 216 232 / 45%), rgb(255 179 168 / 45%));
+}
+
+.content-stack {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.config-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.config-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--trop-ocean-300),
+    var(--trop-mint-300),
+    var(--trop-sun-300)
+  );
+}
+
+.action-row {
+  padding-top: var(--space-1);
+}
+
+.status-alert {
+  margin-top: 0;
+  margin-bottom: var(--space-2);
+}
+
+.beach-button {
+  border-width: 2px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border-radius: 999px;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.btn-outline-secondary.beach-button {
+  border-color: rgb(43 169 190 / 55%);
+  color: #1e6c83;
+  background: rgb(232 251 255 / 72%);
+}
+
+.btn-outline-primary.beach-button {
+  border-color: rgb(47 143 111 / 60%);
+  color: #1f7358;
+  background: rgb(158 232 201 / 26%);
+}
+
+.beach-button:hover:not(:disabled),
+.beach-button:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: var(--trop-shadow-mid);
+}
+
+.beach-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--trop-shadow-press);
+}
+
+.favorite-pill {
+  background: linear-gradient(135deg, rgb(124 216 232 / 24%) 0%, rgb(255 179 168 / 30%) 100%);
+  color: #20596c;
+  border: 1px solid rgb(43 169 190 / 32%);
+  border-radius: 999px;
+  padding-inline: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    filter 160ms ease;
+}
+
+.favorite-pill:hover,
+.favorite-pill:focus-visible {
+  filter: brightness(0.97);
+  transform: translateY(-1px);
+}
+
+.favorite-pill .btn-close {
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgb(42 108 129 / 24%);
+}
+
+.pokemon-search {
+  min-height: 2.65rem;
+}
+
+.tropical-dropdown {
+  border: 1px solid rgb(94 167 185 / 32%);
+  border-radius: 0.75rem;
+  box-shadow: var(--trop-shadow-mid);
+  background-color: rgb(255 255 255 / 97%);
+  z-index: 40;
+}
+
+.tropical-dropdown .list-group-item {
+  border-left: 0;
+  border-right: 0;
+  padding-block: 0.58rem;
+}
+
+.tropical-dropdown .list-group-item.active {
+  background: linear-gradient(90deg, rgb(124 216 232 / 35%), rgb(158 232 201 / 38%));
+  color: #1f657b;
+  border-color: rgb(94 167 185 / 35%);
+}
+
+.pokemon-select-wrap {
+  z-index: 20;
+}
+
+.results-section {
+  margin-top: var(--space-4);
+}
+
+.results-list {
+  margin-top: var(--space-2);
+}
+
+.house-card {
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.house-title {
+  font-family: var(--trop-heading-font);
+  font-size: 1.14rem;
+  color: #24677f;
+}
+
+.house-title::after {
+  content: ' ~';
+  font-size: 0.78em;
+  opacity: 0.88;
+}
+
+.house-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.house-recommendations summary {
+  font-weight: 700;
+  color: #2a6d85;
+  cursor: pointer;
+  list-style: none;
+}
+
+.house-recommendations summary::-webkit-details-marker {
+  display: none;
+}
+
+.house-recommendations summary::before {
+  content: '+';
+  margin-right: 0.36rem;
+  font-size: 0.9em;
+}
+
+.house-recommendations[open] summary::before {
+  content: '-';
+}
+
+.pokemon-card .card-title {
+  font-family: var(--trop-heading-font);
+  color: #2b6e88;
+  margin-bottom: var(--space-1);
+}
+
+.pokemon-card {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.pokemon-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--trop-shadow-mid);
+}
+
+.pokemon-card-body {
+  padding: var(--space-2) var(--space-3);
+}
+
+.pokemon-avatar {
+  border-radius: 0.7rem;
+}
+
+.house-card .card-group {
+  gap: var(--space-2);
+}
+
+.badge.bg-warning,
+.badge.text-bg-warning {
+  color: #5f4b18;
+}
+
+.badge.bg-info,
+.badge.text-bg-info {
+  color: #1e5568;
+}
+
+.badge.bg-danger,
+.badge.text-bg-danger {
+  color: #7c2f26;
+}
+
+.modal-content {
+  overflow: hidden;
+}
+
+.modal-header {
+  border-bottom: 1px solid rgb(94 167 185 / 28%);
+  background: linear-gradient(90deg, rgb(124 216 232 / 22%), rgb(255 217 122 / 18%));
+}
+
+.modal-title {
+  font-family: var(--trop-heading-font);
+  color: #206983;
+}
+
+.modal-footer {
+  border-top: 1px solid rgb(94 167 185 / 22%);
+  background: rgb(255 255 255 / 72%);
+}
+
+.form-control,
+.form-select {
+  border-color: rgb(94 167 185 / 35%);
+  border-radius: 0.75rem;
+  background-color: rgb(255 255 255 / 95%);
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--trop-ocean-300);
+  box-shadow: 0 0 0 0.2rem rgb(124 216 232 / 25%);
+}
+
+.alert {
+  border-radius: 0.85rem;
+}
+
+.alert-heading {
+  font-family: var(--trop-heading-font);
+}
+
+.text-bg-warning {
+  color: #624e1f;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .beach-button,
+  .favorite-pill {
+    transition: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-hero {
+    padding: 0.9rem 1rem;
+  }
+
+  .page-title {
+    font-size: 1.75rem;
+  }
+
+  .house-card {
+    padding: var(--space-2);
+  }
+
+  .pokemon-card-body {
+    padding: var(--space-2);
+  }
+}

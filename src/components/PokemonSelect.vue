@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
 import { BBadge, BCloseButton, BFormInput, BListGroup, BListGroupItem } from 'bootstrap-vue-next'
+import { computed, ref } from 'vue'
 
 const props = defineProps<{
   pokemonNames: string[]
@@ -69,22 +69,23 @@ function onBlur() {
 </script>
 
 <template>
-  <div>
-    <div v-if="modelValue.length" class="d-flex flex-wrap gap-1 mb-2">
+  <div class="pokemon-select">
+    <div v-if="modelValue.length" class="d-flex flex-wrap gap-1 mb-3">
       <BBadge
         v-for="name in modelValue"
         :key="name"
         variant="primary"
         pill
-        class="d-inline-flex align-items-center gap-1 pe-1"
+        class="d-inline-flex align-items-center gap-1 pe-1 favorite-pill"
       >
         {{ name }}
         <BCloseButton class="ms-1" @click="remove(name)" />
       </BBadge>
     </div>
-    <div class="position-relative">
+    <div class="position-relative pokemon-select-wrap">
       <BFormInput
         v-model="query"
+        class="pokemon-search"
         placeholder="Search pokemon..."
         autocomplete="off"
         @input="onInput"
@@ -94,7 +95,7 @@ function onBlur() {
       />
       <BListGroup
         v-if="isOpen && filtered.length"
-        class="position-absolute w-100 overflow-auto"
+        class="position-absolute w-100 overflow-auto tropical-dropdown"
         style="max-height: 200px; z-index: 10"
       >
         <BListGroupItem

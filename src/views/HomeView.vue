@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import HouseRecord from '@/components/HouseRecord.vue'
-import { itemsForFavorite } from '@/items'
 import PokemonSelect from '@/components/PokemonSelect.vue'
+import { itemsForFavorite } from '@/items'
 import { solve, type AdjacencyData, type PokemonData, type SolverResult } from '@/solver'
 import {
   BAlert,
@@ -161,11 +161,11 @@ defineExpose({
 </script>
 
 <template>
-  <div>
-    <BCard class="mb-1">
-      <BCardBody class="p-1">
-        <h5>Houses</h5>
-        <BRow>
+  <div class="home-theme content-stack">
+    <BCard class="mb-3 shell-card config-card">
+      <BCardBody class="p-3 p-md-4">
+        <h5 class="section-heading">Houses</h5>
+        <BRow class="g-3">
           <BCol sm="4">
             <BFormGroup label="Small (1 slot)" label-for="house-small">
               <BFormInput id="house-small" v-model.number="small" type="number" min="0" />
@@ -182,23 +182,33 @@ defineExpose({
             </BFormGroup>
           </BCol>
         </BRow>
-        <h5>Pokemon</h5>
-        <BRow>
+        <h5 class="section-heading">Pokemon</h5>
+        <BRow class="mt-1">
           <PokemonSelect v-model="selectedPokemon" :pokemon-names="pokemonNames" />
         </BRow>
       </BCardBody>
     </BCard>
 
-    <div class="d-flex gap-2 align-items-start flex-wrap mb-2">
-      <BButton variant="outline-secondary" :disabled="!pokemonData" @click="loadSample">
+    <div class="d-flex gap-2 align-items-start flex-wrap mb-3 action-row">
+      <BButton
+        variant="outline-secondary"
+        class="beach-button"
+        :disabled="!pokemonData"
+        @click="loadSample"
+      >
         Show a sample island
       </BButton>
-      <BButton variant="outline-primary" :disabled="!pokemonData" @click="openSaveModal">
+      <BButton
+        variant="outline-primary"
+        class="beach-button"
+        :disabled="!pokemonData"
+        @click="openSaveModal"
+      >
         Save query
       </BButton>
     </div>
 
-    <BAlert v-if="saveSuccess" variant="success" :model-value="true" class="mb-2">
+    <BAlert v-if="saveSuccess" variant="success" :model-value="true" class="mb-3 status-alert">
       Query saved successfully.
     </BAlert>
 
@@ -216,7 +226,7 @@ defineExpose({
       v-if="savedQueries.length"
       label="Restore saved query"
       label-for="saved-queries-select"
-      class="mb-2"
+      class="mb-3"
     >
       <BFormSelect
         id="saved-queries-select"
@@ -233,16 +243,22 @@ defineExpose({
       />
     </BFormGroup>
 
-    <BSpinner v-if="loading" class="my-2" />
+    <BSpinner v-if="loading" class="my-3" />
   </div>
 
-  <BAlert v-if="error" variant="danger" :model-value="true" data-testid="error" class="mt-3">
+  <BAlert
+    v-if="error"
+    variant="danger"
+    :model-value="true"
+    data-testid="error"
+    class="mt-2 status-alert"
+  >
     {{ error }}
   </BAlert>
 
-  <section v-if="result" data-testid="results" class="mt-4">
-    <h2>Results</h2>
-    <BListGroup class="w-100" flush>
+  <section v-if="result" data-testid="results" class="mt-4 results-section">
+    <h2 class="section-heading">Results</h2>
+    <BListGroup class="w-100 results-list" flush>
       <HouseRecord
         v-for="house in result.houses"
         :key="house.houseIndex"
@@ -257,6 +273,7 @@ defineExpose({
       variant="warning"
       :model-value="true"
       data-testid="unhoused"
+      class="mt-3"
     >
       <h5 class="alert-heading">Unhoused</h5>
       <ul class="mb-0">

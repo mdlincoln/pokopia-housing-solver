@@ -4,7 +4,7 @@ Vue 3 homepage styled with Bootstrap Vue Next (`bootstrap-vue-next`) that lets u
 
 ## HomeView
 
-The main page at `/`, implemented in `src/views/HomeView.vue`. Uses Bootstrap Vue Next components (`BCard`, `BButton`, `BRow`/`BCol`, `BFormGroup`, `BFormInput`, `BFormSelect`, `BAlert`, `BListGroup`) with no custom CSS.
+The main page at `/` in `src/views/HomeView.vue`, built with Bootstrap Vue Next components and a global pastel tropical theme from `src/styles/tropical-theme.css`.
 
 ### Form
 
@@ -65,6 +65,14 @@ Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habi
 ## PokemonSelect
 
 Reusable autocomplete multi-select component at `src/components/PokemonSelect.vue`. Uses `BBadge` pills for selected items and `BListGroup` for the dropdown.
+
+## Theming
+
+Global visual theming is implemented in `src/styles/tropical-theme.css`, imported after Bootstrap styles in `src/main.ts` so overrides apply consistently.
+
+The theme defines pastel tropical color tokens, updates Bootstrap color variables, styles cards/pills/forms/dropdowns, and adds subtle entrance/hover motion with a reduced-motion fallback.
+
+A micro-polish layer adds decorative heading marks, playful badge/button treatments, and modal/dropdown accents while keeping selectors and component behavior unchanged.
 
 ### Behavior
 

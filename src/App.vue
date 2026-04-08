@@ -3,11 +3,11 @@ import { BContainer } from 'bootstrap-vue-next'
 </script>
 
 <template>
-  <BContainer class="py-3">
-    <header class="mb-4">
-      <h1>Pokemon Housing</h1>
+  <BContainer class="py-4 py-md-5 app-shell">
+    <header class="mb-4 mb-md-5 page-hero">
+      <h1 class="page-title">Pokemon Housing</h1>
     </header>
-    <main>
+    <main class="page-main">
       <RouterView />
     </main>
   </BContainer>
