@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import PokemonCard from '@/components/PokemonCard.vue'
+import { HABITAT_VARIANT } from '@/habitats'
 import { clusterItemsByFavorites, selectTopNonOverlappingClusters } from '@/items'
 import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/solver'
-import { BBadge, BCardGroup, BListGroupItem, type ColorVariant } from 'bootstrap-vue-next'
+import { BBadge, BCardGroup, BListGroupItem } from 'bootstrap-vue-next'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -25,28 +26,10 @@ const sharedFavorites = computed(() => {
 })
 
 const recommendedItems = computed(() => {
-  const favorites: string[] = []
-  const seen = new Set<string>()
-  for (const name of props.house.pokemon) {
-    for (const favorite of props.pokemonData[name]?.favorites ?? []) {
-      const lower = favorite.toLowerCase()
-      if (seen.has(lower)) continue
-      seen.add(lower)
-      favorites.push(favorite)
-    }
-  }
+  const favorites = props.house.pokemon.flatMap((name) => props.pokemonData[name]?.favorites ?? [])
   if (favorites.length === 0) return []
   return selectTopNonOverlappingClusters(clusterItemsByFavorites(favorites), 3)
 })
-
-const HABITAT_VARIANT: Record<string, ColorVariant> = {
-  Dark: 'dark',
-  Bright: 'warning',
-  Cool: 'info',
-  Warm: 'danger',
-  Dry: 'secondary',
-  Humid: 'success',
-}
 
 const sharedHabitats = computed(() => {
   if (props.house.pokemon.length < 2) return []
