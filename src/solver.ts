@@ -48,7 +48,7 @@ export function buildSubMatrix(
     for (let j = i + 1; j < n; j++) {
       const fullJ = nameToIdx.get(pokemonNames[j]!)
       if (fullJ === undefined) continue
-      const val = adjacency.matrix[fullI]![fullJ]
+      const val = adjacency.matrix[fullI]?.[fullJ] ?? null
       matrix[i]![j] = val
       matrix[j]![i] = val
     }
