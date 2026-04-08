@@ -27,5 +27,11 @@ import { BContainer } from 'bootstrap-vue-next'
     <main class="page-main">
       <RouterView />
     </main>
+    <footer class="app-footer mt-4 mt-md-5" aria-label="Project source">
+      <span>Source:</span>
+      <a href="https://github.com/mdlincoln/pokopia-housing-solver">pokopia-housing-solver</a>
+      ❧
+      <span>Created by <a href="https://matthewlincoln.net">Matt Lincoln</a>, 2026</span>
+    </footer>
   </BContainer>
 </template>

@@ -78,6 +78,31 @@ body {
   gap: var(--space-2);
 }
 
+.app-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(94 167 185 / 35%);
+  border-radius: 999px;
+  padding: 0.5rem 0.9rem;
+  background: linear-gradient(90deg, rgb(124 216 232 / 20%), rgb(255 217 122 / 18%));
+  box-shadow: var(--trop-shadow-soft);
+  color: #255f74;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.app-footer a {
+  color: #19647a;
+}
+
+.app-footer a:hover,
+.app-footer a:focus-visible {
+  color: #124a5a;
+}
+
 .page-hero {
   position: relative;
   overflow: hidden;
