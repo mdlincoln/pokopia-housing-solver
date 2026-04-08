@@ -69,3 +69,15 @@ npm run lint
 ## Pre-commit Hook
 
 Formatting and linting run automatically on every commit via husky. The hook runs `npm run format` (oxfmt) then `npm run lint` (oxlint + ESLint). Both fix issues in place; the commit is blocked if unfixable errors remain.
+
+## Continuous Integration
+
+GitHub Actions builds the production bundle on every push to `main` so deployment always uses the same release process as local builds.
+
+The workflow installs Node from `.nvmrc`, runs `npm ci`, and then runs `npm run build`. That build command already combines `vue-tsc` type-checking with the Vite production bundle.
+
+## Deployment
+
+Production assets are published from `dist/` to the `web` branch and served from the `/pokopia-housing-solver/` subpath.
+
+The Vite config sets the production base path to `/pokopia-housing-solver/` while keeping development at `/`. The Vue Router history already uses `import.meta.env.BASE_URL`, so route generation stays aligned with the deployed asset paths.
