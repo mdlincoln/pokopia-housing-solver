@@ -659,13 +659,6 @@
         ],
         "habitat": "Dark"
     },
-    "Ditto": {
-        "image": null,
-        "favorites": [
-            "None"
-        ],
-        "habitat": "Bright"
-    },
     "Dragapult": {
         "image": "images/887.png",
         "favorites": [
@@ -2580,8 +2573,8 @@
         ],
         "habitat": "Warm"
     },
-    "Gastrodon": {
-        "image": null,
+    "Gastrodon West Sea": {
+        "image": "images/423.png",
         "favorites": [
             "Lots of water",
             "Lots of dirt",
@@ -2614,7 +2607,7 @@
         "habitat": "Humid"
     },
     "Gastrodon East Sea": {
-        "image": null,
+        "image": "images/424.png",
         "favorites": [
             "Lots of water",
             "Lots of dirt",
@@ -2679,8 +2672,8 @@
         ],
         "habitat": "Humid"
     },
-    "Shellos": {
-        "image": null,
+    "Shellos West Sea": {
+        "image": "images/422.png",
         "favorites": [
             "Lots of water",
             "Ocean vibes",
@@ -2691,7 +2684,7 @@
         "habitat": "Humid"
     },
     "Shellos East Sea": {
-        "image": null,
+        "image": "images/421.png",
         "favorites": [
             "Lots of water",
             "Ocean vibes",
@@ -2867,12 +2860,15 @@
         "habitat": "Humid"
     },
     "Tatsugiri Curly Form": {
-        "image": null,
-        "favorites": [],
+        "image": "images/978.png",
+        "favorites": [
+            "Lots of water",
+            "Ocean vibes"
+        ],
         "habitat": "Humid"
     },
     "Tatsugiri Droopy Form": {
-        "image": null,
+        "image": "images/979.png",
         "favorites": [
             "Lots of water",
             "Ocean vibes",
@@ -2883,7 +2879,7 @@
         "habitat": "Humid"
     },
     "Tatsugiri Stretchy Form": {
-        "image": null,
+        "image": "images/977.png",
         "favorites": [
             "Lots of water",
             "Ocean vibes",
@@ -2970,19 +2966,8 @@
         ],
         "habitat": "Humid"
     },
-    "Toxtricity Amped Form": {
-        "image": null,
-        "favorites": [
-            "Electronics",
-            "Play spaces",
-            "Noisy stuff",
-            "Slender objects",
-            "Sharp stuff"
-        ],
-        "habitat": "Humid"
-    },
-    "Toxtricity Low Key Form": {
-        "image": null,
+    "Toxtricity": {
+        "image": "images/x197.png",
         "favorites": [
             "Electronics",
             "Play spaces",

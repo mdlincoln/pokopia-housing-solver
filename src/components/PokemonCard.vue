@@ -25,7 +25,7 @@ function handleFavoriteClick(favorite: string) {
   emit('favoriteClicked', favorite)
 }
 
-const imgURL = computed(() => `https://pokopia-roommate-matchmaker.netlify.app/${props.image}`)
+const imgURL = computed(() => `${import.meta.env.BASE_URL}${props.image}`)
 
 const HABITAT_VARIANT: Record<string, ColorVariant> = {
   Dark: 'dark',
