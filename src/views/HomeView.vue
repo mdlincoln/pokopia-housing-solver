@@ -207,6 +207,7 @@ defineExpose({
       >
         Save query
       </BButton>
+      (this is saved in local browser storage. None of the data leaves your computer.)
     </div>
 
     <BAlert v-if="saveSuccess" variant="success" :model-value="true" class="mb-3 status-alert">
