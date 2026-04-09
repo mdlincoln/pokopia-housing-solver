@@ -1,70 +1,7 @@
-import itemsByFavorite from '../src/items_by_favorite.json'
+import { idealItems, itemsForFavorite } from '@/queries'
 
-const catalog: Record<string, string[]> = itemsByFavorite
-
-// Case-insensitive lookup: normalize catalog keys to lowercase
-const catalogByLower = new Map<string, string[]>()
-for (const [key, items] of Object.entries(catalog)) {
-  catalogByLower.set(key.toLowerCase(), items)
-}
-
-// Build once at module load so item->favorites lookups are O(1) at runtime.
-const favoritesByItemLower = new Map<string, string[]>()
-for (const [favorite, items] of Object.entries(catalog)) {
-  for (const item of items) {
-    const itemKey = item.toLowerCase()
-    let favorites = favoritesByItemLower.get(itemKey)
-    if (!favorites) {
-      favorites = []
-      favoritesByItemLower.set(itemKey, favorites)
-    }
-    favorites.push(favorite)
-  }
-}
-
-for (const favorites of favoritesByItemLower.values()) {
-  favorites.sort((a, b) => a.localeCompare(b))
-}
-
-export interface ItemScore {
-  item: string
-  score: number
-}
-
-/**
- * Returns catalog items that fulfill a single favorite.
- * Lookup is case-insensitive and preserves catalog order.
- */
-export function itemsForFavorite(favorite: string): string[] {
-  return [...(catalogByLower.get(favorite.toLowerCase()) ?? [])]
-}
-
-/**
- * Returns all favorites that the given item fulfills.
- * Lookup is case-insensitive and output is alphabetically sorted.
- */
-export function favoritesForItem(item: string): string[] {
-  return [...(favoritesByItemLower.get(item.toLowerCase()) ?? [])]
-}
-
-/**
- * Given a list of pokemon favorites for a household, returns an array of
- * items with the number of input favorites each item fulfills.
- * Duplicate favorites in the input count each fulfilling item again,
- * so items satisfying a repeated favorite score higher.
- * Items that fulfill none of the input favorites are omitted.
- */
-export function idealItems(favorites: string[]): ItemScore[] {
-  const counts = new Map<string, number>()
-  for (const fav of favorites) {
-    const items = catalogByLower.get(fav.toLowerCase())
-    if (!items) continue
-    for (const item of items) {
-      counts.set(item, (counts.get(item) ?? 0) + 1)
-    }
-  }
-  return Array.from(counts, ([item, score]) => ({ item, score }))
-}
+export type { ItemScore } from '@/queries'
+export { favoritesForItem, idealItems, itemsForFavorite } from '@/queries'
 
 export interface FavoriteCount {
   favorite: string
@@ -75,7 +12,9 @@ export interface FavoriteCount {
  * Expands a favorite/count array into a repeated favorites list,
  * then delegates to idealItems to score items.
  */
-export function favoritesToItems(favoriteCounts: FavoriteCount[]): ItemScore[] {
+export async function favoritesToItems(
+  favoriteCounts: FavoriteCount[],
+): Promise<import('@/queries').ItemScore[]> {
   const favorites: string[] = []
   for (const { favorite, count } of favoriteCounts) {
     for (let i = 0; i < count; i++) {
@@ -100,15 +39,8 @@ function compareClusters(a: ItemCluster, b: ItemCluster): number {
   return clusterKey(a).localeCompare(clusterKey(b))
 }
 
-/**
- * Groups items by the exact set of input favorites they fulfill.
- *
- * For each item that appears in at least one input favorite's catalog entry,
- * collects which of the input favorites it satisfies. Items sharing the same
- * set of fulfilled favorites are clustered together as interchangeable.
- * Clusters are ranked by number of favorites covered (descending).
- */
-export function clusterItemsByFavorites(favorites: string[]): ItemCluster[] {
+// @lat: [[items#clusterItemsByFavorites]]
+export async function clusterItemsByFavorites(favorites: string[]): Promise<ItemCluster[]> {
   // Deduplicate input favorites (case-insensitive)
   const uniqueFavs: string[] = []
   const seen = new Set<string>()
@@ -116,20 +48,19 @@ export function clusterItemsByFavorites(favorites: string[]): ItemCluster[] {
     const lower = fav.toLowerCase()
     if (!seen.has(lower)) {
       seen.add(lower)
-      uniqueFavs.push(fav)
+      uniqueFavs.push(lower)
     }
   }
 
   // For each item, collect which input favorites it fulfills
   const itemFavs = new Map<string, string[]>()
   for (const fav of uniqueFavs) {
-    const items = catalogByLower.get(fav.toLowerCase())
-    if (!items) continue
-    for (const item of items) {
-      let list = itemFavs.get(item)
+    const items = await itemsForFavorite(fav)
+    for (const itemName of items) {
+      let list = itemFavs.get(itemName)
       if (!list) {
         list = []
-        itemFavs.set(item, list)
+        itemFavs.set(itemName, list)
       }
       list.push(fav)
     }
@@ -152,11 +83,11 @@ export function clusterItemsByFavorites(favorites: string[]): ItemCluster[] {
   return Array.from(groups.values()).sort(compareClusters)
 }
 
-/**
- * Selects up to `limit` clusters with pairwise disjoint favorites while maximizing
- * total covered favorites. Uses deterministic tie-breakers for stable output.
- */
-export function selectTopNonOverlappingClusters(clusters: ItemCluster[], limit = 3): ItemCluster[] {
+// @lat: [[items#selectTopNonOverlappingClusters]]
+export async function selectTopNonOverlappingClusters(
+  clusters: ItemCluster[],
+  limit = 3,
+): Promise<ItemCluster[]> {
   const sorted = [...clusters].sort(compareClusters)
   let best: ItemCluster[] = []
   let bestCoverage = -1

@@ -1,24 +1,24 @@
 # Items
 
-Functions about Pokopia items that can be used to fulfil Pokemon favorites when placed in households.
+Functions about Pokopia items that can be used to fulfil Pokemon favorites when placed in households. SQL queries are centralized in [[queries]] — these functions contain only clustering and selection logic.
 
 ## idealItems
 
-Maps a household's shared favorites to the best furniture items. See [[src/items.ts#idealItems]].
+Maps a household's shared favorites to the best furniture items. See [[src/queries.ts#idealItems]].
 
-Given a `string[]` of favorites, looks up every item in `public/items_by_favorite.json` that fulfills at least one of those favorites and returns an `{item, score}[]` array where score is the number of input favorites fulfilled. Duplicate favorites in the input multiply item scores. Items fulfilling zero input favorites are omitted.
+Given a `string[]` of favorites, queries the SQLite database (`public/pokehousing.sqlite` via [[queries]]) for every item that fulfills at least one of those favorites and returns an `{item, score}[]` array where score is the number of input favorites fulfilled. Duplicate favorites in the input multiply item scores. Items fulfilling zero input favorites are omitted.
 
 ## itemsForFavorite
 
-Looks up the catalog entries for one favorite name using a case-insensitive key. See [[src/items.ts#itemsForFavorite]].
+Looks up the catalog entries for one favorite name using a case-insensitive key. See [[src/queries.ts#itemsForFavorite]].
 
 This helper returns a `string[]` list of items in catalog order and is used by the UI modal that opens from favorite pills.
 
 ## favoritesForItem
 
-Returns all favorites fulfilled by one item using a precomputed reverse index. See [[src/items.ts#favoritesForItem]].
+Returns all favorites fulfilled by one item using a precomputed reverse index. See [[src/queries.ts#favoritesForItem]].
 
-At module load, the catalog is inverted once into an item-to-favorites map so UI lookups avoid rebuilding relationships per interaction. Lookup is case-insensitive and output favorites are alphabetically sorted.
+Queries the SQLite database for the favorites associated with a given item. Input is case-insensitive (lowercased before querying); output favorites are in alphabetically sorted order as returned by the DB.
 
 ## clusterItemsByFavorites
 

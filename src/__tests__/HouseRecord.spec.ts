@@ -1,6 +1,19 @@
+import { vi } from 'vitest'
+
+vi.mock('@/db', async () => {
+  const { default: initSqlJs } = await import('sql.js')
+  const { readFileSync } = await import('node:fs')
+  const { resolve } = await import('node:path')
+  const wasmPath = resolve(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm')
+  const SQL = await initSqlJs({ locateFile: () => wasmPath })
+  const dbPath = resolve(process.cwd(), 'public/pokehousing.sqlite')
+  const db = new SQL.Database(new Uint8Array(readFileSync(dbPath)))
+  return { getDb: async () => db }
+})
+
 import HouseRecord from '@/components/HouseRecord.vue'
 import type { HouseAssignment, PokemonData } from '@/solver'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 
 const testPokemonData: PokemonData = {
@@ -139,7 +152,7 @@ describe('HouseRecord', () => {
     expect(card.exists()).toBe(true)
   })
 
-  it('shows recommended items clustered by favorites', () => {
+  it('shows recommended items clustered by favorites', async () => {
     // Both pokemon share 'Exercise' and 'Cleanliness' — real catalog favorites
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['Exercise', 'Cleanliness'], habitat: 'Dark' },
@@ -155,6 +168,7 @@ describe('HouseRecord', () => {
     const wrapper = mount(HouseRecord, {
       props: { house, pokemonData },
     })
+    await flushPromises()
 
     const details = wrapper.find('[data-testid="recommended-items"]')
     expect(details.exists()).toBe(true)
@@ -165,11 +179,12 @@ describe('HouseRecord', () => {
     // Each cluster should show its favorites as text
     const firstCluster = clusters[0]!
     const clusterText = firstCluster.text()
-    // Exercise items and Cleanliness items exist — at least one cluster label should contain a favorite name
-    expect(clusterText.includes('Exercise') || clusterText.includes('Cleanliness')).toBe(true)
+    // Exercise items and Cleanliness items exist — favorites are stored lowercase
+    const lower = clusterText.toLowerCase()
+    expect(lower.includes('exercise') || lower.includes('cleanliness')).toBe(true)
   })
 
-  it('ranks clusters by number of favorites descending', () => {
+  it('ranks clusters by number of favorites descending', async () => {
     // Both share 'Lots of Fire', 'Group Activities', and 'Stone Stuff'
     // which produce clusters of different sizes
     const pokemonData: PokemonData = {
@@ -186,6 +201,7 @@ describe('HouseRecord', () => {
     const wrapper = mount(HouseRecord, {
       props: { house, pokemonData },
     })
+    await flushPromises()
 
     const clusters = wrapper.findAll('[data-testid="item-cluster"]')
     expect(clusters.length).toBeGreaterThan(1)
@@ -194,7 +210,7 @@ describe('HouseRecord', () => {
     // (Clusters with more favorites are listed first)
   })
 
-  it('shows recommended items for a single occupant when favorites map to catalog entries', () => {
+  it('shows recommended items for a single occupant when favorites map to catalog entries', async () => {
     const house: HouseAssignment = {
       houseIndex: 1,
       size: 'small',
@@ -209,11 +225,12 @@ describe('HouseRecord', () => {
     const wrapper = mount(HouseRecord, {
       props: { house, pokemonData },
     })
+    await flushPromises()
 
     expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
   })
 
-  it('shows recommended items even when occupants have no shared favorites', () => {
+  it('shows recommended items even when occupants have no shared favorites', async () => {
     const pokemonData: PokemonData = {
       UniqueOne: { image: '', favorites: ['Exercise'] },
       UniqueTwo: { image: '', favorites: ['Cleanliness'] },
@@ -228,11 +245,12 @@ describe('HouseRecord', () => {
     const wrapper = mount(HouseRecord, {
       props: { house, pokemonData },
     })
+    await flushPromises()
 
     expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
   })
 
-  it('renders at most three recommended clusters with non-overlapping favorites', () => {
+  it('renders at most three recommended clusters with non-overlapping favorites', async () => {
     const pokemonData: PokemonData = {
       PlannerOne: {
         image: '',
@@ -253,6 +271,7 @@ describe('HouseRecord', () => {
     const wrapper = mount(HouseRecord, {
       props: { house, pokemonData },
     })
+    await flushPromises()
 
     const labels = wrapper.findAll('[data-testid="item-cluster-favorites"]')
     expect(labels.length).toBeGreaterThan(0)

@@ -4,3 +4,4 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[solver]] — Greedy clustering pokemon housing optimization module
 - [[items]] — Item scoring for household favorites
 - [[ui]] — Vue homepage UI for configuring and running the solver
+- [[queries]] — All SQLite read queries, the single source of db.exec() calls

@@ -7,28 +7,50 @@ import {
   enumerateHouses,
   greedyMaxWeightMatching,
   solve,
-  type AdjacencyData,
+  type AdjacencyMap,
   type PokemonData,
 } from '../solver'
+
+// Helper to convert matrix to AdjacencyMap
+function matrixToMap(pokemon: string[], matrix: (number | null | undefined)[][]): AdjacencyMap {
+  const map = new Map<string, Map<string, number | null>>()
+  for (let i = 0; i < pokemon.length; i++) {
+    if (!map.has(pokemon[i]!)) {
+      map.set(pokemon[i]!, new Map())
+    }
+    for (let j = 0; j < pokemon.length; j++) {
+      if (i !== j) {
+        const val = matrix[i]![j]
+        map.get(pokemon[i]!)!.set(pokemon[j]!, val === undefined ? null : val)
+      }
+    }
+  }
+  return map
+}
 
 // Simple 4-pokemon adjacency fixture
 // A-B: 4, A-C: 1, A-D: 0
 // B-C: 1, B-D: 0
 // C-D: 3
-const fixture: AdjacencyData = {
-  pokemon: ['A', 'B', 'C', 'D'],
-  matrix: [
+const fixture: AdjacencyMap = matrixToMap(
+  ['A', 'B', 'C', 'D'],
+  [
     [0, 4, 1, 0],
     [4, 0, 1, 0],
     [1, 1, 0, 3],
     [0, 0, 3, 0],
   ],
-}
+)
 
 describe('buildSubMatrix', () => {
   it('returns exact matrix when all pokemon are included', () => {
     const result = buildSubMatrix(['A', 'B', 'C', 'D'], fixture)
-    expect(result).toEqual(fixture.matrix)
+    expect(result).toEqual([
+      [0, 4, 1, 0],
+      [4, 0, 1, 0],
+      [1, 1, 0, 3],
+      [0, 0, 3, 0],
+    ])
   })
 
   it('returns correct sub-matrix for a subset', () => {
@@ -72,9 +94,9 @@ describe('buildSubMatrix', () => {
 // Cluster1: E,F,G,H form a tight clique (weight 5 between all pairs), habitat: Cool
 // Cluster2: I,J are connected (weight 3), habitat: Warm
 // Cross-cluster connections are null (habitat-incompatible: Cool ↔ Warm)
-const clusterFixture: AdjacencyData = {
-  pokemon: ['E', 'F', 'G', 'H', 'I', 'J'],
-  matrix: [
+const clusterFixture: AdjacencyMap = matrixToMap(
+  ['E', 'F', 'G', 'H', 'I', 'J'],
+  [
     //     E     F     G     H     I     J
     [0, 5, 5, 5, null, null], // E (Cool)
     [5, 0, 5, 5, null, null], // F (Cool)
@@ -83,7 +105,7 @@ const clusterFixture: AdjacencyData = {
     [null, null, null, null, 0, 3], // I (Warm)
     [null, null, null, null, 3, 0], // J (Warm)
   ],
-}
+)
 
 describe('agglomerativeCluster4', () => {
   it('finds the obvious 4-clique', () => {
@@ -201,18 +223,9 @@ const testData: PokemonData = {
 
 // Explicit adjacency fixture matching testData order.
 // Includes habitat effects: same-habitat bonus (+1), opposite-axis exclusions (null).
-const testDataFixture: AdjacencyData = {
-  pokemon: [
-    'AlphaOne',
-    'AlphaTwo',
-    'BetaOne',
-    'BetaTwo',
-    'Loner',
-    'ClashCool',
-    'ClashWarm',
-    'NeutralDark',
-  ],
-  matrix: [
+const testDataFixture: AdjacencyMap = matrixToMap(
+  ['AlphaOne', 'AlphaTwo', 'BetaOne', 'BetaTwo', 'Loner', 'ClashCool', 'ClashWarm', 'NeutralDark'],
+  [
     // AlphaOne  AlphaTwo BetaOne BetaTwo Loner ClashCool ClashWarm NeutralDark
     [0, 5, 0, 0, 0, 6, null, 5],
     [5, 0, 0, 0, 0, 5, null, 4],
@@ -223,7 +236,7 @@ const testDataFixture: AdjacencyData = {
     [null, null, 0, 0, 0, null, 0, 5],
     [5, 4, 0, 0, 0, 5, 5, 0],
   ],
-}
+)
 
 describe('enumerateHouses', () => {
   it('enumerates houses with correct indices and capacities', () => {
@@ -459,16 +472,16 @@ describe('habitat incompatibility', () => {
       N1: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
       N2: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
     }
-    const bridgeAdj: AdjacencyData = {
-      pokemon: ['X', 'Y', 'N1', 'N2'],
-      matrix: [
+    const bridgeAdj: AdjacencyMap = matrixToMap(
+      ['X', 'Y', 'N1', 'N2'],
+      [
         //   X     Y     N1    N2
         [0, null, 5, 5], // X (Cool)
         [null, 0, 5, 5], // Y (Warm)
         [5, 5, 0, 6], // N1 (Dark)
         [5, 5, 6, 0], // N2 (Dark)
       ],
-    }
+    )
     const result = await solve(
       ['X', 'Y', 'N1', 'N2'],
       { small: 1, medium: 0, large: 1 },

@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import HouseRecord from '@/components/HouseRecord.vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
-import { assetPath } from '@/assetPath'
-import { favoritesForItem, itemsForFavorite } from '@/items'
-import { solve, type AdjacencyData, type PokemonData, type SolverResult } from '@/solver'
+import { favoritesForItem, itemsForFavorite, loadAdjacencyMap, loadPokemonData } from '@/queries'
+import { solve, type AdjacencyMap, type PokemonData, type SolverResult } from '@/solver'
 import {
   BAlert,
   BBadge,
@@ -22,7 +21,7 @@ import {
 import { computed, onMounted, ref, watch } from 'vue'
 
 const pokemonData = ref<PokemonData | null>(null)
-const adjacencyData = ref<AdjacencyData | null>(null)
+const adjacencyMap = ref<AdjacencyMap | null>(null)
 const pokemonNames = computed(() =>
   pokemonData.value ? Object.keys(pokemonData.value).sort() : [],
 )
@@ -65,15 +64,27 @@ const saveSuccess = ref(false)
 const selectedFavorite = ref('')
 const showFavoriteItemsModal = ref(false)
 
-const selectedFavoriteItems = computed(() => itemsForFavorite(selectedFavorite.value))
-const selectedFavoriteItemRows = computed(() => {
-  const selected = selectedFavorite.value.toLowerCase()
-  return selectedFavoriteItems.value.map((item) => ({
-    item,
-    otherFavorites: favoritesForItem(item).filter(
-      (favorite) => favorite.toLowerCase() !== selected,
-    ),
-  }))
+const selectedFavoriteItems = ref<string[]>([])
+const selectedFavoriteItemRows = ref<Array<{ item: string; otherFavorites: string[] }>>([])
+
+watch(selectedFavorite, async (newFavorite) => {
+  if (!newFavorite) {
+    selectedFavoriteItems.value = []
+    selectedFavoriteItemRows.value = []
+    return
+  }
+  const items = await itemsForFavorite(newFavorite)
+  selectedFavoriteItems.value = items
+  const selected = newFavorite.toLowerCase()
+  const rows = await Promise.all(
+    items.map(async (item) => ({
+      item,
+      otherFavorites: (await favoritesForItem(item)).filter(
+        (favorite) => favorite.toLowerCase() !== selected,
+      ),
+    })),
+  )
+  selectedFavoriteItemRows.value = rows
 })
 function openSaveModal() {
   queryTitle.value = ''
@@ -113,14 +124,8 @@ watch(selectedTimestamp, (ts) => {
 })
 
 onMounted(async () => {
-  const [favoritesResp, adjacencyResp] = await Promise.all([
-    fetch(assetPath('pokemon_favorites.json')),
-    fetch(assetPath('pokemon_adjacency.json')),
-  ])
-  const data: PokemonData = await favoritesResp.json()
-  const adjacency: AdjacencyData = await adjacencyResp.json()
-  pokemonData.value = data
-  adjacencyData.value = adjacency
+  pokemonData.value = await loadPokemonData()
+  adjacencyMap.value = await loadAdjacencyMap()
 })
 
 function loadSample() {
@@ -133,9 +138,9 @@ function loadSample() {
 }
 
 watch(
-  [selectedPokemon, small, medium, large, pokemonData, adjacencyData],
+  [selectedPokemon, small, medium, large, pokemonData, adjacencyMap],
   async () => {
-    if (!pokemonData.value || !adjacencyData.value || totalHouses.value === 0) {
+    if (!pokemonData.value || !adjacencyMap.value || totalHouses.value === 0) {
       result.value = null
       return
     }
@@ -146,7 +151,7 @@ watch(
         selectedPokemon.value,
         { small: small.value, medium: medium.value, large: large.value },
         pokemonData.value,
-        adjacencyData.value,
+        adjacencyMap.value,
       )
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Solver failed'

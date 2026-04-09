@@ -19,14 +19,11 @@
  * Small houses (capacity 1) are never pre-assigned — they are filled in phase 3.
  */
 
-export interface AdjacencyData {
-  pokemon: string[]
-  matrix: (number | null)[][]
-}
+export type AdjacencyMap = Map<string, Map<string, number | null>>
 
 /**
- * Phase 0: Extract an N×N sub-matrix for the selected pokemon from the full
- * adjacency data. This converts the global pokemon-index space into a local
+ * Phase 0: Extract an N×N sub-matrix for the selected pokemon from the
+ * adjacency map. This converts the global pokemon-name space into a local
  * index space that the clustering functions operate on.
  *
  * subMatrix[i][j] = adjacency score between pokemonNames[i] and pokemonNames[j].
@@ -34,21 +31,21 @@ export interface AdjacencyData {
  */
 export function buildSubMatrix(
   pokemonNames: string[],
-  adjacency: AdjacencyData,
+  adjacency: AdjacencyMap,
 ): (number | null)[][] {
-  const nameToIdx = new Map(adjacency.pokemon.map((name, i) => [name, i]))
   const n = pokemonNames.length
   const matrix: (number | null)[][] = Array.from({ length: n }, () =>
     Array.from({ length: n }, (): number | null => 0),
   )
 
   for (let i = 0; i < n; i++) {
-    const fullI = nameToIdx.get(pokemonNames[i]!)
-    if (fullI === undefined) continue
+    const nameA = pokemonNames[i]!
+    const mapA = adjacency.get(nameA)
+    if (!mapA) continue
     for (let j = i + 1; j < n; j++) {
-      const fullJ = nameToIdx.get(pokemonNames[j]!)
-      if (fullJ === undefined) continue
-      const val = adjacency.matrix[fullI]?.[fullJ] ?? null
+      const nameB = pokemonNames[j]!
+      const raw = mapA.get(nameB)
+      const val = raw === undefined ? 0 : raw
       matrix[i]![j] = val
       matrix[j]![i] = val
     }
@@ -400,14 +397,10 @@ function greedyFillRemaining(
   occupants: Map<number, string[]>,
   remainingCapacity: Map<number, number>,
   pokemonData: PokemonData,
-  adjacencyData?: AdjacencyData,
+  adjacencyMap?: AdjacencyMap,
 ): Map<string, number> {
   const result = new Map<string, number>()
   const pool = new Set(remaining)
-
-  const nameToIdx = adjacencyData
-    ? new Map(adjacencyData.pokemon.map((name, i) => [name, i]))
-    : null
 
   while (pool.size > 0) {
     let bestScore = -1
@@ -416,20 +409,19 @@ function greedyFillRemaining(
     let bestHouseCapacity = -1
 
     for (const name of pool) {
-      const fullI = nameToIdx?.get(name)
+      const mapA = adjacencyMap?.get(name)
       for (const [houseIdx, cap] of remainingCapacity) {
         if (cap <= 0) continue
         let score = 0
         let incompatible = false
         for (const occupant of occupants.get(houseIdx) ?? []) {
-          if (adjacencyData && fullI !== undefined) {
-            const fullJ = nameToIdx!.get(occupant)
-            const val = fullJ !== undefined ? adjacencyData.matrix[fullI]![fullJ] : 0
-            if (val === null || val === undefined) {
+          if (adjacencyMap && mapA) {
+            const val = mapA.get(occupant)
+            if (val === null) {
               incompatible = true
               break
             }
-            score += val
+            score += val ?? 0
           } else {
             score += countSharedFavorites(name, occupant, pokemonData)
           }
@@ -463,7 +455,7 @@ export async function solve(
   pokemonNames: string[],
   housingConfig: HousingConfig,
   pokemonData: PokemonData,
-  adjacencyData?: AdjacencyData,
+  adjacencyMap?: AdjacencyMap,
 ): Promise<SolverResult> {
   const houses = enumerateHouses(housingConfig)
   const numHouses = houses.length
@@ -490,8 +482,8 @@ export async function solve(
 
   // Phase 1+2: Cluster-based pre-assignment for large and medium houses
   let preAssignments = new Map<string, number>()
-  if (adjacencyData) {
-    const subMatrix = buildSubMatrix(pokemonNames, adjacencyData)
+  if (adjacencyMap) {
+    const subMatrix = buildSubMatrix(pokemonNames, adjacencyMap)
     preAssignments = clusterPreAssign(pokemonNames, houses, subMatrix)
   }
 
@@ -518,7 +510,7 @@ export async function solve(
     occupants,
     remainingCapacity,
     pokemonData,
-    adjacencyData,
+    adjacencyMap,
   )
 
   // Merge all assignments

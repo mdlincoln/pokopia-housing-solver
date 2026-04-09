@@ -20,7 +20,7 @@ Asset URLs are constructed by the shared helper `src/assetPath.ts` (`assetPath(f
 
 A "Show a sample island" button prefills the form with 1 small, 3 medium, 2 large houses and 13 randomly chosen pokemon. It is disabled until pokemon data has loaded.
 
-Pokemon data is fetched from `${import.meta.env.BASE_URL}pokemon_favorites.json` and adjacency data is fetched from `${import.meta.env.BASE_URL}pokemon_adjacency.json` on mount so subpath deployments can still resolve the static files. The solver runs whenever both datasets are loaded and at least one house is configured; otherwise results are hidden.
+On mount, calls `loadPokemonData()` and `loadAdjacencyMap()` from [[queries]] (which internally uses `src/db.ts` / sql.js WASM) to populate `pokemonData` and `adjacencyMap`. The dev server serves the WASM file from `node_modules/sql.js/dist/sql-wasm.wasm` via a Vite middleware; production builds copy it to `dist/wasm/`. The solver runs whenever both datasets are loaded and at least one house is configured; otherwise results are hidden.
 
 ### Saved Queries
 

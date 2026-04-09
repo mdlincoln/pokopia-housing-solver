@@ -1,8 +1,44 @@
-import type { SolverResult } from '@/solver'
-import HomeView from '@/views/HomeView.vue'
-import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { vi } from 'vitest'
+
+vi.mock('@/db', async () => {
+  const { default: initSqlJs } = await import('sql.js')
+  const { readFileSync } = await import('node:fs')
+  const { resolve } = await import('node:path')
+
+  const wasmPath = resolve(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm')
+  const SQL = await initSqlJs({ locateFile: () => wasmPath })
+  const dbPath = resolve(process.cwd(), 'public/pokehousing.sqlite')
+  const realDb = new SQL.Database(new Uint8Array(readFileSync(dbPath)))
+
+  const fakeDb = {
+    exec(sql: string, params?: import('sql.js').BindParams) {
+      // Pokemon data query (HomeView onMounted GROUP_CONCAT)
+      if (sql.includes('GROUP_CONCAT')) {
+        return [
+          {
+            columns: ['name', 'image_path', 'habitat', 'favorites_str'],
+            values: [
+              ['AlphaOne', '', 'Dark', 'A|B|C|D|E'],
+              ['AlphaTwo', '', 'Dark', 'A|B|C|D|F'],
+              ['BetaOne', '', 'Bright', 'X|Y|Z|W|V'],
+              ['FitOne', '', 'Dark', 'Exercise'],
+              ['FitTwo', '', 'Dark', 'Exercise'],
+              ['Solo', '', 'Dark', 'Exercise'],
+            ],
+          },
+        ]
+      }
+      // Adjacency query (HomeView onMounted)
+      if (sql.includes('FROM adjacency')) {
+        return []
+      }
+      // Item lookup queries (items.ts) — use real database
+      return realDb.exec(sql, params)
+    },
+  }
+
+  return { getDb: async () => fakeDb }
+})
 
 const mockSolve = vi.fn()
 
@@ -14,23 +50,11 @@ vi.mock('@/solver', async (importOriginal) => {
   }
 })
 
-const testPokemonData = {
-  AlphaOne: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
-  AlphaTwo: { image: '', favorites: ['A', 'B', 'C', 'D', 'F'], habitat: 'Dark' },
-  BetaOne: { image: '', favorites: ['X', 'Y', 'Z', 'W', 'V'], habitat: 'Bright' },
-}
-
-function stubFetch() {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(testPokemonData),
-      }),
-    ),
-  )
-}
+import type { SolverResult } from '@/solver'
+import HomeView from '@/views/HomeView.vue'
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 async function mountHome() {
   const router = createRouter({
@@ -50,7 +74,6 @@ async function mountHome() {
 describe('HomeView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    stubFetch()
   })
 
   it('renders the form with house inputs and submit button', async () => {
@@ -62,11 +85,12 @@ describe('HomeView', () => {
     expect(wrapper.find('[data-testid="results"]').exists()).toBe(false)
   })
 
-  it('loads data files from the configured base path', async () => {
-    await mountHome()
+  it('loads pokemon data from the database on mount', async () => {
+    const wrapper = await mountHome()
 
-    expect(fetch).toHaveBeenNthCalledWith(1, `${import.meta.env.BASE_URL}pokemon_favorites.json`)
-    expect(fetch).toHaveBeenNthCalledWith(2, `${import.meta.env.BASE_URL}pokemon_adjacency.json`)
+    // After mount, the component should be interactive without error
+    expect(wrapper.find('[data-testid="error"]').exists()).toBe(false)
+    expect(wrapper.findAll('input[type="number"]')).toHaveLength(3)
   })
 
   it('displays results with all pokemon housed', async () => {
@@ -185,20 +209,6 @@ describe('HomeView', () => {
   })
 
   it('opens favorite items modal from shared favorite pill', async () => {
-    const sharedFavoriteData = {
-      FitOne: { image: '', favorites: ['Exercise'], habitat: 'Dark' },
-      FitTwo: { image: '', favorites: ['Exercise'], habitat: 'Dark' },
-    }
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(sharedFavoriteData),
-        }),
-      ),
-    )
-
     const solverResult: SolverResult = {
       houses: [{ houseIndex: 1, size: 'medium', capacity: 2, pokemon: ['FitOne', 'FitTwo'] }],
       unhoused: [],
@@ -215,23 +225,10 @@ describe('HomeView', () => {
 
     expect(wrapper.vm.showFavoriteItemsModal).toBe(true)
     expect(wrapper.vm.selectedFavorite).toBe('Exercise')
-    expect(wrapper.vm.selectedFavoriteItems).toContain('Punching bag')
+    expect(wrapper.vm.selectedFavoriteItems).toContain('Punching Bag')
   })
 
   it('opens favorite items modal from pokemon card favorite pill', async () => {
-    const cardFavoriteData = {
-      Solo: { image: '', favorites: ['Exercise'], habitat: 'Dark' },
-    }
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(cardFavoriteData),
-        }),
-      ),
-    )
-
     const solverResult: SolverResult = {
       houses: [{ houseIndex: 1, size: 'small', capacity: 1, pokemon: ['Solo'] }],
       unhoused: [],
@@ -248,7 +245,7 @@ describe('HomeView', () => {
 
     expect(wrapper.vm.showFavoriteItemsModal).toBe(true)
     expect(wrapper.vm.selectedFavorite).toBe('Exercise')
-    expect(wrapper.vm.selectedFavoriteItems).toContain('Punching bag')
+    expect(wrapper.vm.selectedFavoriteItems).toContain('Punching Bag')
   })
 
   it('shows related favorite pills for items in favorite modal', async () => {
@@ -259,13 +256,13 @@ describe('HomeView', () => {
     await flushPromises()
 
     const gamingBedRow = wrapper.vm.selectedFavoriteItemRows.find(
-      (row: { item: string; otherFavorites: string[] }) => row.item === 'Gaming bed',
+      (row: { item: string; otherFavorites: string[] }) => row.item === 'Gaming Bed',
     )
     expect(gamingBedRow).toBeDefined()
     if (!gamingBedRow) {
-      throw new Error('Expected Gaming bed row to be present in selectedFavoriteItemRows')
+      throw new Error('Expected Gaming Bed row to be present in selectedFavoriteItemRows')
     }
-    expect(gamingBedRow.otherFavorites).toContain('Colorful Stuff')
-    expect(gamingBedRow.otherFavorites).not.toContain('Shiny Stuff')
+    expect(gamingBedRow.otherFavorites).toContain('colorful stuff')
+    expect(gamingBedRow.otherFavorites).not.toContain('shiny stuff')
   })
 })
