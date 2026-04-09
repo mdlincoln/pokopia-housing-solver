@@ -12,6 +12,7 @@ import {
   BCol,
   BFormGroup,
   BFormInput,
+  BFormSpinbutton,
   BFormSelect,
   BListGroup,
   BModal,
@@ -184,17 +185,17 @@ defineExpose({
         <BRow class="g-3">
           <BCol sm="4">
             <BFormGroup label="Small (1 slot)" label-for="house-small">
-              <BFormInput id="house-small" v-model.number="small" type="number" min="0" />
+              <BFormSpinbutton id="house-small" v-model="small" min="0" />
             </BFormGroup>
           </BCol>
           <BCol sm="4">
             <BFormGroup label="Medium (2 slots)" label-for="house-medium">
-              <BFormInput id="house-medium" v-model.number="medium" type="number" min="0" />
+              <BFormSpinbutton id="house-medium" v-model="medium" min="0" />
             </BFormGroup>
           </BCol>
           <BCol sm="4">
             <BFormGroup label="Large (4 slots)" label-for="house-large">
-              <BFormInput id="house-large" v-model.number="large" type="number" min="0" />
+              <BFormSpinbutton id="house-large" v-model="large" min="0" />
             </BFormGroup>
           </BCol>
         </BRow>
