@@ -230,7 +230,14 @@ defineExpose({
       Query saved successfully.
     </BAlert>
 
-    <BModal v-model="showSaveModal" title="Save query" ok-title="Save" @ok="confirmSave">
+    <BModal
+      v-model="showSaveModal"
+      title="Save query"
+      ok-title="Save"
+      ok-variant="primary"
+      cancel-variant="secondary"
+      @ok="confirmSave"
+    >
       <BFormGroup label="Title (optional)" label-for="query-title-input">
         <BFormInput
           id="query-title-input"
@@ -305,6 +312,7 @@ defineExpose({
     :title="`Items for ${selectedFavorite}`"
     ok-only
     ok-title="Close"
+    ok-variant="primary"
     data-testid="favorite-items-modal"
   >
     <p class="mb-2" data-testid="favorite-items-modal-title">{{ selectedFavorite }}</p>
