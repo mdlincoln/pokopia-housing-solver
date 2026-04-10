@@ -76,7 +76,7 @@ Each recommended item has a small `+` button (`data-testid="add-to-cart"`) that 
 
 Test selectors use `data-testid` attributes so tests do not depend on Bootstrap CSS classes.
 
-Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, `favorite-item-related-favorite-pill`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, and `add-to-cart`.
+Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, `favorite-item-related-favorite-pill`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-clear`, `cart-aggregated`, `cart-aggregated-item`, and `add-to-cart`.
 
 ## ShoppingCart
 
@@ -110,11 +110,15 @@ After adding an item and clicking the `+` (increment) button inside the cart pan
 
 Clicking the `×` (remove) button on a cart entry removes the entire entry regardless of quantity; if it was the last item, the empty-state message returns.
 
+### Clear all empties the cart
+
+A "Clear all" button (`data-testid="cart-clear"`) appears above the items list when the cart has at least one item. Clicking it removes all items at once and restores the empty-state message.
+
 ### Cart Store
 
 The Pinia store at `src/stores/cart.ts` tracks cart state globally. State includes `items` (`Map<string, { quantity, picturePath }>`), `recipes` (cached per item name), and `aggregated` (totals from [[queries#getAggregatedIngredients]]).
 
-Actions: `addItem(name)` — increments quantity or inserts at 1, loads picture and recipe on first add via [[queries#getItemPicturePath]] and [[queries#getRecipeForItem]], then recomputes aggregated. `removeItem`, `incrementItem`, `decrementItem` adjust quantities (removing at 0) and recompute aggregated.
+Actions: `addItem(name)` — increments quantity or inserts at 1, loads picture and recipe on first add via [[queries#getItemPicturePath]] and [[queries#getRecipeForItem]], then recomputes aggregated. `removeItem`, `incrementItem`, `decrementItem` adjust quantities (removing at 0) and recompute aggregated. `clearCart()` removes all items and resets aggregated to an empty array.
 
 Getters: `totalItems` (sum of all quantities), `itemList` (array of `CartItem` for template iteration).
 
