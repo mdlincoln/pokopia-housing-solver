@@ -28,9 +28,9 @@ On mount, calls `loadPokemonData()` and `loadAdjacencyMap()` from [[queries]] (w
 
 Persists query configurations (house counts + selected pokemon) to `localStorage` (`pokehousing_saved_queries`) as a JSON array of `SavedQuery` objects. New entries are prepended so the most recent appears first.
 
-Clicking "Save query" opens a `BModal` prompting for an optional title. The modal uses `@shown` to focus the title input immediately on open. Confirming saves the entry; cancelling discards it. The `SavedQuery` object includes a `title: string` field alongside `timestamp`, `small`, `medium`, `large`, and `pokemon`. A temporary success `BAlert` is shown for 3 seconds after a query is saved.
+Clicking "Save query" opens a `BModal` prompting for an optional title. The modal uses `@shown` to focus the title input immediately on open. Confirming saves the entry; cancelling discards it. The `SavedQuery` object includes a `title: string` field alongside `timestamp`, `small`, `medium`, `large`, `pokemon`, and an optional `cart: Array<{ name, quantity }>` (omitted in older entries for backwards compatibility). A temporary success `BAlert` is shown for 3 seconds after a query is saved.
 
-When saved queries exist, a `BFormSelect` dropdown appears. The timestamp is always shown. When an entry has a non-empty `title`, it is displayed first followed by the timestamp in parentheses (e.g. `My title (4/6/2026, 3:00:00 PM)`); untitled entries show only the timestamp. Selecting an entry restores all four fields into the reactive refs, triggering the solver watcher automatically.
+When saved queries exist, a `BFormSelect` dropdown appears. The timestamp is always shown. When an entry has a non-empty `title`, it is displayed first followed by the timestamp in parentheses (e.g. `My title (4/6/2026, 3:00:00 PM)`); untitled entries show only the timestamp. Selecting an entry restores all five fields into the reactive refs and calls `cartStore.restoreItems(query.cart ?? [])` to restore cart state (clearing the cart if no cart was saved), triggering the solver watcher automatically.
 
 #### Focuses input on modal open
 
@@ -43,6 +43,14 @@ Verifies that after confirming the save modal, a success alert appears and then 
 #### Saves title with query
 
 Verifies that when the user provides a title in the save modal and confirms, the stored `SavedQuery` entry has the `title` field set to the provided value.
+
+#### Saves cart items with saved query
+
+Verifies that when the cart contains items, confirming the save modal writes a `cart` array of `{ name, quantity }` objects into the stored `SavedQuery` entry in localStorage.
+
+#### Restores cart from saved query
+
+Verifies that selecting a saved query that includes a `cart` field calls `cartStore.restoreItems` with the saved cart entries, so the shopping cart state is fully restored alongside the housing configuration.
 
 #### Shows title in restore dropdown
 
@@ -136,7 +144,7 @@ Clicking the `×` (remove) button on a cart entry removes the entire entry regar
 
 The Pinia store at `src/stores/cart.ts` tracks cart state globally. State includes `items` (`Map<string, { quantity, picturePath }>`), `recipes` (cached per item name), and `aggregated` (totals from [[queries#getAggregatedIngredients]]).
 
-Actions: `addItem(name)` — increments quantity or inserts at 1, loads picture, metadata (`isCraftable`, `category`, `flavorText`), and recipe on first add via [[queries#getItemPicturePath]], [[queries#getItemMetadata]], and [[queries#getRecipeForItem]], then recomputes aggregated. `removeItem`, `incrementItem`, `decrementItem` adjust quantities (removing at 0) and recompute aggregated.
+Actions: `addItem(name)` — increments quantity or inserts at 1, loads picture, metadata (`isCraftable`, `category`, `flavorText`), and recipe on first add via [[queries#getItemPicturePath]], [[queries#getItemMetadata]], and [[queries#getRecipeForItem]], then recomputes aggregated. `removeItem`, `incrementItem`, `decrementItem` adjust quantities (removing at 0) and recompute aggregated. `restoreItems(entries)` — clears the cart and re-hydrates from a `{ name, quantity }[]` array; fetches picturePath, metadata, and recipe for all items in parallel, then calls `recomputeAggregated` once. Used by [[ui#HomeView#Saved Queries]] restore.
 
 Getters: `totalItems` (sum of all quantities), `itemList` (array of `CartItem` for template iteration).
 

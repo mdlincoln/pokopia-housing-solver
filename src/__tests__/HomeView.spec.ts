@@ -11,6 +11,7 @@ vi.mock('@/db', async () => {
 
 import { loadAdjacencyMap, loadPokemonData } from '@/queries'
 import type { SolverResult } from '@/solver'
+import { useCartStore } from '@/stores/cart'
 import HomeView from '@/views/HomeView.vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -175,6 +176,54 @@ describe('HomeView', () => {
       'pokehousing_saved_queries',
       expect.stringContaining('"title":"My favourite island"'),
     )
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#Saves cart items with saved query]]
+  it('saves cart items with saved query', async () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem')
+
+    const wrapper = await mountHome()
+    const cartStore = useCartStore()
+    cartStore.items.set('Punching Bag', {
+      quantity: 2,
+      picturePath: null,
+      isCraftable: true,
+      category: 'Outdoor',
+      flavorText: null,
+    })
+
+    wrapper.vm.small = 1
+    wrapper.vm.selectedPokemon = ['AlphaOne']
+    wrapper.vm.queryTitle = 'Cart test'
+    wrapper.vm.confirmSave()
+
+    const call = setItem.mock.calls.find(([key]) => key === 'pokehousing_saved_queries')
+    expect(call).toBeDefined()
+    const saved = JSON.parse(call![1] as string)
+    expect(saved[0].cart).toEqual([{ name: 'Punching Bag', quantity: 2 }])
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#Restores cart from saved query]]
+  it('restores cart from saved query', async () => {
+    const entry = {
+      title: 'Saved with cart',
+      timestamp: 1700000000000,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['AlphaOne'],
+      cart: [{ name: 'Punching Bag', quantity: 3 }],
+    }
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([entry]))
+
+    const wrapper = await mountHome()
+    const cartStore = useCartStore()
+    const restoreItemsSpy = vi.spyOn(cartStore, 'restoreItems').mockResolvedValue(undefined)
+
+    wrapper.vm.selectedTimestamp = 1700000000000
+    await flushPromises()
+
+    expect(restoreItemsSpy).toHaveBeenCalledWith([{ name: 'Punching Bag', quantity: 3 }])
   })
 
   // @lat: [[ui#HomeView#Saved Queries#Shows title in restore dropdown]]

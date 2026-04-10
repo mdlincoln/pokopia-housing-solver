@@ -55,6 +55,7 @@ interface SavedQuery {
   medium: number
   large: number
   pokemon: string[]
+  cart?: Array<{ name: string; quantity: number }>
 }
 
 const STORAGE_KEY = 'pokehousing_saved_queries'
@@ -122,6 +123,7 @@ function confirmSave() {
     medium: medium.value,
     large: large.value,
     pokemon: [...selectedPokemon.value],
+    cart: cartStore.itemList.map(({ name, quantity }) => ({ name, quantity })),
   }
   savedQueries.value = [entry, ...savedQueries.value]
   localStorage.setItem(STORAGE_KEY, JSON.stringify(savedQueries.value))
@@ -136,7 +138,7 @@ function openFavoriteItemsModal(favorite: string) {
   showFavoriteItemsModal.value = true
 }
 
-watch(selectedTimestamp, (ts) => {
+watch(selectedTimestamp, async (ts) => {
   if (ts === null) return
   const query = savedQueries.value.find((q) => q.timestamp === ts)
   if (!query) return
@@ -144,6 +146,7 @@ watch(selectedTimestamp, (ts) => {
   medium.value = query.medium
   large.value = query.large
   selectedPokemon.value = [...query.pokemon]
+  await cartStore.restoreItems(query.cart ?? [])
 })
 
 onMounted(async () => {
@@ -193,6 +196,7 @@ defineExpose({
   selectedPokemon,
   queryTitle,
   confirmSave,
+  selectedTimestamp,
   selectedFavorite,
   selectedFavoriteItems,
   selectedFavoriteItemRows,

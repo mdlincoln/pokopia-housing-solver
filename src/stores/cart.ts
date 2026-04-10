@@ -80,6 +80,40 @@ export const useCartStore = defineStore('cart', () => {
     await recomputeAggregated()
   }
 
+  async function restoreItems(entries: { name: string; quantity: number }[]) {
+    items.value.clear()
+    recipes.value.clear()
+
+    if (entries.length === 0) {
+      aggregated.value = []
+      return
+    }
+
+    const results = await Promise.all(
+      entries.map(async ({ name, quantity }) => {
+        const [picturePath, metadata, recipe] = await Promise.all([
+          getItemPicturePath(name),
+          getItemMetadata(name),
+          getRecipeForItem(name),
+        ])
+        return { name, quantity, picturePath, metadata, recipe }
+      }),
+    )
+
+    for (const { name, quantity, picturePath, metadata, recipe } of results) {
+      items.value.set(name, {
+        quantity,
+        picturePath,
+        isCraftable: metadata.isCraftable,
+        category: metadata.category,
+        flavorText: metadata.flavorText,
+      })
+      recipes.value.set(name, recipe)
+    }
+
+    await recomputeAggregated()
+  }
+
   function removeItem(name: string) {
     items.value.delete(name)
     recomputeAggregated()
@@ -110,6 +144,7 @@ export const useCartStore = defineStore('cart', () => {
     totalItems,
     itemList,
     addItem,
+    restoreItems,
     removeItem,
     incrementItem,
     decrementItem,
