@@ -140,6 +140,10 @@ After adding an item and clicking the `+` (increment) button inside the cart pan
 
 Clicking the `×` (remove) button on a cart entry removes the entire entry regardless of quantity; if it was the last item, the empty-state message returns.
 
+### Clear all empties the cart
+
+A "Clear all" button (`data-testid="cart-clear"`) appears above the items list when the cart has at least one item. Clicking it removes all items at once and restores the empty-state message.
+
 ### Cart Store
 
 The Pinia store at `src/stores/cart.ts` tracks cart state globally. State includes `items` (`Map<string, { quantity, picturePath }>`), `recipes` (cached per item name), and `aggregated` (totals from [[queries#getAggregatedIngredients]]).

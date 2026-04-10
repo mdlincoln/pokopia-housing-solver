@@ -371,4 +371,21 @@ test.describe('Shopping Cart', () => {
     await page.getByTestId('cart-remove').first().click()
     await expect(page.getByTestId('cart-empty')).toBeVisible({ timeout: 2000 })
   })
+
+  // @lat: [[ui#ShoppingCart#Clear all empties the cart]]
+  test('clear all button removes all items and shows empty state', async ({ page }) => {
+    test.setTimeout(40_000)
+    await setupWithRecommendedItems(page)
+
+    // Add two different items
+    const addButtons = page.getByTestId('add-to-cart')
+    await addButtons.nth(0).click()
+    await addButtons.nth(1).click()
+    await expect(page.getByTestId('cart-item')).toHaveCount(2, { timeout: 2000 })
+
+    // Click "Clear all" — empty state should return
+    await page.getByTestId('cart-clear').click()
+    await expect(page.getByTestId('cart-empty')).toBeVisible({ timeout: 2000 })
+    await expect(page.getByTestId('cart-items')).toBeHidden()
+  })
 })

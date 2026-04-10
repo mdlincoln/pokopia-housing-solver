@@ -137,6 +137,11 @@ export const useCartStore = defineStore('cart', () => {
     await recomputeAggregated()
   }
 
+  function clearCart() {
+    items.value.clear()
+    aggregated.value = []
+  }
+
   return {
     items,
     recipes,
@@ -148,5 +153,6 @@ export const useCartStore = defineStore('cart', () => {
     removeItem,
     incrementItem,
     decrementItem,
+    clearCart,
   }
 })

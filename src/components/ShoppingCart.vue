@@ -19,6 +19,17 @@ const cart = useCartStore()
     </template>
 
     <template v-else>
+      <div class="d-flex justify-content-end mb-2">
+        <BButton
+          size="sm"
+          variant="outline-danger"
+          data-testid="cart-clear"
+          @click="cart.clearCart()"
+        >
+          Clear all
+        </BButton>
+      </div>
+
       <BListGroup flush data-testid="cart-items">
         <BListGroupItem
           v-for="item in cart.itemList"
