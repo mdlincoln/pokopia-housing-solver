@@ -14,7 +14,8 @@ vi.mock('@/db', async () => {
 import HouseRecord from '@/components/HouseRecord.vue'
 import type { HouseAssignment, PokemonData } from '@/solver'
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 const testPokemonData: PokemonData = {
   AlphaOne: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
@@ -24,6 +25,10 @@ const testPokemonData: PokemonData = {
 }
 
 describe('HouseRecord', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
   it('shows shared habitats badge when 2+ pokemon share the same habitat', () => {
     const house: HouseAssignment = {
       houseIndex: 1,

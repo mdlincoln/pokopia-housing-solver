@@ -534,3 +534,92 @@ body {
     padding: var(--space-2);
   }
 }
+
+/* ── Shopping Cart ───────────────────────────────────── */
+
+.cart-thumbnail {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.cart-thumbnail-sm {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.cart-add-btn {
+  padding: 0 0.35em;
+  line-height: 1.2;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+
+.cart-controls {
+  white-space: nowrap;
+}
+
+.cart-quantity {
+  min-width: 1.4em;
+  text-align: center;
+  font-weight: 600;
+}
+
+.cart-recipe {
+  font-size: 0.88em;
+  list-style: none;
+}
+
+.cart-item {
+  border-bottom: 1px solid var(--trop-sand-100);
+}
+
+/* At lg+: render inline as a sticky sidebar that fills the full viewport height */
+@media (min-width: 992px) {
+  .cart-sidebar-panel.offcanvas-lg {
+    --bs-offcanvas-width: 300px;
+    position: sticky !important;
+    top: 0;
+    height: 100vh;
+    flex-shrink: 0;
+    /* Column layout so header stays fixed and body scrolls */
+    display: flex !important;
+    flex-direction: column !important;
+    /* Themed backdrop */
+    background: linear-gradient(170deg, var(--trop-sky-100) 0%, var(--trop-sand-50) 65%) !important;
+    border-left: 2px solid var(--trop-ocean-300) !important;
+    box-shadow: -4px 0 16px rgb(22 86 104 / 8%);
+  }
+
+  /* Bootstrap hides the offcanvas header at lg+ — restore it with themed styling */
+  .cart-sidebar-panel.offcanvas-lg .offcanvas-header {
+    display: flex !important;
+    flex-shrink: 0;
+    padding: var(--space-2) var(--space-3);
+    background: linear-gradient(135deg, var(--trop-sky-200) 0%, var(--trop-mint-300) 100%);
+    border-bottom: 1px solid var(--trop-ocean-300);
+  }
+
+  /* No toggle means no close button is needed */
+  .cart-sidebar-panel.offcanvas-lg .btn-close {
+    display: none;
+  }
+
+  .cart-sidebar-panel.offcanvas-lg .offcanvas-title {
+    font-family: var(--trop-heading-font);
+    color: var(--trop-night-700);
+    font-size: 1rem;
+  }
+
+  /* Bootstrap sets offcanvas-body to flex-row at lg+ — fix to column so items stack */
+  .cart-sidebar-panel.offcanvas-lg .offcanvas-body {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow-y: auto;
+    padding: var(--space-2) var(--space-3);
+    flex-grow: 1;
+  }
+}

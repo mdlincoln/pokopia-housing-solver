@@ -3,13 +3,16 @@ import PokemonCard from '@/components/PokemonCard.vue'
 import { HABITAT_VARIANT } from '@/habitats'
 import { clusterItemsByFavorites, selectTopNonOverlappingClusters, type ItemCluster } from '@/items'
 import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/solver'
-import { BBadge, BCardGroup, BListGroupItem } from 'bootstrap-vue-next'
+import { useCartStore } from '@/stores/cart'
+import { BBadge, BButton, BCardGroup, BListGroupItem } from 'bootstrap-vue-next'
 import { computed, ref, watch } from 'vue'
 
 const props = defineProps<{
   house: HouseAssignment
   pokemonData: PokemonData
 }>()
+
+const cartStore = useCartStore()
 
 const emit = defineEmits<{
   favoriteClicked: [favorite: string]
@@ -118,7 +121,18 @@ const sharedHabitats = computed(() => {
         <li v-for="(cluster, ci) in recommendedItems" :key="ci" data-testid="item-cluster">
           <span data-testid="item-cluster-favorites">{{ cluster.favorites.join(', ') }}</span>
           <ol>
-            <li v-for="item in cluster.items" :key="item">{{ item }}</li>
+            <li v-for="item in cluster.items" :key="item" class="d-flex align-items-center gap-1">
+              <BButton
+                size="sm"
+                variant="outline-success"
+                class="cart-add-btn"
+                data-testid="add-to-cart"
+                @click="cartStore.addItem(item)"
+              >
+                +
+              </BButton>
+              <span>{{ item }}</span>
+            </li>
           </ol>
         </li>
       </ol>

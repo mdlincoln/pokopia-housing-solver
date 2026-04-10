@@ -8,6 +8,8 @@ Vue 3 homepage styled with Bootstrap Vue Next (`bootstrap-vue-next`) that lets u
 
 The shell now includes a simple footer bar with a source link to the project repository: `https://github.com/mdlincoln/pokopia-housing-solver`.
 
+The main content area and the [[ui#ShoppingCart]] sidebar are co-mounted inside a `d-flex align-items-start` wrapper: `<main class="page-main flex-fill min-w-0">` alongside `<ShoppingCart />`. This enables the sidebar to push content at lg+.
+
 ## HomeView
 
 The main page at `/` in `src/views/HomeView.vue`, built with Bootstrap Vue Next components and a global pastel tropical theme from `src/styles/tropical-theme.css`.
@@ -52,7 +54,7 @@ After solving, a full-width `BListGroup` renders one [[ui#House]] item per assig
 
 Clicking a favorite pill from either shared house favorites or a pokemon card opens a modal showing catalog items for that exact favorite, sourced from [[items#itemsForFavorite]].
 
-Each modal item row also shows pill badges for other favorites that same item fulfills, sourced from [[items#favoritesForItem]]. The reverse mapping is precomputed once at app load in `src/items.ts`.
+Each modal item row also shows pill badges for other favorites that same item fulfills, sourced from [[items#favoritesForItem]]. Both `selectedFavoriteItems` and `selectedFavoriteItemRows` are `ref`s populated by an async `watch` on `selectedFavorite`, since the query functions are async.
 
 ## House
 
@@ -68,11 +70,53 @@ Shared favorite pills and pokemon-card favorite pills are interactive and emit a
 
 House recommendations use all favorites from pokemon assigned to that house (not only shared favorites). The recommendation list shows up to three item-category clusters selected by [[items#selectTopNonOverlappingClusters]], ensuring selected clusters do not overlap favorites while maximizing total favorites covered. Favorites are passed directly to `clusterItemsByFavorites`, which handles deduplication internally.
 
+Each recommended item has a small `+` button (`data-testid="add-to-cart"`) that calls `cartStore.addItem(itemName)` to add it to the shopping cart. The same `+` button appears on each item row in the favorite items modal in HomeView.
+
 ### Test Selectors
 
 Test selectors use `data-testid` attributes so tests do not depend on Bootstrap CSS classes.
 
-Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, and `favorite-item-related-favorite-pill`.
+Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, `favorite-item-related-favorite-pill`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, and `add-to-cart`.
+
+## ShoppingCart
+
+A `BOffcanvas` panel (`src/components/ShoppingCart.vue`) driven by the Pinia cart store (`src/stores/cart.ts`). Mounted in `App.vue` alongside the main content inside a flex row (`d-flex align-items-start app-content-row`).
+
+Uses `responsive="lg"` so it renders as a sticky inline sidebar (pushing main content left) at ≥992px, and falls back to a sliding overlay at smaller viewports. Width at lg+ is 300px via `--bs-offcanvas-width`.
+
+At lg+, Bootstrap's default `.offcanvas-lg` CSS makes the offcanvas-body a flex row and hides the offcanvas header — both are overridden in `tropical-theme.css`. The sidebar uses `display: flex; flex-direction: column` so the header is fixed at the top and the body scrolls independently (`overflow-y: auto`). The header is restored with a sky-to-mint gradient background and ocean-blue border. The panel background is a sky-to-sand gradient with a left border and soft shadow to distinguish it from the main content.
+
+The panel lists each cart item with a small picture thumbnail, quantity controls (− / + / ×), and a nested ingredient list. Below a divider, aggregated totals across all items are shown as a `BListGroup`. Item and ingredient pictures are served via `assetPath()`. Items with no recipe show "(no recipe)" in muted text.
+
+The sidebar has no toggle button or close button — it is permanently visible. Height is `100vh` so it fills the full viewport even when the cart is empty.
+
+### Opens and closes the panel
+
+At lg+ the sidebar renders inline and is always visible without requiring a toggle; the empty-state message shows when the cart has no items and the items list is hidden until items are added. The Cart button remains available for mobile use.
+
+### Adds item from recommended items
+
+After expanding a house's recommended items details and clicking a `+` button, opening the cart shows that item with quantity 1 and the Cart button badge shows 1.
+
+### Adds item from favorite items modal
+
+After clicking a shared-favorite badge, opening the favorite items modal, and clicking `+` on an item, the cart contains that item when the panel is opened.
+
+### Incrementing quantity updates badge
+
+After adding an item and clicking the `+` (increment) button inside the cart panel, the quantity display changes to 2.
+
+### Remove clears item from cart
+
+Clicking the `×` (remove) button on a cart entry removes the entire entry regardless of quantity; if it was the last item, the empty-state message returns.
+
+### Cart Store
+
+The Pinia store at `src/stores/cart.ts` tracks cart state globally. State includes `items` (`Map<string, { quantity, picturePath }>`), `recipes` (cached per item name), and `aggregated` (totals from [[queries#getAggregatedIngredients]]).
+
+Actions: `addItem(name)` — increments quantity or inserts at 1, loads picture and recipe on first add via [[queries#getItemPicturePath]] and [[queries#getRecipeForItem]], then recomputes aggregated. `removeItem`, `incrementItem`, `decrementItem` adjust quantities (removing at 0) and recompute aggregated.
+
+Getters: `totalItems` (sum of all quantities), `itemList` (array of `CartItem` for template iteration).
 
 ## PokemonSelect
 

@@ -1,44 +1,21 @@
-import { vi } from 'vitest'
-
 vi.mock('@/db', async () => {
   const { default: initSqlJs } = await import('sql.js')
   const { readFileSync } = await import('node:fs')
   const { resolve } = await import('node:path')
-
   const wasmPath = resolve(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm')
   const SQL = await initSqlJs({ locateFile: () => wasmPath })
   const dbPath = resolve(process.cwd(), 'public/pokehousing.sqlite')
-  const realDb = new SQL.Database(new Uint8Array(readFileSync(dbPath)))
-
-  const fakeDb = {
-    exec(sql: string, params?: import('sql.js').BindParams) {
-      // Pokemon data query (HomeView onMounted GROUP_CONCAT)
-      if (sql.includes('GROUP_CONCAT')) {
-        return [
-          {
-            columns: ['name', 'image_path', 'habitat', 'favorites_str'],
-            values: [
-              ['AlphaOne', '', 'Dark', 'A|B|C|D|E'],
-              ['AlphaTwo', '', 'Dark', 'A|B|C|D|F'],
-              ['BetaOne', '', 'Bright', 'X|Y|Z|W|V'],
-              ['FitOne', '', 'Dark', 'Exercise'],
-              ['FitTwo', '', 'Dark', 'Exercise'],
-              ['Solo', '', 'Dark', 'Exercise'],
-            ],
-          },
-        ]
-      }
-      // Adjacency query (HomeView onMounted)
-      if (sql.includes('FROM adjacency')) {
-        return []
-      }
-      // Item lookup queries (items.ts) — use real database
-      return realDb.exec(sql, params)
-    },
-  }
-
-  return { getDb: async () => fakeDb }
+  const db = new SQL.Database(new Uint8Array(readFileSync(dbPath)))
+  return { getDb: async () => db }
 })
+
+import { loadAdjacencyMap, loadPokemonData } from '@/queries'
+import type { SolverResult } from '@/solver'
+import HomeView from '@/views/HomeView.vue'
+import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 const mockSolve = vi.fn()
 
@@ -50,11 +27,20 @@ vi.mock('@/solver', async (importOriginal) => {
   }
 })
 
-import type { SolverResult } from '@/solver'
-import HomeView from '@/views/HomeView.vue'
-import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it } from 'vitest'
-import { createMemoryHistory, createRouter } from 'vue-router'
+vi.mock('@/queries', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...(actual as object),
+    loadPokemonData: vi.fn(),
+    loadAdjacencyMap: vi.fn(),
+  }
+})
+
+const testPokemonData = {
+  AlphaOne: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
+  AlphaTwo: { image: '', favorites: ['A', 'B', 'C', 'D', 'F'], habitat: 'Dark' },
+  BetaOne: { image: '', favorites: ['X', 'Y', 'Z', 'W', 'V'], habitat: 'Bright' },
+}
 
 async function mountHome() {
   const router = createRouter({
@@ -65,7 +51,7 @@ async function mountHome() {
   await router.isReady()
 
   const wrapper = mount(HomeView, {
-    global: { plugins: [router] },
+    global: { plugins: [router, createPinia()] },
   })
   await flushPromises()
   return wrapper
@@ -74,6 +60,9 @@ async function mountHome() {
 describe('HomeView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setActivePinia(createPinia())
+    vi.mocked(loadPokemonData).mockResolvedValue(testPokemonData)
+    vi.mocked(loadAdjacencyMap).mockResolvedValue(new Map())
   })
 
   it('renders the form with house inputs and submit button', async () => {
@@ -85,12 +74,11 @@ describe('HomeView', () => {
     expect(wrapper.find('[data-testid="results"]').exists()).toBe(false)
   })
 
-  it('loads pokemon data from the database on mount', async () => {
-    const wrapper = await mountHome()
+  it('loads pokemon and adjacency data on mount', async () => {
+    await mountHome()
 
-    // After mount, the component should be interactive without error
-    expect(wrapper.find('[data-testid="error"]').exists()).toBe(false)
-    expect(wrapper.findAll('input[type="number"]')).toHaveLength(3)
+    expect(loadPokemonData).toHaveBeenCalledOnce()
+    expect(loadAdjacencyMap).toHaveBeenCalledOnce()
   })
 
   it('displays results with all pokemon housed', async () => {
@@ -209,6 +197,12 @@ describe('HomeView', () => {
   })
 
   it('opens favorite items modal from shared favorite pill', async () => {
+    const sharedFavoriteData = {
+      FitOne: { image: '', favorites: ['Exercise'], habitat: 'Dark' },
+      FitTwo: { image: '', favorites: ['Exercise'], habitat: 'Dark' },
+    }
+    vi.mocked(loadPokemonData).mockResolvedValue(sharedFavoriteData)
+
     const solverResult: SolverResult = {
       houses: [{ houseIndex: 1, size: 'medium', capacity: 2, pokemon: ['FitOne', 'FitTwo'] }],
       unhoused: [],
@@ -229,6 +223,11 @@ describe('HomeView', () => {
   })
 
   it('opens favorite items modal from pokemon card favorite pill', async () => {
+    const cardFavoriteData = {
+      Solo: { image: '', favorites: ['Exercise'], habitat: 'Dark' },
+    }
+    vi.mocked(loadPokemonData).mockResolvedValue(cardFavoriteData)
+
     const solverResult: SolverResult = {
       houses: [{ houseIndex: 1, size: 'small', capacity: 1, pokemon: ['Solo'] }],
       unhoused: [],

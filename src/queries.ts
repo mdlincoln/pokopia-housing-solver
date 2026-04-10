@@ -82,6 +82,75 @@ export async function loadPokemonData(): Promise<PokemonData> {
   return pokemonData
 }
 
+export interface RecipeIngredient {
+  ingredientName: string
+  ingredientPicture: string | null
+  count: number
+}
+
+export interface AggregatedIngredient {
+  name: string
+  picturePath: string | null
+  total: number
+}
+
+export async function getItemPicturePath(itemName: string): Promise<string | null> {
+  const db = await getDb()
+  const rows = db.exec(`SELECT picture_path FROM items WHERE LOWER(name) = ?`, [
+    itemName.toLowerCase(),
+  ])[0]
+  if (!rows || rows.values.length === 0) return null
+  return (rows.values[0]![0] as string | null) ?? null
+}
+
+export async function getRecipeForItem(itemName: string): Promise<RecipeIngredient[]> {
+  const db = await getDb()
+  const rows = db.exec(
+    `SELECT ing.name, ing.picture_path, r.count
+     FROM items i
+     JOIN item_recipe r ON r.item_id = i.id
+     JOIN items ing ON r.ingredient_id = ing.id
+     WHERE LOWER(i.name) = ?
+     ORDER BY ing.name`,
+    [itemName.toLowerCase()],
+  )[0]
+  if (!rows) return []
+  return rows.values.map((row) => ({
+    ingredientName: row[0] as string,
+    ingredientPicture: (row[1] as string | null) ?? null,
+    count: row[2] as number,
+  }))
+}
+
+export async function getAggregatedIngredients(
+  cartItems: Array<{ name: string; quantity: number }>,
+): Promise<AggregatedIngredient[]> {
+  if (cartItems.length === 0) return []
+  const db = await getDb()
+  const unions = cartItems
+    .map(
+      () =>
+        `SELECT ing.name, ing.picture_path, r.count * ? AS scaled
+       FROM items i
+       JOIN item_recipe r ON r.item_id = i.id
+       JOIN items ing ON r.ingredient_id = ing.id
+       WHERE LOWER(i.name) = ?`,
+    )
+    .join(' UNION ALL ')
+  const sql = `SELECT name, picture_path, SUM(scaled) as total FROM (${unions}) GROUP BY name, picture_path ORDER BY name`
+  const params: (string | number)[] = []
+  for (const item of cartItems) {
+    params.push(item.quantity, item.name.toLowerCase())
+  }
+  const rows = db.exec(sql, params)[0]
+  if (!rows) return []
+  return rows.values.map((row) => ({
+    name: row[0] as string,
+    picturePath: (row[1] as string | null) ?? null,
+    total: row[2] as number,
+  }))
+}
+
 export async function loadAdjacencyMap(): Promise<AdjacencyMap> {
   const db = await getDb()
   const adjacencyMap: AdjacencyMap = new Map()

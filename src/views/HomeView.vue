@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import HouseRecord from '@/components/HouseRecord.vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
-import { favoritesForItem, itemsForFavorite, loadAdjacencyMap, loadPokemonData } from '@/queries'
+import { favoritesForItem, itemsForFavorite } from '@/items'
+import { loadAdjacencyMap, loadPokemonData } from '@/queries'
 import { solve, type AdjacencyMap, type PokemonData, type SolverResult } from '@/solver'
+import { useCartStore } from '@/stores/cart'
 import {
   BAlert,
   BBadge,
@@ -12,7 +14,6 @@ import {
   BCol,
   BFormGroup,
   BFormInput,
-  BFormSpinbutton,
   BFormSelect,
   BListGroup,
   BModal,
@@ -21,8 +22,10 @@ import {
 } from 'bootstrap-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 
+const cartStore = useCartStore()
+
 const pokemonData = ref<PokemonData | null>(null)
-const adjacencyMap = ref<AdjacencyMap | null>(null)
+const adjacencyData = ref<AdjacencyMap | null>(null)
 const pokemonNames = computed(() =>
   pokemonData.value ? Object.keys(pokemonData.value).sort() : [],
 )
@@ -66,26 +69,23 @@ const selectedFavorite = ref('')
 const showFavoriteItemsModal = ref(false)
 
 const selectedFavoriteItems = ref<string[]>([])
-const selectedFavoriteItemRows = ref<Array<{ item: string; otherFavorites: string[] }>>([])
+const selectedFavoriteItemRows = ref<{ item: string; otherFavorites: string[] }[]>([])
 
-watch(selectedFavorite, async (newFavorite) => {
-  if (!newFavorite) {
+watch(selectedFavorite, async (favorite) => {
+  if (!favorite) {
     selectedFavoriteItems.value = []
     selectedFavoriteItemRows.value = []
     return
   }
-  const items = await itemsForFavorite(newFavorite)
+  const items = await itemsForFavorite(favorite)
   selectedFavoriteItems.value = items
-  const selected = newFavorite.toLowerCase()
-  const rows = await Promise.all(
+  const lower = favorite.toLowerCase()
+  selectedFavoriteItemRows.value = await Promise.all(
     items.map(async (item) => ({
       item,
-      otherFavorites: (await favoritesForItem(item)).filter(
-        (favorite) => favorite.toLowerCase() !== selected,
-      ),
+      otherFavorites: (await favoritesForItem(item)).filter((f) => f.toLowerCase() !== lower),
     })),
   )
-  selectedFavoriteItemRows.value = rows
 })
 function openSaveModal() {
   queryTitle.value = ''
@@ -125,8 +125,9 @@ watch(selectedTimestamp, (ts) => {
 })
 
 onMounted(async () => {
-  pokemonData.value = await loadPokemonData()
-  adjacencyMap.value = await loadAdjacencyMap()
+  const [data, adjacency] = await Promise.all([loadPokemonData(), loadAdjacencyMap()])
+  pokemonData.value = data
+  adjacencyData.value = adjacency
 })
 
 function loadSample() {
@@ -139,9 +140,9 @@ function loadSample() {
 }
 
 watch(
-  [selectedPokemon, small, medium, large, pokemonData, adjacencyMap],
+  [selectedPokemon, small, medium, large, pokemonData, adjacencyData],
   async () => {
-    if (!pokemonData.value || !adjacencyMap.value || totalHouses.value === 0) {
+    if (!pokemonData.value || !adjacencyData.value || totalHouses.value === 0) {
       result.value = null
       return
     }
@@ -152,7 +153,7 @@ watch(
         selectedPokemon.value,
         { small: small.value, medium: medium.value, large: large.value },
         pokemonData.value,
-        adjacencyMap.value,
+        adjacencyData.value,
       )
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Solver failed'
@@ -185,17 +186,17 @@ defineExpose({
         <BRow class="g-3">
           <BCol sm="4">
             <BFormGroup label="Small (1 slot)" label-for="house-small">
-              <BFormSpinbutton id="house-small" v-model="small" min="0" />
+              <BFormInput id="house-small" v-model.number="small" type="number" min="0" />
             </BFormGroup>
           </BCol>
           <BCol sm="4">
             <BFormGroup label="Medium (2 slots)" label-for="house-medium">
-              <BFormSpinbutton id="house-medium" v-model="medium" min="0" />
+              <BFormInput id="house-medium" v-model.number="medium" type="number" min="0" />
             </BFormGroup>
           </BCol>
           <BCol sm="4">
             <BFormGroup label="Large (4 slots)" label-for="house-large">
-              <BFormSpinbutton id="house-large" v-model="large" min="0" />
+              <BFormInput id="house-large" v-model.number="large" type="number" min="0" />
             </BFormGroup>
           </BCol>
         </BRow>
@@ -317,7 +318,20 @@ defineExpose({
   >
     <p class="mb-2" data-testid="favorite-items-modal-title">{{ selectedFavorite }}</p>
     <ul v-if="selectedFavoriteItems.length" class="mb-0" data-testid="favorite-items-list">
-      <li v-for="row in selectedFavoriteItemRows" :key="row.item" class="d-flex gap-2 flex-wrap">
+      <li
+        v-for="row in selectedFavoriteItemRows"
+        :key="row.item"
+        class="d-flex gap-2 flex-wrap align-items-center"
+      >
+        <BButton
+          size="sm"
+          variant="outline-success"
+          class="cart-add-btn"
+          data-testid="add-to-cart"
+          @click="cartStore.addItem(row.item)"
+        >
+          +
+        </BButton>
         <span>{{ row.item }}</span>
         <span
           v-if="row.otherFavorites.length"

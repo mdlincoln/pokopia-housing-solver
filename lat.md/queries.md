@@ -31,3 +31,21 @@ Case-insensitive item name lookup; results are alphabetically sorted as returned
 Scores items by how many of the given favorites they fulfill. See [[src/queries.ts#idealItems]].
 
 Loops over each favorite, queries matching items, and accumulates counts. Duplicate favorites in the input increase the score for items that fulfill that favorite. Returns `ItemScore[]` omitting any items with zero matches.
+
+## getItemPicturePath
+
+Returns the `picture_path` for a single item by name. See [[src/queries.ts#getItemPicturePath]].
+
+Case-insensitive lookup. Returns `null` if the item has no picture or is not found. Used by the cart store when a new item is first added.
+
+## getRecipeForItem
+
+Returns the crafting recipe for a single item as a `RecipeIngredient[]`. See [[src/queries.ts#getRecipeForItem]].
+
+Each entry has `ingredientName`, `ingredientPicture`, and `count`. Items with no recipe return `[]`. Results are sorted by ingredient name. Cached per item in the cart store.
+
+## getAggregatedIngredients
+
+Aggregates crafting ingredients across all cart items, multiplied by their quantities. See [[src/queries.ts#getAggregatedIngredients]].
+
+Accepts `Array<{ name, quantity }>`. Builds a UNION ALL query (one subquery per cart item) then groups by ingredient to SUM totals. Returns `AggregatedIngredient[]` with `name`, `picturePath`, and `total`, sorted by ingredient name. Returns `[]` for an empty cart.
