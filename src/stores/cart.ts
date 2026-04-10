@@ -1,5 +1,6 @@
 import {
   getAggregatedIngredients,
+  getItemMetadata,
   getItemPicturePath,
   getRecipeForItem,
   type AggregatedIngredient,
@@ -11,6 +12,9 @@ import { computed, ref } from 'vue'
 interface CartEntry {
   quantity: number
   picturePath: string | null
+  isCraftable: boolean
+  category: string | null
+  flavorText: string | null
 }
 
 export interface CartItem {
@@ -18,6 +22,9 @@ export interface CartItem {
   quantity: number
   picturePath: string | null
   recipe: RecipeIngredient[]
+  isCraftable: boolean
+  category: string | null
+  flavorText: string | null
 }
 
 export const useCartStore = defineStore('cart', () => {
@@ -36,6 +43,9 @@ export const useCartStore = defineStore('cart', () => {
       quantity: entry.quantity,
       picturePath: entry.picturePath,
       recipe: recipes.value.get(name) ?? [],
+      isCraftable: entry.isCraftable,
+      category: entry.category,
+      flavorText: entry.flavorText,
     })),
   )
 
@@ -52,8 +62,17 @@ export const useCartStore = defineStore('cart', () => {
     if (existing) {
       existing.quantity++
     } else {
-      const picturePath = await getItemPicturePath(name)
-      items.value.set(name, { quantity: 1, picturePath })
+      const [picturePath, metadata] = await Promise.all([
+        getItemPicturePath(name),
+        getItemMetadata(name),
+      ])
+      items.value.set(name, {
+        quantity: 1,
+        picturePath,
+        isCraftable: metadata.isCraftable,
+        category: metadata.category,
+        flavorText: metadata.flavorText,
+      })
       if (!recipes.value.has(name)) {
         recipes.value.set(name, await getRecipeForItem(name))
       }

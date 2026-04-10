@@ -24,6 +24,7 @@ import {
   itemsForFavorite,
   selectTopNonOverlappingClusters,
   type ItemCluster,
+  type ItemDetails,
   type ItemScore,
 } from '../items'
 
@@ -31,10 +32,42 @@ function scoreOf(results: ItemScore[], item: string): number | undefined {
   return results.find((r) => r.item === item)?.score
 }
 
+function makeItem(name: string): ItemDetails {
+  return { name, isCraftable: false, category: null, flavorText: null, picturePath: null }
+}
+
+function itemNames(items: ItemDetails[]): string[] {
+  return items.map((d) => d.name)
+}
+
 describe('itemsForFavorite', () => {
   it('returns items for a known favorite', async () => {
     const result = await itemsForFavorite('Exercise')
-    expect(result).toContain('Punching Bag')
+    expect(itemNames(result)).toContain('Punching Bag')
+  })
+
+  it('includes craftable status, category, and flavor text', async () => {
+    const result = await itemsForFavorite('Exercise')
+    const bag = result.find((d) => d.name === 'Punching Bag')
+    expect(bag).toBeDefined()
+    expect(bag!.isCraftable).toBe(true)
+    expect(bag!.category).toBe('Outdoor')
+    expect(bag!.flavorText).toBeTruthy()
+  })
+
+  it('includes picturePath in ItemDetails', async () => {
+    const result = await itemsForFavorite('Exercise')
+    const bag = result.find((d) => d.name === 'Punching Bag')
+    expect(bag).toBeDefined()
+    expect('picturePath' in bag!).toBe(true)
+  })
+
+  it('marks non-craftable items correctly', async () => {
+    // Shiny stuff includes non-craftable Meteor Lamps
+    const result = await itemsForFavorite('shiny stuff')
+    const lamp = result.find((d) => d.name === 'Red Meteor Lamp')
+    expect(lamp).toBeDefined()
+    expect(lamp!.isCraftable).toBe(false)
   })
 
   it('is case-insensitive', async () => {
@@ -196,7 +229,7 @@ describe('clusterItemsByFavorites', () => {
     const result = await clusterItemsByFavorites(['exercise'])
     expect(result).toHaveLength(1)
     expect(result[0]!.favorites).toEqual(['exercise'])
-    expect(result[0]!.items).toContain('Punching Bag')
+    expect(itemNames(result[0]!.items)).toContain('Punching Bag')
   })
 
   it('creates separate clusters for items fulfilling different favorite subsets', async () => {
@@ -208,10 +241,10 @@ describe('clusterItemsByFavorites', () => {
 
     // The cluster with both favorites should appear first (2 > 1)
     expect(result[0]!.favorites).toHaveLength(2)
-    expect(result[0]!.items).toContain('Bonfire')
+    expect(itemNames(result[0]!.items)).toContain('Bonfire')
 
     // Campfire should be in a single-favorite cluster
-    const campfireCluster = result.find((c) => c.items.includes('Campfire'))
+    const campfireCluster = result.find((c) => itemNames(c.items).includes('Campfire'))
     expect(campfireCluster).toBeDefined()
     expect(campfireCluster!.favorites).toHaveLength(1)
     expect(campfireCluster!.favorites).toContain('lots of fire')
@@ -238,7 +271,7 @@ describe('clusterItemsByFavorites', () => {
   it('deduplicates input favorites case-insensitively', async () => {
     const result = await clusterItemsByFavorites(['Exercise', 'exercise', 'EXERCISE'])
     expect(result).toHaveLength(1)
-    expect(result[0]!.items).toContain('Punching Bag')
+    expect(itemNames(result[0]!.items)).toContain('Punching Bag')
   })
 
   it('every item in a cluster fulfills all of that cluster favorites', async () => {
@@ -248,19 +281,19 @@ describe('clusterItemsByFavorites', () => {
     const topCluster = result[0]!
     expect(topCluster.favorites).toHaveLength(2)
     // Bonfire appears in both Lots of Fire and Group Activities
-    expect(topCluster.items).toContain('Bonfire')
+    expect(itemNames(topCluster.items)).toContain('Bonfire')
     // Torch only appears in Lots of Fire, not Group Activities — should NOT be here
-    expect(topCluster.items).not.toContain('Torch')
+    expect(itemNames(topCluster.items)).not.toContain('Torch')
   })
 })
 
 describe('selectTopNonOverlappingClusters', () => {
   it('selects a non-overlapping set with the greatest total coverage', async () => {
     const clusters: ItemCluster[] = [
-      { favorites: ['A', 'B'], items: ['AB'] },
-      { favorites: ['A'], items: ['A'] },
-      { favorites: ['C', 'D'], items: ['CD'] },
-      { favorites: ['E'], items: ['E'] },
+      { favorites: ['A', 'B'], items: [makeItem('AB')] },
+      { favorites: ['A'], items: [makeItem('A')] },
+      { favorites: ['C', 'D'], items: [makeItem('CD')] },
+      { favorites: ['E'], items: [makeItem('E')] },
     ]
 
     const result = await selectTopNonOverlappingClusters(clusters, 3)
@@ -269,9 +302,9 @@ describe('selectTopNonOverlappingClusters', () => {
 
   it('never returns overlapping favorites', async () => {
     const clusters: ItemCluster[] = [
-      { favorites: ['A', 'B'], items: ['AB'] },
-      { favorites: ['B', 'C'], items: ['BC'] },
-      { favorites: ['D'], items: ['D'] },
+      { favorites: ['A', 'B'], items: [makeItem('AB')] },
+      { favorites: ['B', 'C'], items: [makeItem('BC')] },
+      { favorites: ['D'], items: [makeItem('D')] },
     ]
 
     const result = await selectTopNonOverlappingClusters(clusters, 3)
@@ -287,10 +320,10 @@ describe('selectTopNonOverlappingClusters', () => {
 
   it('returns at most limit clusters', async () => {
     const clusters: ItemCluster[] = [
-      { favorites: ['A'], items: ['A'] },
-      { favorites: ['B'], items: ['B'] },
-      { favorites: ['C'], items: ['C'] },
-      { favorites: ['D'], items: ['D'] },
+      { favorites: ['A'], items: [makeItem('A')] },
+      { favorites: ['B'], items: [makeItem('B')] },
+      { favorites: ['C'], items: [makeItem('C')] },
+      { favorites: ['D'], items: [makeItem('D')] },
     ]
 
     const result = await selectTopNonOverlappingClusters(clusters, 3)
@@ -299,9 +332,9 @@ describe('selectTopNonOverlappingClusters', () => {
 
   it('is deterministic across equivalent coverage ties', async () => {
     const clusters: ItemCluster[] = [
-      { favorites: ['B'], items: ['B'] },
-      { favorites: ['A'], items: ['A'] },
-      { favorites: ['C'], items: ['C'] },
+      { favorites: ['B'], items: [makeItem('B')] },
+      { favorites: ['A'], items: [makeItem('A')] },
+      { favorites: ['C'], items: [makeItem('C')] },
     ]
 
     const result = await selectTopNonOverlappingClusters(clusters, 2)

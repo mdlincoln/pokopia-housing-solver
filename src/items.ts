@@ -1,6 +1,6 @@
-import { idealItems, itemsForFavorite } from '@/queries'
+import { idealItems, itemsForFavorite, type ItemDetails } from '@/queries'
 
-export type { ItemScore } from '@/queries'
+export type { ItemDetails, ItemScore } from '@/queries'
 export { favoritesForItem, idealItems, itemsForFavorite } from '@/queries'
 
 export interface FavoriteCount {
@@ -26,7 +26,7 @@ export async function favoritesToItems(
 
 export interface ItemCluster {
   favorites: string[]
-  items: string[]
+  items: ItemDetails[]
 }
 
 function clusterKey(cluster: ItemCluster): string {
@@ -52,23 +52,23 @@ export async function clusterItemsByFavorites(favorites: string[]): Promise<Item
     }
   }
 
-  // For each item, collect which input favorites it fulfills
-  const itemFavs = new Map<string, string[]>()
+  // For each item, collect which input favorites it fulfills (keeping full ItemDetails)
+  const itemFavs = new Map<string, { details: ItemDetails; favs: string[] }>()
   for (const fav of uniqueFavs) {
     const items = await itemsForFavorite(fav)
-    for (const itemName of items) {
-      let list = itemFavs.get(itemName)
-      if (!list) {
-        list = []
-        itemFavs.set(itemName, list)
+    for (const detail of items) {
+      let entry = itemFavs.get(detail.name)
+      if (!entry) {
+        entry = { details: detail, favs: [] }
+        itemFavs.set(detail.name, entry)
       }
-      list.push(fav)
+      entry.favs.push(fav)
     }
   }
 
   // Group items by their sorted favorites key
-  const groups = new Map<string, { favorites: string[]; items: string[] }>()
-  for (const [item, favs] of itemFavs) {
+  const groups = new Map<string, { favorites: string[]; items: ItemDetails[] }>()
+  for (const [, { details, favs }] of itemFavs) {
     const sorted = [...favs].sort()
     const key = sorted.join('\0')
     let group = groups.get(key)
@@ -76,7 +76,7 @@ export async function clusterItemsByFavorites(favorites: string[]): Promise<Item
       group = { favorites: sorted, items: [] }
       groups.set(key, group)
     }
-    group.items.push(item)
+    group.items.push(details)
   }
 
   // Rank by number of favorites covered (descending), then alphabetically by cluster key

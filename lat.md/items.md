@@ -12,7 +12,7 @@ Given a `string[]` of favorites, queries the SQLite database (`public/pokehousin
 
 Looks up the catalog entries for one favorite name using a case-insensitive key. See [[src/queries.ts#itemsForFavorite]].
 
-This helper returns a `string[]` list of items in catalog order and is used by the UI modal that opens from favorite pills.
+Returns `ItemDetails[]` (name, isCraftable, category, flavorText) in database order. Re-exported from queries via this module and used by the UI modal and `clusterItemsByFavorites`.
 
 ## favoritesForItem
 
@@ -24,7 +24,7 @@ Queries the SQLite database for the favorites associated with a given item. Inpu
 
 Builds interchangeable item clusters keyed by the exact favorites each item fulfills. See [[src/items.ts#clusterItemsByFavorites]].
 
-Given a favorite list, it deduplicates favorites case-insensitively, groups items by the sorted set of fulfilled favorites, and returns `ItemCluster[]` ranked by favorite coverage descending. Coverage ties are broken alphabetically by cluster favorite key for deterministic output.
+Given a favorite list, it deduplicates favorites case-insensitively, groups items by the sorted set of fulfilled favorites, and returns `ItemCluster[]` ranked by favorite coverage descending. Coverage ties are broken alphabetically by cluster favorite key. Each cluster's `items` is `ItemDetails[]` — carrying craftable status, category, and flavor text from the DB query.
 
 ## selectTopNonOverlappingClusters
 

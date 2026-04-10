@@ -72,11 +72,33 @@ House recommendations use all favorites from pokemon assigned to that house (not
 
 Each recommended item has a small `+` button (`data-testid="add-to-cart"`) that calls `cartStore.addItem(itemName)` to add it to the shopping cart. The same `+` button appears on each item row in the favorite items modal in HomeView.
 
+### Item Metadata Display
+
+Every place an item is shown — recommended items list, favorite items modal, and shopping cart — renders metadata columns from the DB using `BTableSimple` tables (Bootstrap Vue Next) with `borderless` and `small` props for minimal visual weight.
+
+The recommended items inside each house card use a single `BTableSimple` where each cluster's favorites label is a `<BTh :rowspan="N">` cell (data-testid `item-cluster-favorites`) spanning all N item rows of that cluster. The row where the favorites `<BTh>` appears also carries `data-testid="item-cluster"`. Rows that start a new group (after the first) receive the CSS class `row-group-start`, which applies a `border-top: 1px solid var(--bs-border-color-translucent) !important` to separate groups from one another. The modal's item list uses a flat `BTableSimple` (no rowspan, one favorite per modal).
+
+Columns in both tables: picture thumbnail (`item-thumbnail` CSS, 32×32), item name with flavor text as native `title` tooltip (`data-testid="item-name"`), craftable badge (`data-testid="item-craftable-badge"`, "Craft" `variant="success"` / "Buy" `variant="secondary"`), and category badge (`data-testid="item-category-badge"`, `variant="warning"`). The modal additionally has an "Also fulfills" column with related favorite pill badges.
+
+All metadata — `isCraftable`, `category`, `flavorText`, and `picturePath` — is fetched in a single SQL query inside `itemsForFavorite` (via `ItemDetails`) so no extra round trips are needed for the recommended items or modal displays.
+
+#### Shows craftable badge on recommended items
+
+Verifies that opening a house's recommended items list shows at least one `item-craftable-badge` with text "Craft" or "Buy".
+
+#### Shows category badge on recommended items
+
+Verifies that opening a house's recommended items list shows at least one `item-category-badge`.
+
+#### Shows craftable badge in favorite modal
+
+Verifies that clicking a shared-favorite badge and opening the modal shows `item-craftable-badge` elements on items in the list.
+
 ### Test Selectors
 
 Test selectors use `data-testid` attributes so tests do not depend on Bootstrap CSS classes.
 
-Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, `favorite-item-related-favorite-pill`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, and `add-to-cart`.
+Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, `favorite-item-related-favorite-pill`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-name`, `item-craftable-badge`, and `item-category-badge`.
 
 ## ShoppingCart
 
@@ -86,7 +108,7 @@ Uses `responsive="lg"` so it renders as a sticky inline sidebar (pushing main co
 
 At lg+, Bootstrap's default `.offcanvas-lg` CSS makes the offcanvas-body a flex row and hides the offcanvas header — both are overridden in `tropical-theme.css`. The sidebar uses `display: flex; flex-direction: column` so the header is fixed at the top and the body scrolls independently (`overflow-y: auto`). The header is restored with a sky-to-mint gradient background and ocean-blue border. The panel background is a sky-to-sand gradient with a left border and soft shadow to distinguish it from the main content.
 
-The panel lists each cart item with a small picture thumbnail, quantity controls (− / + / ×), and a nested ingredient list. Below a divider, aggregated totals across all items are shown as a `BListGroup`. Item and ingredient pictures are served via `assetPath()`. Items with no recipe show "(no recipe)" in muted text.
+The panel lists each cart item with a small picture thumbnail, the item name (with flavor text as a native `title` tooltip), craftable/buy and category badges (see [[ui#House#Item Metadata Display]]), quantity controls (− / + / ×), and a nested ingredient list. Below a divider, aggregated totals across all items are shown as a `BListGroup`. Item and ingredient pictures are served via `assetPath()`. Items with no recipe show "(no recipe)" in muted text.
 
 The sidebar has no toggle button or close button — it is permanently visible. Height is `100vh` so it fills the full viewport even when the cart is empty.
 
@@ -114,7 +136,7 @@ Clicking the `×` (remove) button on a cart entry removes the entire entry regar
 
 The Pinia store at `src/stores/cart.ts` tracks cart state globally. State includes `items` (`Map<string, { quantity, picturePath }>`), `recipes` (cached per item name), and `aggregated` (totals from [[queries#getAggregatedIngredients]]).
 
-Actions: `addItem(name)` — increments quantity or inserts at 1, loads picture and recipe on first add via [[queries#getItemPicturePath]] and [[queries#getRecipeForItem]], then recomputes aggregated. `removeItem`, `incrementItem`, `decrementItem` adjust quantities (removing at 0) and recompute aggregated.
+Actions: `addItem(name)` — increments quantity or inserts at 1, loads picture, metadata (`isCraftable`, `category`, `flavorText`), and recipe on first add via [[queries#getItemPicturePath]], [[queries#getItemMetadata]], and [[queries#getRecipeForItem]], then recomputes aggregated. `removeItem`, `incrementItem`, `decrementItem` adjust quantities (removing at 0) and recompute aggregated.
 
 Getters: `totalItems` (sum of all quantities), `itemList` (array of `CartItem` for template iteration).
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import HouseRecord from '@/components/HouseRecord.vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
+import { assetPath } from '@/assetPath'
 import { favoritesForItem, itemsForFavorite } from '@/items'
 import { loadAdjacencyMap, loadPokemonData } from '@/queries'
 import { solve, type AdjacencyMap, type PokemonData, type SolverResult } from '@/solver'
@@ -19,6 +20,12 @@ import {
   BModal,
   BRow,
   BSpinner,
+  BTableSimple,
+  BTbody,
+  BTd,
+  BTh,
+  BThead,
+  BTr,
 } from 'bootstrap-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 
@@ -69,7 +76,16 @@ const selectedFavorite = ref('')
 const showFavoriteItemsModal = ref(false)
 
 const selectedFavoriteItems = ref<string[]>([])
-const selectedFavoriteItemRows = ref<{ item: string; otherFavorites: string[] }[]>([])
+const selectedFavoriteItemRows = ref<
+  {
+    item: string
+    picturePath: string | null
+    otherFavorites: string[]
+    isCraftable: boolean
+    category: string | null
+    flavorText: string | null
+  }[]
+>([])
 
 watch(selectedFavorite, async (favorite) => {
   if (!favorite) {
@@ -78,12 +94,18 @@ watch(selectedFavorite, async (favorite) => {
     return
   }
   const items = await itemsForFavorite(favorite)
-  selectedFavoriteItems.value = items
+  selectedFavoriteItems.value = items.map((d) => d.name)
   const lower = favorite.toLowerCase()
   selectedFavoriteItemRows.value = await Promise.all(
-    items.map(async (item) => ({
-      item,
-      otherFavorites: (await favoritesForItem(item)).filter((f) => f.toLowerCase() !== lower),
+    items.map(async (detail) => ({
+      item: detail.name,
+      picturePath: detail.picturePath,
+      isCraftable: detail.isCraftable,
+      category: detail.category,
+      flavorText: detail.flavorText,
+      otherFavorites: (await favoritesForItem(detail.name)).filter(
+        (f) => f.toLowerCase() !== lower,
+      ),
     })),
   )
 })
@@ -316,42 +338,76 @@ defineExpose({
     ok-variant="primary"
     data-testid="favorite-items-modal"
   >
-    <p class="mb-2" data-testid="favorite-items-modal-title">{{ selectedFavorite }}</p>
-    <ul v-if="selectedFavoriteItems.length" class="mb-0" data-testid="favorite-items-list">
-      <li
-        v-for="row in selectedFavoriteItemRows"
-        :key="row.item"
-        class="d-flex gap-2 flex-wrap align-items-center"
-      >
-        <BButton
-          size="sm"
-          variant="outline-success"
-          class="cart-add-btn"
-          data-testid="add-to-cart"
-          @click="cartStore.addItem(row.item)"
-        >
-          +
-        </BButton>
-        <span>{{ row.item }}</span>
-        <span
-          v-if="row.otherFavorites.length"
-          class="d-inline-flex gap-1 flex-wrap"
-          data-testid="favorite-item-related-favorites"
-        >
-          (also fulfills
-          <BBadge
-            v-for="favorite in row.otherFavorites"
-            :key="`${row.item}-${favorite}`"
-            variant="secondary"
-            pill
-            data-testid="favorite-item-related-favorite-pill"
-          >
-            {{ favorite }}
-          </BBadge>
-          )
-        </span>
-      </li>
-    </ul>
+    <BTableSimple
+      v-if="selectedFavoriteItems.length"
+      small
+      borderless
+      class="mb-0"
+      data-testid="favorite-items-list"
+    >
+      <BThead>
+        <BTr>
+          <BTh></BTh>
+          <BTh></BTh>
+          <BTh>Item</BTh>
+          <BTh>Craft</BTh>
+          <BTh>Category</BTh>
+          <BTh>Also fulfills</BTh>
+        </BTr>
+      </BThead>
+      <BTbody>
+        <BTr v-for="row in selectedFavoriteItemRows" :key="row.item">
+          <BTd>
+            <BButton
+              size="sm"
+              variant="outline-success"
+              class="cart-add-btn"
+              data-testid="add-to-cart"
+              @click="cartStore.addItem(row.item)"
+              >+</BButton
+            >
+          </BTd>
+          <BTd class="ps-0">
+            <img
+              v-if="row.picturePath"
+              :src="assetPath(row.picturePath)"
+              :alt="row.item"
+              class="item-thumbnail"
+            />
+          </BTd>
+          <BTd :title="row.flavorText ?? undefined" data-testid="item-name">{{ row.item }}</BTd>
+          <BTd>
+            <BBadge
+              :variant="row.isCraftable ? 'success' : 'secondary'"
+              pill
+              data-testid="item-craftable-badge"
+              >{{ row.isCraftable ? 'Craft' : 'Buy' }}</BBadge
+            >
+          </BTd>
+          <BTd>
+            <BBadge v-if="row.category" variant="warning" pill data-testid="item-category-badge">{{
+              row.category
+            }}</BBadge>
+          </BTd>
+          <BTd>
+            <span
+              v-if="row.otherFavorites.length"
+              class="d-inline-flex gap-1 flex-wrap"
+              data-testid="favorite-item-related-favorites"
+            >
+              <BBadge
+                v-for="favorite in row.otherFavorites"
+                :key="`${row.item}-${favorite}`"
+                variant="secondary"
+                pill
+                data-testid="favorite-item-related-favorite-pill"
+                >{{ favorite }}</BBadge
+              >
+            </span>
+          </BTd>
+        </BTr>
+      </BTbody>
+    </BTableSimple>
     <p v-else class="text-muted mb-0" data-testid="favorite-items-empty">
       No items found for this favorite.
     </p>

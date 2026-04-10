@@ -264,4 +264,47 @@ describe('HomeView', () => {
     expect(gamingBedRow.otherFavorites).toContain('colorful stuff')
     expect(gamingBedRow.otherFavorites).not.toContain('shiny stuff')
   })
+
+  it('includes craftable status in selectedFavoriteItemRows', async () => {
+    const wrapper = await mountHome()
+
+    wrapper.vm.selectedFavorite = 'Exercise'
+    wrapper.vm.showFavoriteItemsModal = true
+    await flushPromises()
+
+    const row = wrapper.vm.selectedFavoriteItemRows.find(
+      (r: { item: string }) => r.item === 'Punching Bag',
+    )
+    expect(row).toBeDefined()
+    expect(row!.isCraftable).toBe(true)
+  })
+
+  it('includes non-craftable status in selectedFavoriteItemRows', async () => {
+    const wrapper = await mountHome()
+
+    wrapper.vm.selectedFavorite = 'Shiny Stuff'
+    wrapper.vm.showFavoriteItemsModal = true
+    await flushPromises()
+
+    const row = wrapper.vm.selectedFavoriteItemRows.find(
+      (r: { item: string }) => r.item === 'Red Meteor Lamp',
+    )
+    expect(row).toBeDefined()
+    expect(row!.isCraftable).toBe(false)
+  })
+
+  it('includes category and flavor text in selectedFavoriteItemRows', async () => {
+    const wrapper = await mountHome()
+
+    wrapper.vm.selectedFavorite = 'Exercise'
+    wrapper.vm.showFavoriteItemsModal = true
+    await flushPromises()
+
+    const row = wrapper.vm.selectedFavoriteItemRows.find(
+      (r: { item: string }) => r.item === 'Punching Bag',
+    )
+    expect(row).toBeDefined()
+    expect(row!.category).toBe('Outdoor')
+    expect(row!.flavorText).toBeTruthy()
+  })
 })

@@ -16,9 +16,15 @@ Returns an `AdjacencyMap` (`Map<string, Map<string, number | null>>`). Entries a
 
 ## itemsForFavorite
 
-Looks up catalog item names for a single favorite. See [[src/queries.ts#itemsForFavorite]].
+Looks up catalog item details for a single favorite. See [[src/queries.ts#itemsForFavorite]].
 
-Case-insensitive lookup via normalized favorite name. Returns `string[]` in database order.
+Case-insensitive lookup via normalized favorite name. Returns `ItemDetails[]` in database order. Each entry includes `name`, `isCraftable` (true if the item has at least one recipe row), `category`, `flavorText`, and `picturePath`.
+
+## getItemMetadata
+
+Returns craftable status, category, and flavor text for a single item by name. See [[src/queries.ts#getItemMetadata]].
+
+Case-insensitive lookup. Returns `{ isCraftable, category, flavorText }`. Used by the cart store when a new item is first added so the cart can display badges and tooltips. Returns all-null/false defaults if the item is not found.
 
 ## favoritesForItem
 

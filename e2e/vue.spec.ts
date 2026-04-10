@@ -201,6 +201,63 @@ test.describe('Homepage', () => {
     expect(weezingInMedium && venonatInMedium).toBe(false)
   })
 
+  // @lat: [[ui#House#Item Metadata Display#Shows craftable badge on recommended items]]
+  test('shows craftable and buy badges on recommended items', async ({ page }) => {
+    await page.goto('/')
+
+    await setSpinbutton(page, 'house-medium', 1)
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Ivysaur')
+
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+
+    const details = page.getByTestId('recommended-items')
+    await expect(details).toBeVisible()
+    await details.locator('summary').click()
+
+    // At least one item must have a craftable or buy badge
+    const craftBadge = page.getByTestId('item-craftable-badge').first()
+    await expect(craftBadge).toBeVisible({ timeout: 5000 })
+    const text = await craftBadge.textContent()
+    expect(['Craft', 'Buy']).toContain(text?.trim())
+  })
+
+  // @lat: [[ui#House#Item Metadata Display#Shows category badge on recommended items]]
+  test('shows category badge on recommended items', async ({ page }) => {
+    await page.goto('/')
+
+    await setSpinbutton(page, 'house-small', 1)
+    await selectPokemon(page, 'Bulbasaur')
+
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+
+    const details = page.getByTestId('recommended-items')
+    await expect(details).toBeVisible()
+    await details.locator('summary').click()
+
+    await expect(page.getByTestId('item-category-badge').first()).toBeVisible({ timeout: 5000 })
+  })
+
+  // @lat: [[ui#House#Item Metadata Display#Shows craftable badge in favorite modal]]
+  test('shows craftable badge in favorite items modal', async ({ page }) => {
+    await page.goto('/')
+
+    await setSpinbutton(page, 'house-medium', 1)
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Ivysaur')
+
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+
+    await page.getByTestId('shared-favorite-badge').first().click()
+    const modal = page.getByTestId('favorite-items-modal')
+    await expect(modal).toBeVisible({ timeout: 2000 })
+
+    const badge = modal.getByTestId('item-craftable-badge').first()
+    await expect(badge).toBeVisible({ timeout: 5000 })
+    const text = await badge.textContent()
+    expect(['Craft', 'Buy']).toContain(text?.trim())
+  })
+
   test('displays recommended items for house with shared favorites', async ({ page }) => {
     await page.goto('/')
 
