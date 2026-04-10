@@ -1,18 +1,59 @@
 import { getDb } from '@/db'
 import type { AdjacencyMap, PokemonData } from '@/solver'
 
+export interface ItemDetails {
+  name: string
+  isCraftable: boolean
+  category: string | null
+  flavorText: string | null
+  picturePath: string | null
+}
+
 // @lat: [[items#itemsForFavorite]]
-export async function itemsForFavorite(favorite: string): Promise<string[]> {
+export async function itemsForFavorite(favorite: string): Promise<ItemDetails[]> {
   const db = await getDb()
   const normalized = favorite.toLowerCase()
   const rows = db.exec(
-    `SELECT i.name FROM items i
-       JOIN item_favorites IF ON i.id = IF.item_id
-       WHERE IF.favorite_name = ?`,
+    `SELECT i.name, i.category, i.flavor_text, i.picture_path,
+            CASE WHEN COUNT(r.ingredient_id) > 0 THEN 1 ELSE 0 END AS is_craftable
+     FROM items i
+     JOIN item_favorites IF ON i.id = IF.item_id
+     LEFT JOIN item_recipe r ON r.item_id = i.id
+     WHERE IF.favorite_name = ?
+     GROUP BY i.id, i.name, i.category, i.flavor_text, i.picture_path`,
     [normalized],
   )[0]
   if (!rows) return []
-  return rows.values.map((row) => row[0] as string)
+  return rows.values.map((row) => ({
+    name: row[0] as string,
+    category: (row[1] as string | null) ?? null,
+    flavorText: (row[2] as string | null) ?? null,
+    picturePath: (row[3] as string | null) ?? null,
+    isCraftable: (row[4] as number) === 1,
+  }))
+}
+
+export async function getItemMetadata(
+  itemName: string,
+): Promise<{ isCraftable: boolean; category: string | null; flavorText: string | null }> {
+  const db = await getDb()
+  const rows = db.exec(
+    `SELECT i.category, i.flavor_text,
+            CASE WHEN COUNT(r.ingredient_id) > 0 THEN 1 ELSE 0 END AS is_craftable
+     FROM items i
+     LEFT JOIN item_recipe r ON r.item_id = i.id
+     WHERE LOWER(i.name) = ?
+     GROUP BY i.id`,
+    [itemName.toLowerCase()],
+  )[0]
+  if (!rows || rows.values.length === 0)
+    return { isCraftable: false, category: null, flavorText: null }
+  const row = rows.values[0]!
+  return {
+    category: (row[0] as string | null) ?? null,
+    flavorText: (row[1] as string | null) ?? null,
+    isCraftable: (row[2] as number) === 1,
+  }
 }
 
 // @lat: [[items#favoritesForItem]]

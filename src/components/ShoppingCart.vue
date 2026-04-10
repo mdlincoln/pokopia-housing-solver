@@ -44,7 +44,26 @@ const cart = useCartStore()
               :alt="item.name"
               class="cart-thumbnail"
             />
-            <strong class="flex-grow-1">{{ item.name }}</strong>
+            <div class="flex-grow-1">
+              <strong :title="item.flavorText ?? undefined" data-testid="item-name">{{
+                item.name
+              }}</strong>
+              <div class="d-flex gap-1 mt-1 flex-wrap">
+                <BBadge
+                  :variant="item.isCraftable ? 'success' : 'secondary'"
+                  pill
+                  data-testid="item-craftable-badge"
+                  >{{ item.isCraftable ? 'Craft' : 'Buy' }}</BBadge
+                >
+                <BBadge
+                  v-if="item.category"
+                  variant="warning"
+                  pill
+                  data-testid="item-category-badge"
+                  >{{ item.category }}</BBadge
+                >
+              </div>
+            </div>
             <div class="d-flex align-items-center gap-1 cart-controls">
               <BButton
                 size="sm"

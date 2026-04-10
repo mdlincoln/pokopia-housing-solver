@@ -544,6 +544,18 @@ body {
   flex-shrink: 0;
 }
 
+.item-thumbnail {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.row-group-start > th,
+.row-group-start > td {
+  border-top: 1px solid var(--bs-border-color-translucent) !important;
+}
+
 .cart-thumbnail-sm {
   width: 20px;
   height: 20px;

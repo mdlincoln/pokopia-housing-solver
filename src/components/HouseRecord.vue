@@ -1,10 +1,27 @@
 <script setup lang="ts">
+import { assetPath } from '@/assetPath'
 import PokemonCard from '@/components/PokemonCard.vue'
 import { HABITAT_VARIANT } from '@/habitats'
-import { clusterItemsByFavorites, selectTopNonOverlappingClusters, type ItemCluster } from '@/items'
+import {
+  clusterItemsByFavorites,
+  selectTopNonOverlappingClusters,
+  type ItemCluster,
+  type ItemDetails,
+} from '@/items'
 import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
-import { BBadge, BButton, BCardGroup, BListGroupItem } from 'bootstrap-vue-next'
+import {
+  BBadge,
+  BButton,
+  BCardGroup,
+  BListGroupItem,
+  BTableSimple,
+  BTbody,
+  BTd,
+  BTh,
+  BThead,
+  BTr,
+} from 'bootstrap-vue-next'
 import { computed, ref, watch } from 'vue'
 
 const props = defineProps<{
@@ -60,6 +77,28 @@ const sharedHabitats = computed(() => {
       count,
       variant: HABITAT_VARIANT[habitat] ?? 'light',
     }))
+})
+
+interface FlatRow {
+  favorites: string
+  item: ItemDetails
+  span: number
+  isFirst: boolean
+}
+
+const flatRows = computed<FlatRow[]>(() => {
+  const result: FlatRow[] = []
+  for (const cluster of recommendedItems.value) {
+    cluster.items.forEach((item, idx) => {
+      result.push({
+        favorites: cluster.favorites.join(', '),
+        item,
+        span: cluster.items.length,
+        isFirst: idx === 0,
+      })
+    })
+  }
+  return result
 })
 </script>
 
@@ -117,25 +156,72 @@ const sharedHabitats = computed(() => {
       class="mt-3 house-recommendations"
     >
       <summary>Recommended items</summary>
-      <ol data-testid="recommended-items-list">
-        <li v-for="(cluster, ci) in recommendedItems" :key="ci" data-testid="item-cluster">
-          <span data-testid="item-cluster-favorites">{{ cluster.favorites.join(', ') }}</span>
-          <ol>
-            <li v-for="item in cluster.items" :key="item" class="d-flex align-items-center gap-1">
+      <BTableSimple small borderless data-testid="recommended-items-list">
+        <BThead>
+          <BTr>
+            <BTh>Favorites</BTh>
+            <BTh></BTh>
+            <BTh></BTh>
+            <BTh>Item</BTh>
+            <BTh>Craft</BTh>
+            <BTh>Category</BTh>
+          </BTr>
+        </BThead>
+        <BTbody>
+          <BTr
+            v-for="(row, i) in flatRows"
+            :key="i"
+            :class="{ 'row-group-start': row.isFirst && i > 0 }"
+            :data-testid="row.isFirst ? 'item-cluster' : undefined"
+          >
+            <BTh
+              v-if="row.isFirst"
+              :rowspan="row.span"
+              class="align-top text-muted fw-normal small"
+              data-testid="item-cluster-favorites"
+              >{{ row.favorites }}</BTh
+            >
+            <BTd>
               <BButton
                 size="sm"
                 variant="outline-success"
                 class="cart-add-btn"
                 data-testid="add-to-cart"
-                @click="cartStore.addItem(item)"
+                @click="cartStore.addItem(row.item.name)"
+                >+</BButton
               >
-                +
-              </BButton>
-              <span>{{ item }}</span>
-            </li>
-          </ol>
-        </li>
-      </ol>
+            </BTd>
+            <BTd class="ps-0">
+              <img
+                v-if="row.item.picturePath"
+                :src="assetPath(row.item.picturePath)"
+                :alt="row.item.name"
+                class="item-thumbnail"
+              />
+            </BTd>
+            <BTd :title="row.item.flavorText ?? undefined" data-testid="item-name">
+              {{ row.item.name }}
+            </BTd>
+            <BTd>
+              <BBadge
+                :variant="row.item.isCraftable ? 'success' : 'secondary'"
+                pill
+                data-testid="item-craftable-badge"
+                >{{ row.item.isCraftable ? 'Craft' : 'Buy' }}</BBadge
+              >
+            </BTd>
+            <BTd>
+              <BBadge
+                v-if="row.item.category"
+                variant="warning"
+                pill
+                data-testid="item-category-badge"
+                >{{ row.item.category }}</BBadge
+              >
+            </BTd>
+          </BTr>
+        </BTbody>
+      </BTableSimple>
     </details>
   </BListGroupItem>
 </template>

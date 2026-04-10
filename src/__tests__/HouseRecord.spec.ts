@@ -337,4 +337,94 @@ describe('HouseRecord', () => {
 
     expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise']])
   })
+
+  it('shows craftable badge for items that have recipes', async () => {
+    // Punching Bag (Exercise) is craftable
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseIndex: 1,
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
+    await flushPromises()
+
+    const badge = wrapper.find('[data-testid="item-craftable-badge"]')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe('Craft')
+  })
+
+  it('shows Buy badge for items without recipes', async () => {
+    // Shiny Stuff includes non-craftable Meteor Lamps
+    const pokemonData: PokemonData = {
+      ShinyOne: { image: '', favorites: ['Shiny Stuff'] },
+    }
+    const house: HouseAssignment = {
+      houseIndex: 1,
+      size: 'small',
+      capacity: 1,
+      pokemon: ['ShinyOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
+    await flushPromises()
+
+    const badges = wrapper.findAll('[data-testid="item-craftable-badge"]')
+    const buyBadge = badges.find((b) => b.text() === 'Buy')
+    expect(buyBadge).toBeDefined()
+  })
+
+  it('shows category badge for items with a category', async () => {
+    // Punching Bag has category 'Outdoor'
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseIndex: 1,
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
+    await flushPromises()
+
+    const catBadge = wrapper.find('[data-testid="item-category-badge"]')
+    expect(catBadge.exists()).toBe(true)
+    expect(catBadge.text()).toBe('Outdoor')
+  })
+
+  it('shows flavor text as title attribute on item name', async () => {
+    // Punching Bag has flavor text
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseIndex: 1,
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
+    await flushPromises()
+
+    const nameEl = wrapper.find('[data-testid="item-name"]')
+    expect(nameEl.exists()).toBe(true)
+    const title = nameEl.attributes('title')
+    expect(title).toBeTruthy()
+    expect(title!.length).toBeGreaterThan(0)
+  })
 })
