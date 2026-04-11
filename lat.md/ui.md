@@ -20,7 +20,7 @@ Users set house counts via `BFormInput` (type number) in a `BRow` grid and selec
 
 Asset URLs are constructed by the shared helper `src/assetPath.ts` (`assetPath(fileName)` returns `BASE_URL + fileName`). Both `HomeView` and `PokemonCard` import from this module.
 
-A "Show a sample island" button prefills the form with 1 small, 3 medium, 2 large houses and 13 randomly chosen pokemon. It is disabled until pokemon data has loaded.
+A "Show a sample island" button prefills the form with 1 small, 3 medium, 2 large houses and 13 randomly chosen pokemon. It is disabled until pokemon data has loaded. It also clears the progress store (all checked houses and pokemon) before loading the new sample.
 
 On mount, calls `loadPokemonData()` and `loadAdjacencyMap()` from [[queries]] (which internally uses `src/db.ts` / sql.js WASM) to populate `pokemonData` and `adjacencyMap`. The dev server serves the WASM file from `node_modules/sql.js/dist/sql-wasm.wasm` via a Vite middleware; production builds copy it to `dist/wasm/`. The solver runs whenever both datasets are loaded and at least one house is configured; otherwise results are hidden.
 
@@ -83,6 +83,10 @@ Verifies that when the save modal is confirmed, the stored `SavedQuery` entry in
 #### Restores checkbox state from query
 
 Verifies that selecting a saved query that includes `checkedHouses` and `checkedPokemon` restores those arrays into the progress store so the correct items are checked after restore.
+
+#### Sample island clears progress
+
+Verifies that clicking "Show a sample island" after checking off a house unchecks all progress checkboxes, so the new sample starts with a clean slate.
 
 Clicking a favorite pill from either shared house favorites or a pokemon card opens a modal showing catalog items for that exact favorite, sourced from [[items#itemsForFavorite]].
 

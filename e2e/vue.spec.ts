@@ -281,6 +281,39 @@ test.describe('Homepage', () => {
   })
 })
 
+test.describe('Progress Tracking', () => {
+  // @lat: [[ui#HomeView#Progress Tracking#Sample island clears progress]]
+  test('sample island clears checked houses and pokemon', async ({ page }) => {
+    test.setTimeout(60_000)
+    await page.goto('/')
+
+    // Load the first sample — waits for solver results
+    await page.getByRole('button', { name: 'Show a sample island' }).click()
+    await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
+
+    // Check the first house and first pokemon checkboxes
+    await page.getByTestId('progress-checkbox-house').first().check()
+    await page.getByTestId('progress-checkbox-pokemon').first().check()
+    await expect(page.getByTestId('progress-checkbox-house').first()).toBeChecked()
+    await expect(page.getByTestId('progress-checkbox-pokemon').first()).toBeChecked()
+
+    // Load a new sample — progress should be cleared
+    await page.getByRole('button', { name: 'Show a sample island' }).click()
+    await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
+
+    // All house and pokemon checkboxes must be unchecked
+    const houseCheckboxes = page.getByTestId('progress-checkbox-house')
+    const pokemonCheckboxes = page.getByTestId('progress-checkbox-pokemon')
+    await expect(houseCheckboxes.first()).not.toBeChecked()
+    for (const cb of await houseCheckboxes.all()) {
+      await expect(cb).not.toBeChecked()
+    }
+    for (const cb of await pokemonCheckboxes.all()) {
+      await expect(cb).not.toBeChecked()
+    }
+  })
+})
+
 test.describe('Shopping Cart', () => {
   /**
    * Set up a medium house with Bulbasaur + Ivysaur so the solver produces

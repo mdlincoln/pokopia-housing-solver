@@ -162,6 +162,7 @@ onMounted(async () => {
 })
 
 function loadSample() {
+  progressStore.restoreProgress({})
   small.value = 1
   medium.value = 3
   large.value = 2
