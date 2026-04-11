@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { assetPath } from '@/assetPath'
 import { useCartStore } from '@/stores/cart'
+import { useProgressStore } from '@/stores/progress'
 import { BBadge, BButton, BListGroup, BListGroupItem, BOffcanvas } from 'bootstrap-vue-next'
 
 const cart = useCartStore()
+const progressStore = useProgressStore()
 </script>
 
 <template>
@@ -30,87 +32,116 @@ const cart = useCartStore()
         </BButton>
       </div>
 
-      <BListGroup flush data-testid="cart-items">
-        <BListGroupItem
-          v-for="item in cart.itemList"
-          :key="item.name"
-          class="cart-item"
-          data-testid="cart-item"
+      <div data-testid="cart-items">
+        <div
+          v-for="[houseIndex, houseItems] in cart.itemsByHouse"
+          :key="houseIndex"
+          class="mb-3"
+          data-testid="cart-house-group"
         >
-          <div class="d-flex align-items-center gap-2 mb-1">
-            <img
-              v-if="item.picturePath"
-              :src="assetPath(item.picturePath)"
-              :alt="item.name"
-              class="cart-thumbnail"
-            />
-            <div class="flex-grow-1">
-              <strong :title="item.flavorText ?? undefined" data-testid="item-name">{{
-                item.name
-              }}</strong>
-              <div class="d-flex gap-1 mt-1 flex-wrap">
-                <BBadge
-                  :variant="item.isCraftable ? 'success' : 'secondary'"
-                  pill
-                  data-testid="item-craftable-badge"
-                  >{{ item.isCraftable ? 'Craft' : 'Buy' }}</BBadge
-                >
-                <BBadge
-                  v-if="item.category"
-                  variant="warning"
-                  pill
-                  data-testid="item-category-badge"
-                  >{{ item.category }}</BBadge
-                >
-              </div>
-            </div>
-            <div class="d-flex align-items-center gap-1 cart-controls">
-              <BButton
-                size="sm"
-                variant="outline-secondary"
-                data-testid="cart-decrement"
-                @click="cart.decrementItem(item.name)"
-              >
-                &minus;
-              </BButton>
-              <span class="cart-quantity" data-testid="cart-quantity">{{ item.quantity }}</span>
-              <BButton
-                size="sm"
-                variant="outline-secondary"
-                data-testid="cart-increment"
-                @click="cart.incrementItem(item.name)"
-              >
-                +
-              </BButton>
-              <BButton
-                size="sm"
-                variant="outline-danger"
-                data-testid="cart-remove"
-                @click="cart.removeItem(item.name)"
-              >
-                &times;
-              </BButton>
-            </div>
-          </div>
-
-          <ul v-if="item.recipe.length" class="cart-recipe mb-0 ps-3">
-            <li
-              v-for="ing in item.recipe"
-              :key="ing.ingredientName"
-              class="d-flex align-items-center gap-1"
+          <h6 class="cart-house-heading">House #{{ houseIndex }}</h6>
+          <BListGroup flush>
+            <BListGroupItem
+              v-for="item in houseItems"
+              :key="`${item.houseIndex}:${item.name}`"
+              class="cart-item"
+              :class="{
+                'checked-off': progressStore.isCartItemChecked(item.houseIndex, item.name),
+              }"
+              data-testid="cart-item"
             >
-              <img
-                v-if="ing.ingredientPicture"
-                :src="assetPath(ing.ingredientPicture)"
-                :alt="ing.ingredientName"
-                class="cart-thumbnail-sm"
-              />
-              <span>{{ ing.count * item.quantity }}&times; {{ ing.ingredientName }}</span>
-            </li>
-          </ul>
-          <span v-else class="text-muted small ps-3">(no recipe)</span>
-        </BListGroupItem>
-      </BListGroup>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <input
+                  type="checkbox"
+                  :checked="progressStore.isCartItemChecked(item.houseIndex, item.name)"
+                  class="form-check-input"
+                  data-testid="progress-checkbox-cart-item"
+                  title="Check off this item once acquired"
+                  @change="progressStore.toggleCartItem(item.houseIndex, item.name)"
+                />
+                <img
+                  v-if="item.picturePath"
+                  :src="assetPath(item.picturePath)"
+                  :alt="item.name"
+                  class="cart-thumbnail"
+                />
+                <div class="flex-grow-1">
+                  <strong
+                    :title="item.flavorText ?? undefined"
+                    data-testid="item-name"
+                    :class="{
+                      'text-decoration-line-through': progressStore.isCartItemChecked(
+                        item.houseIndex,
+                        item.name,
+                      ),
+                    }"
+                    >{{ item.name }}</strong
+                  >
+                  <div class="d-flex gap-1 mt-1 flex-wrap">
+                    <BBadge
+                      :variant="item.isCraftable ? 'success' : 'secondary'"
+                      pill
+                      data-testid="item-craftable-badge"
+                      >{{ item.isCraftable ? 'Craft' : 'Buy' }}</BBadge
+                    >
+                    <BBadge
+                      v-if="item.category"
+                      variant="warning"
+                      pill
+                      data-testid="item-category-badge"
+                      >{{ item.category }}</BBadge
+                    >
+                  </div>
+                </div>
+                <div class="d-flex align-items-center gap-1 cart-controls">
+                  <BButton
+                    size="sm"
+                    variant="outline-secondary"
+                    data-testid="cart-decrement"
+                    @click="cart.decrementItem(item.houseIndex, item.name)"
+                  >
+                    &minus;
+                  </BButton>
+                  <span class="cart-quantity" data-testid="cart-quantity">{{ item.quantity }}</span>
+                  <BButton
+                    size="sm"
+                    variant="outline-secondary"
+                    data-testid="cart-increment"
+                    @click="cart.incrementItem(item.houseIndex, item.name)"
+                  >
+                    +
+                  </BButton>
+                  <BButton
+                    size="sm"
+                    variant="outline-danger"
+                    data-testid="cart-remove"
+                    @click="cart.removeItem(item.houseIndex, item.name)"
+                  >
+                    &times;
+                  </BButton>
+                </div>
+              </div>
+
+              <ul v-if="item.recipe.length" class="cart-recipe mb-0 ps-3">
+                <li
+                  v-for="ing in item.recipe"
+                  :key="ing.ingredientName"
+                  class="d-flex align-items-center gap-1"
+                >
+                  <img
+                    v-if="ing.ingredientPicture"
+                    :src="assetPath(ing.ingredientPicture)"
+                    :alt="ing.ingredientName"
+                    class="cart-thumbnail-sm"
+                  />
+                  <span>{{ ing.count * item.quantity }}&times; {{ ing.ingredientName }}</span>
+                </li>
+              </ul>
+              <span v-else class="text-muted small ps-3">(no recipe)</span>
+            </BListGroupItem>
+          </BListGroup>
+        </div>
+      </div>
 
       <hr />
 

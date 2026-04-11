@@ -28,9 +28,35 @@ On mount, calls `loadPokemonData()` and `loadAdjacencyMap()` from [[queries]] (w
 
 Persists query configurations (house counts + selected pokemon) to `localStorage` (`pokehousing_saved_queries`) as a JSON array of `SavedQuery` objects. New entries are prepended so the most recent appears first.
 
-Clicking "Save query" opens a `BModal` prompting for an optional title. The modal uses `@shown` to focus the title input immediately on open. Confirming saves the entry; cancelling discards it. The `SavedQuery` object includes a `title: string` field alongside `timestamp`, `small`, `medium`, `large`, `pokemon`, and an optional `cart: Array<{ name, quantity }>` (omitted in older entries for backwards compatibility). A temporary success `BAlert` is shown for 3 seconds after a query is saved.
+Clicking "Save query" opens a `BModal` prompting for an optional title. The modal uses `@shown` to focus the title input immediately on open. Confirming saves the entry; cancelling discards it. The `SavedQuery` object includes a `title: string` field alongside `timestamp`, `small`, `medium`, `large`, `pokemon`, an optional `cart: Array<{ houseIndex?, name, quantity }>` (each entry associates items with the house they belong to; older entries without `houseIndex` default to 0), and optional `checkedCartItems: string[]`. A temporary success `BAlert` is shown for 3 seconds after a query is saved.
 
-When saved queries exist, a `BFormSelect` dropdown appears. The timestamp is always shown. When an entry has a non-empty `title`, it is displayed first followed by the timestamp in parentheses (e.g. `My title (4/6/2026, 3:00:00 PM)`); untitled entries show only the timestamp. Selecting an entry restores all five fields into the reactive refs and calls `cartStore.restoreItems(query.cart ?? [])` to restore cart state (clearing the cart if no cart was saved), triggering the solver watcher automatically.
+When saved queries exist, a `BFormSelect` dropdown appears. The timestamp is always shown. When an entry has a non-empty `title`, it is displayed first followed by the timestamp in parentheses (e.g. `My title (4/6/2026, 3:00:00 PM)`); untitled entries show only the timestamp. Selecting an entry restores all fields into the reactive refs, calls `cartStore.restoreItems(query.cart ?? [])` to restore per-house cart state, and calls `progressStore.restoreProgress(query)` to restore all progress checkboxes (houses, pokemon, and cart items), triggering the solver watcher automatically.
+
+#### URL Sharing
+
+Scenario state is reactively encoded into the URL hash as base64 JSON so users can share links.
+
+A `watch` on all state sources (house counts, selected pokemon, cart items, and progress checkboxes) updates the hash via `history.replaceState` whenever any value changes. When a new user visits a URL with a hash fragment, `onMounted` decodes the state, saves it as an unlabeled `SavedQuery` in localStorage, restores all fields, and clears the hash. A `restoringFromUrl` flag suppresses the hash watcher during import.
+
+##### Hash updates reactively
+
+Verifies that after configuring houses and pokemon, the URL gains a non-empty hash fragment whose decoded payload matches the configured state.
+
+##### Restores houses and pokemon from hash
+
+Verifies that navigating to a URL with an encoded hash automatically restores house counts and selected pokemon so the solver displays the correct results.
+
+##### Saves imported state as unlabeled scenario
+
+Verifies that importing from a URL hash creates an unlabeled (timestamp-only) entry in the saved queries dropdown in localStorage.
+
+##### Restores cart items from hash
+
+Verifies that cart entries encoded in the hash are restored into the shopping cart with the correct quantities.
+
+##### Restores checkboxes from hash
+
+Verifies that `checkedHouses` and `checkedPokemon` encoded in the hash are restored so the correct progress checkboxes appear checked.
 
 #### Focuses input on modal open
 
@@ -106,7 +132,9 @@ Shared favorite pills and pokemon-card favorite pills are interactive and emit a
 
 House recommendations use all favorites from pokemon assigned to that house (not only shared favorites). The recommendation list shows up to three item-category clusters selected by [[items#selectTopNonOverlappingClusters]], ensuring selected clusters do not overlap favorites while maximizing total favorites covered. Favorites are passed directly to `clusterItemsByFavorites`, which handles deduplication internally.
 
-Each recommended item has a small `+` button (`data-testid="add-to-cart"`) that calls `cartStore.addItem(itemName)` to add it to the shopping cart. The same `+` button appears on each item row in the favorite items modal in HomeView.
+Each recommended item has a small `+` button (`data-testid="add-to-cart"`) that calls `cartStore.addItem(houseIndex, itemName)` to add it to the shopping cart for that house. The same `+` button appears on each item row in the favorite items modal in HomeView, passing the originating house index.
+
+Below the recommended items, a "Shopping list" section (`data-testid="house-cart-items"`) appears when the house has cart items. Each item shows a progress checkbox (`data-testid="progress-checkbox-cart-item"`), thumbnail, quantity, and name. Checking an item applies `checked-off` opacity/grayscale and `text-decoration-line-through` on the name. The same checkbox state is shared with the sidebar via the progress store.
 
 ### Item Metadata Display
 
@@ -134,7 +162,7 @@ Verifies that clicking a shared-favorite badge and opening the modal shows `item
 
 Test selectors use `data-testid` attributes so tests do not depend on Bootstrap CSS classes.
 
-Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, `favorite-item-related-favorite-pill`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-name`, `item-craftable-badge`, `item-category-badge`, `progress-checkbox-house`, and `progress-checkbox-pokemon`.
+Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, `favorite-item-related-favorite-pill`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-name`, `item-craftable-badge`, `item-category-badge`, `progress-checkbox-house`, `progress-checkbox-pokemon`, `progress-checkbox-cart-item`, `cart-house-group`, `house-cart-items`, and `house-cart-item`.
 
 ## ShoppingCart
 
@@ -144,7 +172,7 @@ Uses `responsive="lg"` so it renders as a sticky inline sidebar (pushing main co
 
 At lg+, Bootstrap's default `.offcanvas-lg` CSS makes the offcanvas-body a flex row and hides the offcanvas header — both are overridden in `tropical-theme.css`. The sidebar uses `display: flex; flex-direction: column` so the header is fixed at the top and the body scrolls independently (`overflow-y: auto`). The header is restored with a sky-to-mint gradient background and ocean-blue border. The panel background is a sky-to-sand gradient with a left border and soft shadow to distinguish it from the main content.
 
-The panel lists each cart item with a small picture thumbnail, the item name (with flavor text as a native `title` tooltip), craftable/buy and category badges (see [[ui#House#Item Metadata Display]]), quantity controls (− / + / ×), and a nested ingredient list. Below a divider, aggregated totals across all items are shown as a `BListGroup`. Item and ingredient pictures are served via `assetPath()`. Items with no recipe show "(no recipe)" in muted text.
+Items are grouped by house (`data-testid="cart-house-group"`), with a heading showing the house number. Each cart item has a progress checkbox (`data-testid="progress-checkbox-cart-item"`) that toggles the `.checked-off` visual treatment and `text-decoration-line-through` on the item name via the progress store. The same checkbox state is shared with the house card's shopping list section. Items also show a small picture thumbnail, the item name (with flavor text as a native `title` tooltip), craftable/buy and category badges (see [[ui#House#Item Metadata Display]]), quantity controls (− / + / ×), and a nested ingredient list. Below all house groups, aggregated totals across all items are shown as a `BListGroup`. Item and ingredient pictures are served via `assetPath()`. Items with no recipe show "(no recipe)" in muted text.
 
 The sidebar has no toggle button or close button — it is permanently visible. Height is `100vh` so it fills the full viewport even when the cart is empty.
 
@@ -174,17 +202,21 @@ A "Clear all" button (`data-testid="cart-clear"`) appears above the items list w
 
 ### Cart Store
 
-The Pinia store at `src/stores/cart.ts` tracks cart state globally. State includes `items` (`Map<string, { quantity, picturePath }>`), `recipes` (cached per item name), and `aggregated` (totals from [[queries#getAggregatedIngredients]]).
+The Pinia store at `src/stores/cart.ts` tracks cart state per house using composite `"houseIndex:itemName"` keys.
 
-Actions: `addItem(name)` — increments quantity or inserts at 1, loads picture, metadata (`isCraftable`, `category`, `flavorText`), and recipe on first add via [[queries#getItemPicturePath]], [[queries#getItemMetadata]], and [[queries#getRecipeForItem]], then recomputes aggregated. `removeItem`, `incrementItem`, `decrementItem` adjust quantities (removing at 0) and recompute aggregated. `restoreItems(entries)` — clears the cart and re-hydrates from a `{ name, quantity }[]` array; fetches picturePath, metadata, and recipe for all items in parallel, then calls `recomputeAggregated` once. Used by [[ui#HomeView#Saved Queries]] restore.
+State: `items` (`Map<string, CartEntry>` with `houseIndex`, `quantity`, `picturePath`, `isCraftable`, `category`, `flavorText`), `recipes` (cached per item name), `aggregated` (totals from [[queries#getAggregatedIngredients]]).
 
-Getters: `totalItems` (sum of all quantities), `itemList` (array of `CartItem` for template iteration).
+Actions: `addItem(houseIndex, name)` — increments quantity or inserts at 1 for the given house, loads picture, metadata, and recipe on first add via [[queries#getItemPicturePath]], [[queries#getItemMetadata]], and [[queries#getRecipeForItem]], then recomputes aggregated. `removeItem(houseIndex, name)`, `incrementItem(houseIndex, name)`, `decrementItem(houseIndex, name)` adjust quantities (removing at 0) and recompute aggregated. `restoreItems(entries)` — clears the cart and re-hydrates from a `{ houseIndex?, name, quantity }[]` array (old entries without `houseIndex` default to 0); fetches metadata and recipes for all items in parallel, then calls `recomputeAggregated` once. Used by [[ui#HomeView#Saved Queries]] restore.
+
+Getters: `totalItems` (sum of all quantities), `itemList` (array of `CartItem` including `houseIndex` for template iteration), `itemsByHouse` (`Map<number, CartItem[]>` grouping `itemList` by house — used by `ShoppingCart.vue` for grouped rendering).
 
 ### Progress Store
 
-The Pinia store at `src/stores/progress.ts` tracks which houses and pokemon have been checked off. State: `checkedHouses` (`Set<number>`) and `checkedPokemon` (`Set<string>`, keys formatted as `"houseIndex:pokemonName"`).
+The Pinia store at `src/stores/progress.ts` tracks which houses, pokemon, and cart items have been checked off.
 
-Actions: `toggleHouse(houseIndex)` and `togglePokemon(houseIndex, name)` add or remove entries. `isHouseChecked(houseIndex)` / `isPokemonChecked(houseIndex, name)` return boolean. `restoreProgress({ checkedHouses?, checkedPokemon? })` replaces both sets (used by [[ui#HomeView#Saved Queries]] restore). `toSerializable()` returns arrays for JSON storage.
+State: `checkedHouses` (`Set<number>`), `checkedPokemon` (`Set<string>`, keys `"houseIndex:pokemonName"`), and `checkedCartItems` (`Set<string>`, keys `"houseIndex:itemName"`).
+
+Actions: `toggleHouse(houseIndex)`, `togglePokemon(houseIndex, name)`, and `toggleCartItem(houseIndex, name)` add or remove entries. `isHouseChecked(houseIndex)` / `isPokemonChecked(houseIndex, name)` / `isCartItemChecked(houseIndex, name)` return boolean. `restoreProgress({ checkedHouses?, checkedPokemon?, checkedCartItems? })` replaces all three sets (used by [[ui#HomeView#Saved Queries]] restore). `toSerializable()` returns arrays for JSON storage.
 
 ## PokemonSelect
 

@@ -57,12 +57,43 @@ interface SavedQuery {
   medium: number
   large: number
   pokemon: string[]
-  cart?: Array<{ name: string; quantity: number }>
+  cart?: Array<{ houseIndex?: number; name: string; quantity: number }>
   checkedHouses?: number[]
   checkedPokemon?: string[]
+  checkedCartItems?: string[]
 }
 
 const STORAGE_KEY = 'pokehousing_saved_queries'
+
+type SharedState = Omit<SavedQuery, 'title' | 'timestamp'>
+
+let restoringFromUrl = false
+
+function encodeState(): string {
+  const state: SharedState = {
+    small: small.value,
+    medium: medium.value,
+    large: large.value,
+    pokemon: [...selectedPokemon.value],
+    cart: cartStore.itemList.map(({ houseIndex, name, quantity }) => ({
+      houseIndex,
+      name,
+      quantity,
+    })),
+    ...progressStore.toSerializable(),
+  }
+  return btoa(JSON.stringify(state))
+}
+
+function decodeStateFromUrl(): SharedState | null {
+  const hash = window.location.hash.slice(1)
+  if (!hash) return null
+  try {
+    return JSON.parse(atob(hash))
+  } catch {
+    return null
+  }
+}
 
 function loadSavedQueries(): SavedQuery[] {
   try {
@@ -78,6 +109,7 @@ const queryTitle = ref('')
 const showSaveModal = ref(false)
 const saveSuccess = ref(false)
 const selectedFavorite = ref('')
+const selectedFavoriteHouseIndex = ref(0)
 const showFavoriteItemsModal = ref(false)
 
 const selectedFavoriteItems = ref<string[]>([])
@@ -127,7 +159,11 @@ function confirmSave() {
     medium: medium.value,
     large: large.value,
     pokemon: [...selectedPokemon.value],
-    cart: cartStore.itemList.map(({ name, quantity }) => ({ name, quantity })),
+    cart: cartStore.itemList.map(({ houseIndex, name, quantity }) => ({
+      houseIndex,
+      name,
+      quantity,
+    })),
     ...progressStore.toSerializable(),
   }
   savedQueries.value = [entry, ...savedQueries.value]
@@ -138,8 +174,9 @@ function confirmSave() {
   }, 3000)
 }
 
-function openFavoriteItemsModal(favorite: string) {
+function openFavoriteItemsModal(favorite: string, houseIndex: number) {
   selectedFavorite.value = favorite
+  selectedFavoriteHouseIndex.value = houseIndex
   showFavoriteItemsModal.value = true
 }
 
@@ -159,7 +196,46 @@ onMounted(async () => {
   const [data, adjacency] = await Promise.all([loadPokemonData(), loadAdjacencyMap()])
   pokemonData.value = data
   adjacencyData.value = adjacency
+
+  const shared = decodeStateFromUrl()
+  if (shared) {
+    restoringFromUrl = true
+    const entry: SavedQuery = {
+      title: '',
+      timestamp: Date.now(),
+      ...shared,
+    }
+    savedQueries.value = [entry, ...savedQueries.value]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedQueries.value))
+    small.value = shared.small
+    medium.value = shared.medium
+    large.value = shared.large
+    selectedPokemon.value = [...shared.pokemon]
+    await cartStore.restoreItems(shared.cart ?? [])
+    progressStore.restoreProgress(shared)
+    restoringFromUrl = false
+  }
 })
+
+watch(
+  [
+    small,
+    medium,
+    large,
+    selectedPokemon,
+    () => cartStore.itemList,
+    () => progressStore.checkedHouses,
+    () => progressStore.checkedPokemon,
+    () => progressStore.checkedCartItems,
+  ],
+  () => {
+    if (restoringFromUrl) return
+    const encoded = encodeState()
+    if (window.location.hash === '#' + encoded) return
+    history.replaceState(null, '', '#' + encoded)
+  },
+  { deep: true },
+)
 
 function loadSample() {
   progressStore.restoreProgress({})
@@ -374,7 +450,7 @@ defineExpose({
               variant="outline-success"
               class="cart-add-btn"
               data-testid="add-to-cart"
-              @click="cartStore.addItem(row.item)"
+              @click="cartStore.addItem(selectedFavoriteHouseIndex, row.item)"
               >+</BButton
             >
           </BTd>

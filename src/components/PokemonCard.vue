@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { HABITAT_VARIANT } from '@/habitats'
 import { assetPath } from '@/assetPath'
+import { HABITAT_VARIANT } from '@/habitats'
 import { BBadge, BCard, BCardBody, BCardImg, BCol, BRow } from 'bootstrap-vue-next'
 import { computed } from 'vue'
 
@@ -10,7 +10,6 @@ const props = defineProps<{
   favorites: string[]
   habitat?: string
   checked?: boolean
-  houseIndex: number
 }>()
 
 const emit = defineEmits<{
@@ -49,6 +48,7 @@ const habitatVariant = computed(() =>
               class="form-check-input me-1"
               data-testid="progress-checkbox-pokemon"
               @change="emit('toggle')"
+              title="Checkbox to keep track of which Pokemon you have finished housing."
             />
           </div>
           <div v-if="habitat && habitatVariant">
@@ -65,6 +65,7 @@ const habitatVariant = computed(() =>
               data-testid="fave-badge"
               role="button"
               tabindex="0"
+              title="Click to view items that fulfill this favorite"
               @click="handleFavoriteClick(fav)"
               @keydown.enter.prevent="handleFavoriteClick(fav)"
               @keydown.space.prevent="handleFavoriteClick(fav)"

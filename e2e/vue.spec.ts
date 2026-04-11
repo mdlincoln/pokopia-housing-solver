@@ -422,3 +422,106 @@ test.describe('Shopping Cart', () => {
     await expect(page.getByTestId('cart-items')).toBeHidden()
   })
 })
+
+test.describe('URL Hash Sharing', () => {
+  // @lat: [[ui#HomeView#Saved Queries#URL Sharing#Hash updates reactively]]
+  test('URL hash updates when scenario state changes', async ({ page }) => {
+    test.setTimeout(40_000)
+    await page.goto('/')
+
+    await setSpinbutton(page, 'house-small', 1)
+    await selectPokemon(page, 'Bulbasaur')
+
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+
+    const url = page.url()
+    expect(url).toContain('#')
+    const hash = new URL(url).hash.slice(1)
+    expect(hash.length).toBeGreaterThan(0)
+
+    // Decoded payload should contain the configured state
+    const decoded = JSON.parse(atob(hash))
+    expect(decoded.small).toBe(1)
+    expect(decoded.pokemon).toContain('Bulbasaur')
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#URL Sharing#Restores houses and pokemon from hash]]
+  test('loading a shared URL restores house counts and pokemon', async ({ page }) => {
+    test.setTimeout(40_000)
+
+    // Build a minimal shared state and encode it
+    const state = { small: 1, medium: 0, large: 0, pokemon: ['Bulbasaur', 'Ivysaur'] }
+    const hash = btoa(JSON.stringify(state))
+
+    await page.goto(`/#${hash}`)
+
+    // Houses and pokemon should be restored automatically
+    await expect(page.locator('#house-small')).toHaveValue('1')
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+    await expect(page.getByTestId('results')).toContainText('Ivysaur')
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#URL Sharing#Saves imported state as unlabeled scenario]]
+  test('imported URL state is saved as an unlabeled entry in the dropdown', async ({ page }) => {
+    test.setTimeout(40_000)
+
+    const state = { small: 1, medium: 0, large: 0, pokemon: ['Bulbasaur'] }
+    const hash = btoa(JSON.stringify(state))
+
+    await page.goto(`/#${hash}`)
+
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+
+    const select = page.locator('#saved-queries-select')
+    await expect(select).toBeVisible({ timeout: 2000 })
+
+    // The imported entry appears with only a timestamp (no title prefix)
+    const option = select.locator('option').nth(1)
+    const text = await option.textContent()
+    expect(text?.trim().length).toBeGreaterThan(0)
+    // A titled entry would look like "My title (date)"; unlabeled is just the timestamp
+    expect(text?.trim()).not.toMatch(/^\w.+\(/)
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#URL Sharing#Restores cart items from hash]]
+  test('loading a shared URL restores cart items', async ({ page }) => {
+    test.setTimeout(40_000)
+
+    const state = {
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['Bulbasaur'],
+      cart: [{ houseIndex: 1, name: 'Berry Pots', quantity: 2 }],
+    }
+    const hash = btoa(JSON.stringify(state))
+
+    await page.goto(`/#${hash}`)
+
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+    await expect(page.getByTestId('cart-items')).toBeVisible({ timeout: 5000 })
+    await expect(page.getByTestId('cart-quantity')).toHaveText('2')
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#URL Sharing#Restores checkboxes from hash]]
+  test('loading a shared URL restores checked houses and pokemon', async ({ page }) => {
+    test.setTimeout(40_000)
+
+    const state = {
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['Bulbasaur'],
+      checkedHouses: [1],
+      checkedPokemon: ['1:Bulbasaur'],
+    }
+    const hash = btoa(JSON.stringify(state))
+
+    await page.goto(`/#${hash}`)
+
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+
+    await expect(page.getByTestId('progress-checkbox-house').first()).toBeChecked()
+    await expect(page.getByTestId('progress-checkbox-pokemon').first()).toBeChecked()
+  })
+})

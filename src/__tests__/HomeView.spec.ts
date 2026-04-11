@@ -65,6 +65,7 @@ describe('HomeView', () => {
     setActivePinia(createPinia())
     vi.mocked(loadPokemonData).mockResolvedValue(testPokemonData)
     vi.mocked(loadAdjacencyMap).mockResolvedValue(new Map())
+    window.location.hash = ''
   })
 
   it('renders the form with house inputs and submit button', async () => {
@@ -185,7 +186,8 @@ describe('HomeView', () => {
 
     const wrapper = await mountHome()
     const cartStore = useCartStore()
-    cartStore.items.set('Punching Bag', {
+    cartStore.items.set('1:Punching Bag', {
+      houseIndex: 1,
       quantity: 2,
       picturePath: null,
       isCraftable: true,
@@ -201,7 +203,7 @@ describe('HomeView', () => {
     const call = setItem.mock.calls.find(([key]) => key === 'pokehousing_saved_queries')
     expect(call).toBeDefined()
     const saved = JSON.parse(call![1] as string)
-    expect(saved[0].cart).toEqual([{ name: 'Punching Bag', quantity: 2 }])
+    expect(saved[0].cart).toEqual([{ houseIndex: 1, name: 'Punching Bag', quantity: 2 }])
   })
 
   // @lat: [[ui#HomeView#Saved Queries#Restores cart from saved query]]
@@ -213,7 +215,7 @@ describe('HomeView', () => {
       medium: 0,
       large: 0,
       pokemon: ['AlphaOne'],
-      cart: [{ name: 'Punching Bag', quantity: 3 }],
+      cart: [{ houseIndex: 1, name: 'Punching Bag', quantity: 3 }],
     }
     vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([entry]))
 
@@ -224,7 +226,9 @@ describe('HomeView', () => {
     wrapper.vm.selectedTimestamp = 1700000000000
     await flushPromises()
 
-    expect(restoreItemsSpy).toHaveBeenCalledWith([{ name: 'Punching Bag', quantity: 3 }])
+    expect(restoreItemsSpy).toHaveBeenCalledWith([
+      { houseIndex: 1, name: 'Punching Bag', quantity: 3 },
+    ])
   })
 
   // @lat: [[ui#HomeView#Progress Tracking#Saves checkbox state with query]]

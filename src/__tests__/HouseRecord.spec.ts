@@ -315,7 +315,7 @@ describe('HouseRecord', () => {
 
     await wrapper.find('[data-testid="shared-favorite-badge"]').trigger('click')
 
-    expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise']])
+    expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise', 1]])
   })
 
   it('emits favoriteClicked when a pokemon card favorite badge is clicked', async () => {
@@ -335,7 +335,7 @@ describe('HouseRecord', () => {
 
     await wrapper.find('[data-testid="fave-badge"]').trigger('click')
 
-    expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise']])
+    expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise', 1]])
   })
 
   it('shows craftable badge for items that have recipes', async () => {

@@ -15,6 +15,7 @@ import {
   BBadge,
   BButton,
   BCardGroup,
+  BListGroup,
   BListGroupItem,
   BTableSimple,
   BTbody,
@@ -34,11 +35,11 @@ const cartStore = useCartStore()
 const progressStore = useProgressStore()
 
 const emit = defineEmits<{
-  favoriteClicked: [favorite: string]
+  favoriteClicked: [favorite: string, houseIndex: number]
 }>()
 
 function handleFavoriteClick(favorite: string) {
-  emit('favoriteClicked', favorite)
+  emit('favoriteClicked', favorite, props.house.houseIndex)
 }
 
 const sharedFavorites = computed(() => {
@@ -81,6 +82,8 @@ const sharedHabitats = computed(() => {
     }))
 })
 
+const houseCartItems = computed(() => cartStore.itemsByHouse.get(props.house.houseIndex) ?? [])
+
 interface FlatRow {
   favorites: string
   item: ItemDetails
@@ -117,6 +120,7 @@ const flatRows = computed<FlatRow[]>(() => {
         class="form-check-input me-2"
         data-testid="progress-checkbox-house"
         @change="progressStore.toggleHouse(house.houseIndex)"
+        title="Checkbox to keep track of your progress building and housing your Pokemon"
       />
       {{ house.size }} house #{{ house.houseIndex }}
     </h5>
@@ -161,7 +165,6 @@ const flatRows = computed<FlatRow[]>(() => {
         :favorites="pokemonData[name]!.favorites"
         :habitat="pokemonData[name]?.habitat"
         :checked="progressStore.isPokemonChecked(house.houseIndex, name)"
-        :house-index="house.houseIndex"
         @favorite-clicked="handleFavoriteClick"
         @toggle="progressStore.togglePokemon(house.houseIndex, name)"
       />
@@ -205,7 +208,7 @@ const flatRows = computed<FlatRow[]>(() => {
                 variant="outline-success"
                 class="cart-add-btn"
                 data-testid="add-to-cart"
-                @click="cartStore.addItem(row.item.name)"
+                @click="cartStore.addItem(house.houseIndex, row.item.name)"
                 >+</BButton
               >
             </BTd>
@@ -241,5 +244,42 @@ const flatRows = computed<FlatRow[]>(() => {
         </BTbody>
       </BTableSimple>
     </details>
+
+    <div v-if="houseCartItems.length" class="mt-3" data-testid="house-cart-items">
+      <h6 class="text-muted small mb-2">Shopping list</h6>
+      <BListGroup flush>
+        <BListGroupItem
+          v-for="item in houseCartItems"
+          :key="item.name"
+          class="d-flex align-items-center gap-2 py-1 px-0"
+          :class="{ 'checked-off': progressStore.isCartItemChecked(house.houseIndex, item.name) }"
+          data-testid="house-cart-item"
+        >
+          <input
+            type="checkbox"
+            :checked="progressStore.isCartItemChecked(house.houseIndex, item.name)"
+            class="form-check-input"
+            data-testid="progress-checkbox-cart-item"
+            @change="progressStore.toggleCartItem(house.houseIndex, item.name)"
+          />
+          <img
+            v-if="item.picturePath"
+            :src="assetPath(item.picturePath)"
+            :alt="item.name"
+            class="item-thumbnail"
+          />
+          <span
+            :class="{
+              'text-decoration-line-through': progressStore.isCartItemChecked(
+                house.houseIndex,
+                item.name,
+              ),
+            }"
+          >
+            {{ item.quantity }}&times; {{ item.name }}
+          </span>
+        </BListGroupItem>
+      </BListGroup>
+    </div>
   </BListGroupItem>
 </template>
