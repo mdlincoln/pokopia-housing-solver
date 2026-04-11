@@ -60,6 +60,30 @@ Verifies that when a saved query has a non-empty title, the restore dropdown opt
 
 After solving, a full-width `BListGroup` renders one [[ui#House]] item per assigned house. Unhoused pokemon appear in a `BAlert` warning. Error and loading states are handled inline with `BAlert` and `BSpinner`.
 
+### Progress Tracking
+
+Lets users check off houses and pokemon one by one as they complete them in-game. State is owned by `src/stores/progress.ts` (see [[ui#ShoppingCart#Progress Store]]).
+
+Each house card has a `data-testid="progress-checkbox-house"` checkbox in the title row. Each pokemon card has a `data-testid="progress-checkbox-pokemon"` checkbox inside the card body. Checking an item applies a `.checked-off` CSS class (defined in `tropical-theme.css`) which reduces opacity and desaturates it. Items can be checked and unchecked independently and repeatedly.
+
+Progress is saved into `SavedQuery` as `checkedHouses: number[]` and `checkedPokemon: string[]` (keys formatted as `"houseIndex:pokemonName"`). On restore, `progressStore.restoreProgress(query)` rehydrates both sets.
+
+#### Checks off a house
+
+Verifies that clicking a house checkbox marks that house as checked and applies the `checked-off` visual treatment, while leaving other houses unaffected.
+
+#### Checks off a pokemon
+
+Verifies that clicking a pokemon checkbox marks that pokemon as checked independently of its house and other pokemon in the same house.
+
+#### Saves checkbox state with query
+
+Verifies that when the save modal is confirmed, the stored `SavedQuery` entry includes `checkedHouses` and `checkedPokemon` arrays reflecting the current progress store state.
+
+#### Restores checkbox state from query
+
+Verifies that selecting a saved query that includes `checkedHouses` and `checkedPokemon` restores those arrays into the progress store so the correct items are checked after restore.
+
 Clicking a favorite pill from either shared house favorites or a pokemon card opens a modal showing catalog items for that exact favorite, sourced from [[items#itemsForFavorite]].
 
 Each modal item row also shows pill badges for other favorites that same item fulfills, sourced from [[items#favoritesForItem]]. Both `selectedFavoriteItems` and `selectedFavoriteItemRows` are `ref`s populated by an async `watch` on `selectedFavorite`, since the query functions are async.
@@ -106,7 +130,7 @@ Verifies that clicking a shared-favorite badge and opening the modal shows `item
 
 Test selectors use `data-testid` attributes so tests do not depend on Bootstrap CSS classes.
 
-Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, `favorite-item-related-favorite-pill`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-name`, `item-craftable-badge`, and `item-category-badge`.
+Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, `favorite-item-related-favorite-pill`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-name`, `item-craftable-badge`, `item-category-badge`, `progress-checkbox-house`, and `progress-checkbox-pokemon`.
 
 ## ShoppingCart
 
@@ -151,6 +175,12 @@ The Pinia store at `src/stores/cart.ts` tracks cart state globally. State includ
 Actions: `addItem(name)` — increments quantity or inserts at 1, loads picture, metadata (`isCraftable`, `category`, `flavorText`), and recipe on first add via [[queries#getItemPicturePath]], [[queries#getItemMetadata]], and [[queries#getRecipeForItem]], then recomputes aggregated. `removeItem`, `incrementItem`, `decrementItem` adjust quantities (removing at 0) and recompute aggregated. `restoreItems(entries)` — clears the cart and re-hydrates from a `{ name, quantity }[]` array; fetches picturePath, metadata, and recipe for all items in parallel, then calls `recomputeAggregated` once. Used by [[ui#HomeView#Saved Queries]] restore.
 
 Getters: `totalItems` (sum of all quantities), `itemList` (array of `CartItem` for template iteration).
+
+### Progress Store
+
+The Pinia store at `src/stores/progress.ts` tracks which houses and pokemon have been checked off. State: `checkedHouses` (`Set<number>`) and `checkedPokemon` (`Set<string>`, keys formatted as `"houseIndex:pokemonName"`).
+
+Actions: `toggleHouse(houseIndex)` and `togglePokemon(houseIndex, name)` add or remove entries. `isHouseChecked(houseIndex)` / `isPokemonChecked(houseIndex, name)` return boolean. `restoreProgress({ checkedHouses?, checkedPokemon? })` replaces both sets (used by [[ui#HomeView#Saved Queries]] restore). `toSerializable()` returns arrays for JSON storage.
 
 ## PokemonSelect
 

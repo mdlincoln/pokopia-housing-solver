@@ -12,6 +12,7 @@ vi.mock('@/db', async () => {
 import { loadAdjacencyMap, loadPokemonData } from '@/queries'
 import type { SolverResult } from '@/solver'
 import { useCartStore } from '@/stores/cart'
+import { useProgressStore } from '@/stores/progress'
 import HomeView from '@/views/HomeView.vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -224,6 +225,51 @@ describe('HomeView', () => {
     await flushPromises()
 
     expect(restoreItemsSpy).toHaveBeenCalledWith([{ name: 'Punching Bag', quantity: 3 }])
+  })
+
+  // @lat: [[ui#HomeView#Progress Tracking#Saves checkbox state with query]]
+  it('saves checkbox state with saved query', async () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem')
+
+    const wrapper = await mountHome()
+    const progressStore = useProgressStore()
+    progressStore.toggleHouse(1)
+    progressStore.togglePokemon(2, 'AlphaTwo')
+
+    wrapper.vm.confirmSave()
+
+    const call = setItem.mock.calls.find(([key]) => key === 'pokehousing_saved_queries')
+    expect(call).toBeDefined()
+    const saved = JSON.parse(call![1] as string)
+    expect(saved[0].checkedHouses).toEqual([1])
+    expect(saved[0].checkedPokemon).toEqual(['2:AlphaTwo'])
+  })
+
+  // @lat: [[ui#HomeView#Progress Tracking#Restores checkbox state from query]]
+  it('restores checkbox state from saved query', async () => {
+    const entry = {
+      title: 'With progress',
+      timestamp: 1700000000001,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['AlphaOne'],
+      checkedHouses: [1],
+      checkedPokemon: ['1:AlphaOne'],
+    }
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([entry]))
+
+    const wrapper = await mountHome()
+    const progressStore = useProgressStore()
+    const cartStore = useCartStore()
+    vi.spyOn(cartStore, 'restoreItems').mockResolvedValue(undefined)
+
+    wrapper.vm.selectedTimestamp = 1700000000001
+    await flushPromises()
+
+    expect(progressStore.isHouseChecked(1)).toBe(true)
+    expect(progressStore.isPokemonChecked(1, 'AlphaOne')).toBe(true)
+    expect(progressStore.isHouseChecked(2)).toBe(false)
   })
 
   // @lat: [[ui#HomeView#Saved Queries#Shows title in restore dropdown]]

@@ -6,6 +6,7 @@ import { favoritesForItem, itemsForFavorite } from '@/items'
 import { loadAdjacencyMap, loadPokemonData } from '@/queries'
 import { solve, type AdjacencyMap, type PokemonData, type SolverResult } from '@/solver'
 import { useCartStore } from '@/stores/cart'
+import { useProgressStore } from '@/stores/progress'
 import {
   BAlert,
   BBadge,
@@ -30,6 +31,7 @@ import {
 import { computed, onMounted, ref, watch } from 'vue'
 
 const cartStore = useCartStore()
+const progressStore = useProgressStore()
 
 const pokemonData = ref<PokemonData | null>(null)
 const adjacencyData = ref<AdjacencyMap | null>(null)
@@ -56,6 +58,8 @@ interface SavedQuery {
   large: number
   pokemon: string[]
   cart?: Array<{ name: string; quantity: number }>
+  checkedHouses?: number[]
+  checkedPokemon?: string[]
 }
 
 const STORAGE_KEY = 'pokehousing_saved_queries'
@@ -124,6 +128,7 @@ function confirmSave() {
     large: large.value,
     pokemon: [...selectedPokemon.value],
     cart: cartStore.itemList.map(({ name, quantity }) => ({ name, quantity })),
+    ...progressStore.toSerializable(),
   }
   savedQueries.value = [entry, ...savedQueries.value]
   localStorage.setItem(STORAGE_KEY, JSON.stringify(savedQueries.value))
@@ -147,6 +152,7 @@ watch(selectedTimestamp, async (ts) => {
   large.value = query.large
   selectedPokemon.value = [...query.pokemon]
   await cartStore.restoreItems(query.cart ?? [])
+  progressStore.restoreProgress(query)
 })
 
 onMounted(async () => {

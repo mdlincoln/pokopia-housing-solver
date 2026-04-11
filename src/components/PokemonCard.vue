@@ -9,10 +9,13 @@ const props = defineProps<{
   image: string
   favorites: string[]
   habitat?: string
+  checked?: boolean
+  houseIndex: number
 }>()
 
 const emit = defineEmits<{
   favoriteClicked: [favorite: string]
+  toggle: []
 }>()
 
 function handleFavoriteClick(favorite: string) {
@@ -27,7 +30,7 @@ const habitatVariant = computed(() =>
 </script>
 
 <template>
-  <BCard no-body class="overflow-hidden pokemon-card">
+  <BCard no-body class="overflow-hidden pokemon-card" :class="{ 'checked-off': checked }">
     <BRow class="g-0">
       <BCol cols="auto">
         <BCardImg
@@ -39,6 +42,15 @@ const habitatVariant = computed(() =>
       </BCol>
       <BCol>
         <BCardBody :title="name" class="pokemon-card-body">
+          <div class="mb-1">
+            <input
+              type="checkbox"
+              :checked="checked"
+              class="form-check-input me-1"
+              data-testid="progress-checkbox-pokemon"
+              @change="emit('toggle')"
+            />
+          </div>
           <div v-if="habitat && habitatVariant">
             <BBadge :variant="habitatVariant" pill class="me-1 mb-1" data-testid="habitat-badge">
               {{ habitat }}

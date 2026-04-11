@@ -10,6 +10,7 @@ import {
 } from '@/items'
 import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
+import { useProgressStore } from '@/stores/progress'
 import {
   BBadge,
   BButton,
@@ -30,6 +31,7 @@ const props = defineProps<{
 }>()
 
 const cartStore = useCartStore()
+const progressStore = useProgressStore()
 
 const emit = defineEmits<{
   favoriteClicked: [favorite: string]
@@ -103,8 +105,21 @@ const flatRows = computed<FlatRow[]>(() => {
 </script>
 
 <template>
-  <BListGroupItem class="house-card" data-testid="house-card">
-    <h5 class="mb-1 house-title">{{ house.size }} house #{{ house.houseIndex }}</h5>
+  <BListGroupItem
+    class="house-card"
+    data-testid="house-card"
+    :class="{ 'checked-off': progressStore.isHouseChecked(house.houseIndex) }"
+  >
+    <h5 class="mb-1 house-title">
+      <input
+        type="checkbox"
+        :checked="progressStore.isHouseChecked(house.houseIndex)"
+        class="form-check-input me-2"
+        data-testid="progress-checkbox-house"
+        @change="progressStore.toggleHouse(house.houseIndex)"
+      />
+      {{ house.size }} house #{{ house.houseIndex }}
+    </h5>
     <p class="text-muted mb-2 house-meta">
       <span v-if="sharedHabitats.length" class="mt-2" data-testid="shared-habitats">
         <BBadge
@@ -145,7 +160,10 @@ const flatRows = computed<FlatRow[]>(() => {
         :image="pokemonData[name]!.image"
         :favorites="pokemonData[name]!.favorites"
         :habitat="pokemonData[name]?.habitat"
+        :checked="progressStore.isPokemonChecked(house.houseIndex, name)"
+        :house-index="house.houseIndex"
         @favorite-clicked="handleFavoriteClick"
+        @toggle="progressStore.togglePokemon(house.houseIndex, name)"
       />
     </BCardGroup>
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
