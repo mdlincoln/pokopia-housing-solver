@@ -8,6 +8,8 @@ import {
   greedyMaxWeightMatching,
   solve,
   type AdjacencyMap,
+  type HouseWithId,
+  type HousingConfig,
   type PokemonData,
 } from '../solver'
 
@@ -26,6 +28,22 @@ function matrixToMap(pokemon: string[], matrix: (number | null | undefined)[][])
     }
   }
   return map
+}
+
+// Helper to create HouseWithId[] from a HousingConfig
+function makeHouses(config: HousingConfig): HouseWithId[] {
+  const houses: HouseWithId[] = []
+  const sizes: Array<{ key: keyof HousingConfig; prefix: string; capacity: number }> = [
+    { key: 'small', prefix: 'S', capacity: 1 },
+    { key: 'medium', prefix: 'M', capacity: 2 },
+    { key: 'large', prefix: 'L', capacity: 4 },
+  ]
+  for (const { key, prefix, capacity } of sizes) {
+    for (let i = 1; i <= config[key]; i++) {
+      houses.push({ id: `${prefix}${i}`, size: key, capacity })
+    }
+  }
+  return houses
 }
 
 // Simple 4-pokemon adjacency fixture
@@ -171,7 +189,7 @@ describe('greedyMaxWeightMatching', () => {
 describe('clusterPreAssign', () => {
   it('fills a large house with a 4-cluster and a medium house with a pair', () => {
     const names = ['E', 'F', 'G', 'H', 'I', 'J']
-    const houses = enumerateHouses({ small: 0, medium: 1, large: 1 })
+    const houses = makeHouses({ small: 0, medium: 1, large: 1 })
     const subMatrix = buildSubMatrix(names, clusterFixture)
     const result = clusterPreAssign(names, houses, subMatrix)
 
@@ -192,7 +210,7 @@ describe('clusterPreAssign', () => {
 
   it('skips small houses', () => {
     const names = ['A', 'B', 'C', 'D']
-    const houses = enumerateHouses({ small: 4, medium: 0, large: 0 })
+    const houses = makeHouses({ small: 4, medium: 0, large: 0 })
     const subMatrix = buildSubMatrix(names, fixture)
     const result = clusterPreAssign(names, houses, subMatrix)
     expect(result.size).toBe(0)
@@ -200,7 +218,7 @@ describe('clusterPreAssign', () => {
 
   it('handles only medium houses', () => {
     const names = ['A', 'B', 'C', 'D']
-    const houses = enumerateHouses({ small: 0, medium: 2, large: 0 })
+    const houses = makeHouses({ small: 0, medium: 2, large: 0 })
     const subMatrix = buildSubMatrix(names, fixture)
     const result = clusterPreAssign(names, houses, subMatrix)
 
@@ -272,7 +290,7 @@ describe('solve', () => {
   it('places 1 pokemon in 1 small house', async () => {
     const result = await solve(
       ['AlphaOne'],
-      { small: 1, medium: 0, large: 0 },
+      makeHouses({ small: 1, medium: 0, large: 0 }),
       testData,
       testDataFixture,
     )
@@ -283,7 +301,7 @@ describe('solve', () => {
   it('leaves one unhoused when capacity is exceeded', async () => {
     const result = await solve(
       ['AlphaOne', 'AlphaTwo'],
-      { small: 1, medium: 0, large: 0 },
+      makeHouses({ small: 1, medium: 0, large: 0 }),
       testData,
       testDataFixture,
     )
@@ -292,7 +310,12 @@ describe('solve', () => {
   }, 30_000)
 
   it('returns empty result for no pokemon', async () => {
-    const result = await solve([], { small: 1, medium: 0, large: 0 }, testData, testDataFixture)
+    const result = await solve(
+      [],
+      makeHouses({ small: 1, medium: 0, large: 0 }),
+      testData,
+      testDataFixture,
+    )
     expect(result.unhoused).toEqual([])
     expect(result.houses[0]!.pokemon).toEqual([])
   })
@@ -300,7 +323,7 @@ describe('solve', () => {
   it('marks all unhoused when no houses exist', async () => {
     const result = await solve(
       ['AlphaOne', 'AlphaTwo'],
-      { small: 0, medium: 0, large: 0 },
+      makeHouses({ small: 0, medium: 0, large: 0 }),
       testData,
       testDataFixture,
     )
@@ -311,7 +334,7 @@ describe('solve', () => {
   it('fits all pokemon when capacity is sufficient', async () => {
     const result = await solve(
       ['AlphaOne', 'AlphaTwo', 'BetaOne'],
-      { small: 0, medium: 0, large: 1 },
+      makeHouses({ small: 0, medium: 0, large: 1 }),
       testData,
       testDataFixture,
     )
@@ -324,7 +347,7 @@ describe('solve', () => {
     // 1 medium (cap 2) + 1 small (cap 1) should put the Alphas together.
     const result = await solve(
       ['AlphaOne', 'AlphaTwo', 'BetaOne'],
-      { small: 1, medium: 1, large: 0 },
+      makeHouses({ small: 1, medium: 1, large: 0 }),
       testData,
       testDataFixture,
     )
@@ -339,7 +362,7 @@ describe('solve', () => {
     // Given 2 medium houses, each pair should end up together.
     const result = await solve(
       ['AlphaOne', 'AlphaTwo', 'BetaOne', 'BetaTwo'],
-      { small: 0, medium: 2, large: 0 },
+      makeHouses({ small: 0, medium: 2, large: 0 }),
       testData,
       testDataFixture,
     )
@@ -358,8 +381,18 @@ describe('solve', () => {
 
   it('throws for unknown pokemon names', async () => {
     await expect(
-      solve(['FakeMon'], { small: 1, medium: 0, large: 0 }, testData, testDataFixture),
+      solve(['FakeMon'], makeHouses({ small: 1, medium: 0, large: 0 }), testData, testDataFixture),
     ).rejects.toThrow('Unknown pokemon: FakeMon')
+  })
+
+  it('uses houseId in results', async () => {
+    const result = await solve(
+      ['AlphaOne'],
+      makeHouses({ small: 1, medium: 0, large: 0 }),
+      testData,
+      testDataFixture,
+    )
+    expect(result.houses[0]!.houseId).toBe('S1')
   })
 })
 
@@ -367,7 +400,7 @@ describe('habitat incompatibility', () => {
   it('prevents opposite-habitat pokemon from sharing a medium house', async () => {
     const result = await solve(
       ['ClashCool', 'ClashWarm'],
-      { small: 0, medium: 1, large: 0 },
+      makeHouses({ small: 0, medium: 1, large: 0 }),
       testData,
       testDataFixture,
     )
@@ -380,7 +413,7 @@ describe('habitat incompatibility', () => {
   it('places opposite-habitat pokemon in separate small houses', async () => {
     const result = await solve(
       ['ClashCool', 'ClashWarm'],
-      { small: 2, medium: 0, large: 0 },
+      makeHouses({ small: 2, medium: 0, large: 0 }),
       testData,
       testDataFixture,
     )
@@ -394,7 +427,7 @@ describe('habitat incompatibility', () => {
     // ClashCool + NeutralDark are compatible; ClashWarm opposes ClashCool
     const result = await solve(
       ['ClashCool', 'ClashWarm', 'NeutralDark'],
-      { small: 0, medium: 0, large: 1 },
+      makeHouses({ small: 0, medium: 0, large: 1 }),
       testData,
       testDataFixture,
     )
@@ -411,7 +444,7 @@ describe('habitat incompatibility', () => {
     // Cool ↔ Dark are on different axes — no conflict
     const result = await solve(
       ['ClashCool', 'NeutralDark'],
-      { small: 0, medium: 1, large: 0 },
+      makeHouses({ small: 0, medium: 1, large: 0 }),
       testData,
       testDataFixture,
     )
@@ -425,7 +458,7 @@ describe('habitat incompatibility', () => {
     // but must not be clustered with them in a house
     const result = await solve(
       ['ClashCool', 'ClashWarm'],
-      { small: 1, medium: 1, large: 0 },
+      makeHouses({ small: 1, medium: 1, large: 0 }),
       testData,
       testDataFixture,
     )
@@ -445,7 +478,7 @@ describe('habitat incompatibility', () => {
     // but must not be clustered with them in a large house
     const result = await solve(
       ['AlphaOne', 'AlphaTwo', 'ClashCool', 'ClashWarm', 'NeutralDark'],
-      { small: 1, medium: 0, large: 1 },
+      makeHouses({ small: 1, medium: 0, large: 1 }),
       testData,
       testDataFixture,
     )
@@ -484,7 +517,7 @@ describe('habitat incompatibility', () => {
     )
     const result = await solve(
       ['X', 'Y', 'N1', 'N2'],
-      { small: 1, medium: 0, large: 1 },
+      makeHouses({ small: 1, medium: 0, large: 1 }),
       bridgeData,
       bridgeAdj,
     )
@@ -493,5 +526,132 @@ describe('habitat incompatibility', () => {
     const hasX = largeHouse.pokemon.includes('X')
     const hasY = largeHouse.pokemon.includes('Y')
     expect(hasX && hasY).toBe(false)
+  }, 30_000)
+})
+
+describe('pinned assignments', () => {
+  it('pinned pokemon stay in their assigned house', async () => {
+    const houses = makeHouses({ small: 0, medium: 2, large: 0 })
+    const pinned = new Map([['M1', ['AlphaOne']]])
+
+    const result = await solve(
+      ['AlphaOne', 'AlphaTwo', 'BetaOne', 'BetaTwo'],
+      houses,
+      testData,
+      testDataFixture,
+      pinned,
+    )
+
+    const m1 = result.houses.find((h) => h.houseId === 'M1')!
+    expect(m1.pokemon).toContain('AlphaOne')
+  }, 30_000)
+
+  it('unpinned pokemon are still clustered optimally', async () => {
+    // Pin AlphaOne to M1. The solver should still pair BetaOne+BetaTwo in M2.
+    const houses = makeHouses({ small: 0, medium: 2, large: 0 })
+    const pinned = new Map([['M1', ['AlphaOne']]])
+
+    const result = await solve(
+      ['AlphaOne', 'AlphaTwo', 'BetaOne', 'BetaTwo'],
+      houses,
+      testData,
+      testDataFixture,
+      pinned,
+    )
+
+    // AlphaTwo should join AlphaOne in M1 (highest affinity)
+    const m1 = result.houses.find((h) => h.houseId === 'M1')!
+    expect(m1.pokemon.sort()).toEqual(['AlphaOne', 'AlphaTwo'])
+
+    const m2 = result.houses.find((h) => h.houseId === 'M2')!
+    expect(m2.pokemon.sort()).toEqual(['BetaOne', 'BetaTwo'])
+  }, 30_000)
+
+  it('pinned pokemon reduce available capacity', async () => {
+    // Pin 3 pokemon to a large house (capacity 4). Only 1 slot remains.
+    const houses = makeHouses({ small: 1, medium: 0, large: 1 })
+    const pinned = new Map([['L1', ['AlphaOne', 'AlphaTwo', 'ClashCool']]])
+
+    const result = await solve(
+      ['AlphaOne', 'AlphaTwo', 'ClashCool', 'NeutralDark', 'BetaOne'],
+      houses,
+      testData,
+      testDataFixture,
+      pinned,
+    )
+
+    const l1 = result.houses.find((h) => h.houseId === 'L1')!
+    expect(l1.pokemon).toHaveLength(4) // 3 pinned + 1 solver-assigned
+    expect(l1.pokemon).toContain('AlphaOne')
+    expect(l1.pokemon).toContain('AlphaTwo')
+    expect(l1.pokemon).toContain('ClashCool')
+  }, 30_000)
+
+  it('full pinned house gets no additional assignments', async () => {
+    // Pin all 4 slots of a large house
+    const houses = makeHouses({ small: 1, medium: 0, large: 1 })
+    const pinned = new Map([['L1', ['AlphaOne', 'AlphaTwo', 'ClashCool', 'NeutralDark']]])
+
+    const result = await solve(
+      ['AlphaOne', 'AlphaTwo', 'ClashCool', 'NeutralDark', 'BetaOne'],
+      houses,
+      testData,
+      testDataFixture,
+      pinned,
+    )
+
+    const l1 = result.houses.find((h) => h.houseId === 'L1')!
+    expect(l1.pokemon).toHaveLength(4)
+    expect(l1.pokemon).not.toContain('BetaOne')
+
+    // BetaOne should be in the small house
+    const s1 = result.houses.find((h) => h.houseId === 'S1')!
+    expect(s1.pokemon).toContain('BetaOne')
+  }, 30_000)
+
+  it('does not place habitat-incompatible pokemon into a house with pinned occupants', async () => {
+    // Pin ClashCool to M1. ClashWarm is habitat-incompatible with ClashCool.
+    const houses = makeHouses({ small: 1, medium: 1, large: 0 })
+    const pinned = new Map([['M1', ['ClashCool']]])
+
+    const result = await solve(
+      ['ClashCool', 'ClashWarm'],
+      houses,
+      testData,
+      testDataFixture,
+      pinned,
+    )
+
+    const m1 = result.houses.find((h) => h.houseId === 'M1')!
+    // ClashWarm must not be placed with ClashCool
+    expect(m1.pokemon).not.toContain('ClashWarm')
+  }, 30_000)
+
+  it('fills remaining slots in a partial large house to complement the pinned occupant', async () => {
+    // AlphaOne is pinned to L1 (3 slots remain). Its best companions by adjacency:
+    //   ClashCool (6), AlphaTwo (5), NeutralDark (5) — all higher than BetaOne/BetaTwo/Loner (0).
+    // Before fix: L1 (remaining cap 3) was classified as "medium" by clusterPreAssign,
+    //   so it got at most one pair chosen by free-pokemon mutual affinity, ignoring AlphaOne.
+    //   AlphaOne's best companions could end up in L2 instead.
+    // After fix: pin-complement fill runs on L1 first, picking the best 3 companions
+    //   for AlphaOne before clustering runs on the empty L2.
+    const houses = makeHouses({ small: 0, medium: 0, large: 2 })
+    const pinned = new Map([['L1', ['AlphaOne']]])
+
+    const result = await solve(
+      ['AlphaOne', 'AlphaTwo', 'ClashCool', 'NeutralDark', 'BetaOne', 'BetaTwo', 'Loner'],
+      houses,
+      testData,
+      testDataFixture,
+      pinned,
+    )
+
+    const l1 = result.houses.find((h) => h.houseId === 'L1')!
+    expect(l1.pokemon).toContain('AlphaOne') // pinned
+    expect(l1.pokemon).toContain('ClashCool') // highest affinity with AlphaOne (6)
+    expect(l1.pokemon).toContain('AlphaTwo') // high affinity with AlphaOne (5)
+    // BetaOne and BetaTwo have 0 affinity with AlphaOne — should NOT be chosen over the Alphas
+    expect(l1.pokemon).not.toContain('BetaOne')
+    expect(l1.pokemon).not.toContain('BetaTwo')
   }, 30_000)
 })

@@ -265,15 +265,15 @@ export function greedyMaxWeightMatching(
  * Small houses (capacity 1) are deliberately skipped — they gain nothing
  * from clustering and are filled during the greedy tail phase.
  *
- * Returns a Map from pokemon name → house index for all pre-assigned pokemon.
+ * Returns a Map from pokemon name → house ID for all pre-assigned pokemon.
  */
 export function clusterPreAssign(
   pokemonNames: string[],
-  houses: EnumeratedHouse[],
+  houses: HouseWithId[],
   subMatrix: (number | null)[][],
-): Map<string, number> {
+): Map<string, string> {
   const available = new Set(pokemonNames.map((_, i) => i))
-  const result = new Map<string, number>()
+  const result = new Map<string, string>()
 
   // Separate houses by size
   const largeHouses = houses.filter((h) => h.capacity >= 4)
@@ -285,7 +285,7 @@ export function clusterPreAssign(
     for (let c = 0; c < clusters.length; c++) {
       const house = largeHouses[c]!
       for (const idx of clusters[c]!) {
-        result.set(pokemonNames[idx]!, house.index)
+        result.set(pokemonNames[idx]!, house.id)
         available.delete(idx)
       }
     }
@@ -297,7 +297,7 @@ export function clusterPreAssign(
     for (let p = 0; p < pairs.length; p++) {
       const house = mediumHouses[p]!
       for (const idx of pairs[p]!) {
-        result.set(pokemonNames[idx]!, house.index)
+        result.set(pokemonNames[idx]!, house.id)
         available.delete(idx)
       }
     }
@@ -313,10 +313,16 @@ export interface PokemonData {
 export type HousingConfig = Record<HouseSize, number>
 
 export interface HouseAssignment {
-  houseIndex: number
+  houseId: string
   size: string
   capacity: number
   pokemon: string[]
+}
+
+export interface HouseWithId {
+  id: string
+  size: string
+  capacity: number
 }
 
 export interface SolverResult {
@@ -394,27 +400,27 @@ export function countSharedFavorites(nameA: string, nameB: string, data: Pokemon
  */
 function greedyFillRemaining(
   remaining: string[],
-  occupants: Map<number, string[]>,
-  remainingCapacity: Map<number, number>,
+  occupants: Map<string, string[]>,
+  remainingCapacity: Map<string, number>,
   pokemonData: PokemonData,
   adjacencyMap?: AdjacencyMap,
-): Map<string, number> {
-  const result = new Map<string, number>()
+): Map<string, string> {
+  const result = new Map<string, string>()
   const pool = new Set(remaining)
 
   while (pool.size > 0) {
     let bestScore = -1
     let bestPokemon = ''
-    let bestHouse = -1
+    let bestHouse = ''
     let bestHouseCapacity = -1
 
     for (const name of pool) {
       const mapA = adjacencyMap?.get(name)
-      for (const [houseIdx, cap] of remainingCapacity) {
+      for (const [houseId, cap] of remainingCapacity) {
         if (cap <= 0) continue
         let score = 0
         let incompatible = false
-        for (const occupant of occupants.get(houseIdx) ?? []) {
+        for (const occupant of occupants.get(houseId) ?? []) {
           if (adjacencyMap && mapA) {
             const val = mapA.get(occupant)
             if (val === null) {
@@ -431,13 +437,13 @@ function greedyFillRemaining(
         if (score > bestScore || (score === bestScore && cap > bestHouseCapacity)) {
           bestScore = score
           bestPokemon = name
-          bestHouse = houseIdx
+          bestHouse = houseId
           bestHouseCapacity = cap
         }
       }
     }
 
-    if (bestHouse === -1) break // No capacity remaining anywhere
+    if (bestHouse === '') break // No capacity remaining anywhere
 
     result.set(bestPokemon, bestHouse)
     pool.delete(bestPokemon)
@@ -453,11 +459,11 @@ function greedyFillRemaining(
 
 export async function solve(
   pokemonNames: string[],
-  housingConfig: HousingConfig,
+  houses: HouseWithId[],
   pokemonData: PokemonData,
   adjacencyMap?: AdjacencyMap,
+  pinnedAssignments?: Map<string, string[]>,
 ): Promise<SolverResult> {
-  const houses = enumerateHouses(housingConfig)
   const numHouses = houses.length
 
   // Validate pokemon names
@@ -470,7 +476,12 @@ export async function solve(
   // Trivial: no pokemon
   if (pokemonNames.length === 0) {
     return {
-      houses: houses.map((h) => ({ ...h, houseIndex: h.index, pokemon: [] })),
+      houses: houses.map((h) => ({
+        houseId: h.id,
+        size: h.size,
+        capacity: h.capacity,
+        pokemon: [],
+      })),
       unhoused: [],
     }
   }
@@ -480,30 +491,93 @@ export async function solve(
     return { houses: [], unhoused: [...pokemonNames] }
   }
 
-  // Phase 1+2: Cluster-based pre-assignment for large and medium houses
-  let preAssignments = new Map<string, number>()
-  if (adjacencyMap) {
-    const subMatrix = buildSubMatrix(pokemonNames, adjacencyMap)
-    preAssignments = clusterPreAssign(pokemonNames, houses, subMatrix)
+  // Pre-place pinned pokemon
+  const occupants = new Map<string, string[]>()
+  const remainingCapacity = new Map<string, number>()
+  for (const house of houses) {
+    occupants.set(house.id, [])
+    remainingCapacity.set(house.id, house.capacity)
   }
 
-  // Build occupants and remaining capacity from pre-assignments
-  const occupants = new Map<number, string[]>()
-  const remainingCapacity = new Map<number, number>()
-  for (const house of houses) {
-    occupants.set(house.index, [])
-    remainingCapacity.set(house.index, house.capacity)
+  const pinnedNames = new Set<string>()
+  if (pinnedAssignments) {
+    for (const [houseId, names] of pinnedAssignments) {
+      if (!occupants.has(houseId)) continue
+      for (const name of names) {
+        if (!pokemonNames.includes(name)) continue
+        occupants.get(houseId)!.push(name)
+        remainingCapacity.set(houseId, remainingCapacity.get(houseId)! - 1)
+        if (remainingCapacity.get(houseId) === 0) {
+          remainingCapacity.delete(houseId)
+        }
+        pinnedNames.add(name)
+      }
+    }
   }
-  for (const [name, houseIdx] of preAssignments) {
-    occupants.get(houseIdx)!.push(name)
-    remainingCapacity.set(houseIdx, remainingCapacity.get(houseIdx)! - 1)
-    if (remainingCapacity.get(houseIdx) === 0) {
-      remainingCapacity.delete(houseIdx)
+
+  // Filter to unpinned pokemon for clustering
+  const unpinnedNames = pokemonNames.filter((n) => !pinnedNames.has(n))
+
+  // Pin-complement fill: fill remaining slots in partial houses (those with pinned occupants)
+  // before clustering, so free pokemon are chosen by affinity to the pinned residents rather
+  // than just by mutual affinity among themselves.
+  const pinComplementAssigned = new Set<string>()
+  if (pinnedNames.size > 0 && unpinnedNames.length > 0) {
+    // Temporarily hide empty houses so greedyFillRemaining only considers partial houses
+    const savedEmptyCapacity = new Map<string, number>()
+    for (const [id, cap] of remainingCapacity) {
+      if (occupants.get(id)!.length === 0) {
+        savedEmptyCapacity.set(id, cap)
+      }
+    }
+    for (const id of savedEmptyCapacity.keys()) {
+      remainingCapacity.delete(id)
+    }
+
+    if (remainingCapacity.size > 0) {
+      // greedyFillRemaining mutates occupants and remainingCapacity in place
+      const pinFillResult = greedyFillRemaining(
+        unpinnedNames,
+        occupants,
+        remainingCapacity,
+        pokemonData,
+        adjacencyMap,
+      )
+      for (const name of pinFillResult.keys()) {
+        pinComplementAssigned.add(name)
+      }
+    }
+
+    // Restore empty houses for the clustering phase
+    for (const [id, cap] of savedEmptyCapacity) {
+      remainingCapacity.set(id, cap)
+    }
+  }
+
+  // Phase 1+2: Cluster remaining unpinned pokemon into empty houses
+  let preAssignments = new Map<string, string>()
+  if (adjacencyMap && unpinnedNames.length > 0) {
+    const clusterNames = unpinnedNames.filter((n) => !pinComplementAssigned.has(n))
+    const availableHouses: HouseWithId[] = houses
+      .filter((h) => (remainingCapacity.get(h.id) ?? 0) > 0)
+      .map((h) => ({ ...h, capacity: remainingCapacity.get(h.id)! }))
+    if (clusterNames.length > 0) {
+      const subMatrix = buildSubMatrix(clusterNames, adjacencyMap)
+      preAssignments = clusterPreAssign(clusterNames, availableHouses, subMatrix)
+    }
+  }
+
+  // Apply cluster pre-assignments
+  for (const [name, houseId] of preAssignments) {
+    occupants.get(houseId)!.push(name)
+    remainingCapacity.set(houseId, remainingCapacity.get(houseId)! - 1)
+    if (remainingCapacity.get(houseId) === 0) {
+      remainingCapacity.delete(houseId)
     }
   }
 
   // Phase 3: Greedily fill remaining slots with unassigned pokemon
-  const assigned = new Set(preAssignments.keys())
+  const assigned = new Set([...pinnedNames, ...pinComplementAssigned, ...preAssignments.keys()])
   const remaining = pokemonNames.filter((name) => !assigned.has(name))
   const tailAssignments = greedyFillRemaining(
     remaining,
@@ -513,15 +587,38 @@ export async function solve(
     adjacencyMap,
   )
 
-  // Merge all assignments
-  const allAssignments = new Map([...preAssignments, ...tailAssignments])
+  // Merge all assignments (occupants already reflects all placements; this map is used
+  // solely to compute unhoused pokemon)
+  const allAssignments = new Map<string, string>()
+  for (const name of pinnedNames) {
+    for (const [houseId, occ] of occupants) {
+      if (occ.includes(name)) {
+        allAssignments.set(name, houseId)
+        break
+      }
+    }
+  }
+  for (const name of pinComplementAssigned) {
+    for (const [houseId, occ] of occupants) {
+      if (occ.includes(name)) {
+        allAssignments.set(name, houseId)
+        break
+      }
+    }
+  }
+  for (const [name, houseId] of preAssignments) {
+    allAssignments.set(name, houseId)
+  }
+  for (const [name, houseId] of tailAssignments) {
+    allAssignments.set(name, houseId)
+  }
   const unhoused = pokemonNames.filter((name) => !allAssignments.has(name))
 
   const houseAssignments: HouseAssignment[] = houses.map((h) => ({
-    houseIndex: h.index,
+    houseId: h.id,
     size: h.size,
     capacity: h.capacity,
-    pokemon: occupants.get(h.index) ?? [],
+    pokemon: occupants.get(h.id) ?? [],
   }))
 
   return { houses: houseAssignments, unhoused }

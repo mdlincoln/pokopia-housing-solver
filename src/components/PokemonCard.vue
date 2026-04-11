@@ -48,7 +48,7 @@ const habitatVariant = computed(() =>
               class="form-check-input me-1"
               data-testid="progress-checkbox-pokemon"
               @change="emit('toggle')"
-              title="Checkbox to keep track of which Pokemon you have finished housing."
+              title="Pin this pokemon to this house so it stays when re-solving"
             />
           </div>
           <div v-if="habitat && habitatVariant">

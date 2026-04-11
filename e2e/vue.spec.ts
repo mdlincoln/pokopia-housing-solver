@@ -192,7 +192,7 @@ test.describe('Homepage', () => {
     await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
 
     const mediumHouse = page.getByTestId('house-card').filter({
-      has: page.getByRole('heading', { name: 'medium house #2' }),
+      has: page.locator('h5', { hasText: /medium house M\d/ }),
     })
     await expect(mediumHouse).toHaveCount(1)
 
@@ -282,7 +282,7 @@ test.describe('Homepage', () => {
 })
 
 test.describe('Progress Tracking', () => {
-  // @lat: [[ui#HomeView#Progress Tracking#Sample island clears progress]]
+  // @lat: [[ui#HomeView#Pinning#Sample island clears progress]]
   test('sample island clears checked houses and pokemon', async ({ page }) => {
     test.setTimeout(60_000)
     await page.goto('/')
@@ -492,7 +492,7 @@ test.describe('URL Hash Sharing', () => {
       medium: 0,
       large: 0,
       pokemon: ['Bulbasaur'],
-      cart: [{ houseIndex: 1, name: 'Berry Pots', quantity: 2 }],
+      cart: [{ houseId: 'S1', name: 'Berry Pots', quantity: 2 }],
     }
     const hash = btoa(JSON.stringify(state))
 
@@ -503,17 +503,20 @@ test.describe('URL Hash Sharing', () => {
     await expect(page.getByTestId('cart-quantity')).toHaveText('2')
   })
 
-  // @lat: [[ui#HomeView#Saved Queries#URL Sharing#Restores checkboxes from hash]]
-  test('loading a shared URL restores checked houses and pokemon', async ({ page }) => {
+  // @lat: [[ui#HomeView#Saved Queries#URL Sharing#Restores pins from hash]]
+  test('loading a shared URL restores pinned houses and pokemon', async ({ page }) => {
     test.setTimeout(40_000)
 
     const state = {
+      version: 2,
       small: 1,
       medium: 0,
       large: 0,
       pokemon: ['Bulbasaur'],
-      checkedHouses: [1],
-      checkedPokemon: ['1:Bulbasaur'],
+      pinnedHouses: ['S1'],
+      pinnedPokemon: ['S1:Bulbasaur'],
+      houseRegistry: [{ id: 'S1', size: 'small' }],
+      houseCounters: { small: 1, medium: 0, large: 0 },
     }
     const hash = btoa(JSON.stringify(state))
 
@@ -617,5 +620,70 @@ test.describe('State Migration', () => {
 
     // Cart should be empty
     await expect(page.getByTestId('cart-empty')).toBeVisible({ timeout: 2000 })
+  })
+})
+
+test.describe('Pinning', () => {
+  test('pinned pokemon stays in same house after adding new pokemon', async ({ page }) => {
+    test.setTimeout(60_000)
+    await page.goto('/')
+
+    await setSpinbutton(page, 'house-small', 1)
+    await setSpinbutton(page, 'house-medium', 1)
+
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Ivysaur')
+
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+
+    // Find the house that contains Bulbasaur and pin it
+    const bulbasaurCard = page.getByTestId('house-card').filter({ hasText: 'Bulbasaur' })
+    const houseHeading = await bulbasaurCard.locator('h5').first().textContent()
+    await bulbasaurCard.getByTestId('progress-checkbox-pokemon').first().check()
+
+    // Add a third pokemon — should trigger re-solve
+    await selectPokemon(page, 'Charmander')
+    await expect(page.getByTestId('results')).toContainText('Charmander', { timeout: 30_000 })
+
+    // Bulbasaur should still be in the same house
+    const bulbasaurHouseAfter = page.getByTestId('house-card').filter({ hasText: 'Bulbasaur' })
+    const headingAfter = bulbasaurHouseAfter.locator('h5').first()
+    await expect(headingAfter).toHaveText(houseHeading)
+  })
+
+  test('pinned pokemon cannot be removed from PokemonSelect', async ({ page }) => {
+    test.setTimeout(60_000)
+    await page.goto('/')
+
+    await setSpinbutton(page, 'house-small', 1)
+    await selectPokemon(page, 'Bulbasaur')
+
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+
+    // Pin Bulbasaur
+    await page.getByTestId('progress-checkbox-pokemon').first().check()
+
+    // The close button on Bulbasaur's badge should be disabled
+    const badge = page.locator('.pokemon-select .favorite-pill', { hasText: 'Bulbasaur' })
+    const closeBtn = badge.locator('.btn-close')
+    await expect(closeBtn).toBeDisabled()
+  })
+
+  test('locked house cannot be removed by reducing count', async ({ page }) => {
+    test.setTimeout(60_000)
+    await page.goto('/')
+
+    await setSpinbutton(page, 'house-small', 2)
+    await selectPokemon(page, 'Bulbasaur')
+
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+
+    // Pin the house that has Bulbasaur
+    const bulbasaurHouse = page.getByTestId('house-card').filter({ hasText: 'Bulbasaur' })
+    await bulbasaurHouse.getByTestId('progress-checkbox-house').check()
+
+    // The small house input should have min=1 now
+    const smallInput = page.locator('#house-small')
+    await expect(smallInput).toHaveAttribute('min', '1')
   })
 })

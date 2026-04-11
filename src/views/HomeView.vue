@@ -6,6 +6,8 @@ import { favoritesForItem, itemsForFavorite } from '@/items'
 import { loadAdjacencyMap, loadPokemonData } from '@/queries'
 import { solve, type AdjacencyMap, type PokemonData, type SolverResult } from '@/solver'
 import { useCartStore } from '@/stores/cart'
+import { useHouseStore } from '@/stores/houses'
+import { usePinStore } from '@/stores/pins'
 import { useProgressStore } from '@/stores/progress'
 import {
   BAlert,
@@ -31,6 +33,8 @@ import {
 import { computed, onMounted, ref, watch } from 'vue'
 
 const cartStore = useCartStore()
+const houseStore = useHouseStore()
+const pinStore = usePinStore()
 const progressStore = useProgressStore()
 
 const pokemonData = ref<PokemonData | null>(null)
@@ -46,6 +50,19 @@ const large = ref(0)
 
 const totalHouses = computed(() => small.value + medium.value + large.value)
 
+const minSmall = computed(() => {
+  const locked = houseStore.lockedCountBySize(pinStore.effectivelyPinnedHouseIds)
+  return locked.small
+})
+const minMedium = computed(() => {
+  const locked = houseStore.lockedCountBySize(pinStore.effectivelyPinnedHouseIds)
+  return locked.medium
+})
+const minLarge = computed(() => {
+  const locked = houseStore.lockedCountBySize(pinStore.effectivelyPinnedHouseIds)
+  return locked.large
+})
+
 const loading = ref(false)
 const error = ref('')
 const result = ref<SolverResult | null>(null)
@@ -57,10 +74,15 @@ interface SavedQuery {
   medium: number
   large: number
   pokemon: string[]
-  cart?: Array<{ houseIndex?: number; name: string; quantity: number }>
+  cart?: Array<{ houseId?: string; houseIndex?: number; name: string; quantity: number }>
   checkedHouses?: number[]
   checkedPokemon?: string[]
   checkedCartItems?: string[]
+  pinnedHouses?: string[]
+  pinnedPokemon?: string[]
+  houseRegistry?: Array<{ id: string; size: string }>
+  houseCounters?: Record<string, number>
+  version?: number
 }
 
 const STORAGE_KEY = 'pokehousing_saved_queries'
@@ -71,16 +93,19 @@ let restoringFromUrl = false
 
 function encodeState(): string {
   const state: SharedState = {
+    version: 2,
     small: small.value,
     medium: medium.value,
     large: large.value,
     pokemon: [...selectedPokemon.value],
-    cart: cartStore.itemList.map(({ houseIndex, name, quantity }) => ({
-      houseIndex,
+    cart: cartStore.itemList.map(({ houseId, name, quantity }) => ({
+      houseId,
       name,
       quantity,
     })),
     ...progressStore.toSerializable(),
+    ...pinStore.toSerializable(),
+    ...houseStore.toSerializable(),
   }
   return btoa(JSON.stringify(state))
 }
@@ -109,7 +134,7 @@ const queryTitle = ref('')
 const showSaveModal = ref(false)
 const saveSuccess = ref(false)
 const selectedFavorite = ref('')
-const selectedFavoriteHouseIndex = ref(0)
+const selectedFavoriteHouseId = ref('')
 const showFavoriteItemsModal = ref(false)
 
 const selectedFavoriteItems = ref<string[]>([])
@@ -155,16 +180,19 @@ function confirmSave() {
   const entry: SavedQuery = {
     title: queryTitle.value.trim(),
     timestamp: Date.now(),
+    version: 2,
     small: small.value,
     medium: medium.value,
     large: large.value,
     pokemon: [...selectedPokemon.value],
-    cart: cartStore.itemList.map(({ houseIndex, name, quantity }) => ({
-      houseIndex,
+    cart: cartStore.itemList.map(({ houseId, name, quantity }) => ({
+      houseId,
       name,
       quantity,
     })),
     ...progressStore.toSerializable(),
+    ...pinStore.toSerializable(),
+    ...houseStore.toSerializable(),
   }
   savedQueries.value = [entry, ...savedQueries.value]
   localStorage.setItem(STORAGE_KEY, JSON.stringify(savedQueries.value))
@@ -174,22 +202,46 @@ function confirmSave() {
   }, 3000)
 }
 
-function openFavoriteItemsModal(favorite: string, houseIndex: number) {
+function openFavoriteItemsModal(favorite: string, houseId: string) {
   selectedFavorite.value = favorite
-  selectedFavoriteHouseIndex.value = houseIndex
+  selectedFavoriteHouseId.value = houseId
   showFavoriteItemsModal.value = true
+}
+
+async function restoreState(query: SharedState) {
+  small.value = query.small
+  medium.value = query.medium
+  large.value = query.large
+  selectedPokemon.value = [...query.pokemon]
+
+  // Restore house registry if available (version 2+)
+  if (query.houseRegistry) {
+    houseStore.restoreRegistry(query)
+  } else {
+    // Legacy: create fresh house IDs
+    houseStore.clear()
+    houseStore.reconcileHouses(
+      { small: query.small, medium: query.medium, large: query.large },
+      new Set(),
+    )
+  }
+
+  // Restore pins if available (version 2+)
+  if (query.pinnedHouses || query.pinnedPokemon) {
+    pinStore.restorePins(query)
+  } else {
+    pinStore.clear()
+  }
+
+  await cartStore.restoreItems(query.cart ?? [])
+  progressStore.restoreProgress(query)
 }
 
 watch(selectedTimestamp, async (ts) => {
   if (ts === null) return
   const query = savedQueries.value.find((q) => q.timestamp === ts)
   if (!query) return
-  small.value = query.small
-  medium.value = query.medium
-  large.value = query.large
-  selectedPokemon.value = [...query.pokemon]
-  await cartStore.restoreItems(query.cart ?? [])
-  progressStore.restoreProgress(query)
+  await restoreState(query)
 })
 
 onMounted(async () => {
@@ -207,12 +259,7 @@ onMounted(async () => {
     }
     savedQueries.value = [entry, ...savedQueries.value]
     localStorage.setItem(STORAGE_KEY, JSON.stringify(savedQueries.value))
-    small.value = shared.small
-    medium.value = shared.medium
-    large.value = shared.large
-    selectedPokemon.value = [...shared.pokemon]
-    await cartStore.restoreItems(shared.cart ?? [])
-    progressStore.restoreProgress(shared)
+    await restoreState(shared)
     restoringFromUrl = false
   }
 })
@@ -224,9 +271,9 @@ watch(
     large,
     selectedPokemon,
     () => cartStore.itemList,
-    () => progressStore.checkedHouses,
-    () => progressStore.checkedPokemon,
     () => progressStore.checkedCartItems,
+    () => pinStore.pinnedHouses,
+    () => pinStore.pinnedPokemon,
   ],
   () => {
     if (restoringFromUrl) return
@@ -238,30 +285,55 @@ watch(
 )
 
 function loadSample() {
+  pinStore.clear()
   progressStore.restoreProgress({})
+  houseStore.clear()
   small.value = 1
   medium.value = 3
   large.value = 2
+  houseStore.reconcileHouses({ small: 1, medium: 3, large: 2 }, new Set())
   const names = pokemonNames.value
   const shuffled = [...names].sort(() => Math.random() - 0.5)
   selectedPokemon.value = shuffled.slice(0, 13)
 }
 
 watch(
-  [selectedPokemon, small, medium, large, pokemonData, adjacencyData],
+  [
+    selectedPokemon,
+    small,
+    medium,
+    large,
+    pokemonData,
+    adjacencyData,
+    () => pinStore.pinnedPokemon,
+    () => pinStore.pinnedHouses,
+  ],
   async () => {
     if (!pokemonData.value || !adjacencyData.value || totalHouses.value === 0) {
       result.value = null
       return
     }
+
+    // Clamp house counts to minimums
+    if (small.value < minSmall.value) small.value = minSmall.value
+    if (medium.value < minMedium.value) medium.value = minMedium.value
+    if (large.value < minLarge.value) large.value = minLarge.value
+
+    // Reconcile house registry
+    houseStore.reconcileHouses(
+      { small: small.value, medium: medium.value, large: large.value },
+      pinStore.effectivelyPinnedHouseIds,
+    )
+
     loading.value = true
     error.value = ''
     try {
       result.value = await solve(
         selectedPokemon.value,
-        { small: small.value, medium: medium.value, large: large.value },
+        houseStore.orderedHouses,
         pokemonData.value,
         adjacencyData.value,
+        pinStore.getPinnedAssignments(),
       )
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Solver failed'
@@ -295,23 +367,32 @@ defineExpose({
         <BRow class="g-3">
           <BCol sm="4">
             <BFormGroup label="Small (1 slot)" label-for="house-small">
-              <BFormInput id="house-small" v-model.number="small" type="number" min="0" />
+              <BFormInput id="house-small" v-model.number="small" type="number" :min="minSmall" />
             </BFormGroup>
           </BCol>
           <BCol sm="4">
             <BFormGroup label="Medium (2 slots)" label-for="house-medium">
-              <BFormInput id="house-medium" v-model.number="medium" type="number" min="0" />
+              <BFormInput
+                id="house-medium"
+                v-model.number="medium"
+                type="number"
+                :min="minMedium"
+              />
             </BFormGroup>
           </BCol>
           <BCol sm="4">
             <BFormGroup label="Large (4 slots)" label-for="house-large">
-              <BFormInput id="house-large" v-model.number="large" type="number" min="0" />
+              <BFormInput id="house-large" v-model.number="large" type="number" :min="minLarge" />
             </BFormGroup>
           </BCol>
         </BRow>
         <h5 class="section-heading">Pokémon</h5>
         <BRow class="mt-1">
-          <PokemonSelect v-model="selectedPokemon" :pokemon-names="pokemonNames" />
+          <PokemonSelect
+            v-model="selectedPokemon"
+            :pokemon-names="pokemonNames"
+            :pinned-names="pinStore.allPinnedPokemonNames"
+          />
         </BRow>
       </BCardBody>
     </BCard>
@@ -396,7 +477,7 @@ defineExpose({
     <BListGroup class="w-100 results-list" flush>
       <HouseRecord
         v-for="house in result.houses"
-        :key="house.houseIndex"
+        :key="house.houseId"
         :house="house"
         :pokemon-data="pokemonData!"
         @favorite-clicked="openFavoriteItemsModal"
@@ -450,7 +531,7 @@ defineExpose({
               variant="outline-success"
               class="cart-add-btn"
               data-testid="add-to-cart"
-              @click="cartStore.addItem(selectedFavoriteHouseIndex, row.item)"
+              @click="cartStore.addItem(selectedFavoriteHouseId, row.item)"
               >+</BButton
             >
           </BTd>

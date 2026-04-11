@@ -5,6 +5,7 @@ import { computed, ref } from 'vue'
 const props = defineProps<{
   pokemonNames: string[]
   modelValue: string[]
+  pinnedNames?: Set<string>
 }>()
 
 const emit = defineEmits<{
@@ -79,7 +80,7 @@ function onBlur() {
         class="d-inline-flex align-items-center gap-1 pe-1 favorite-pill"
       >
         {{ name }}
-        <BCloseButton class="ms-1" @click="remove(name)" />
+        <BCloseButton class="ms-1" :disabled="props.pinnedNames?.has(name)" @click="remove(name)" />
       </BBadge>
     </div>
     <div class="position-relative pokemon-select-wrap">

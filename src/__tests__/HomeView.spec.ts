@@ -12,7 +12,7 @@ vi.mock('@/db', async () => {
 import { loadAdjacencyMap, loadPokemonData } from '@/queries'
 import type { SolverResult } from '@/solver'
 import { useCartStore } from '@/stores/cart'
-import { useProgressStore } from '@/stores/progress'
+import { usePinStore } from '@/stores/pins'
 import HomeView from '@/views/HomeView.vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -87,8 +87,8 @@ describe('HomeView', () => {
   it('displays results with all pokemon housed', async () => {
     const solverResult: SolverResult = {
       houses: [
-        { houseIndex: 1, size: 'medium', capacity: 2, pokemon: ['AlphaOne', 'AlphaTwo'] },
-        { houseIndex: 2, size: 'small', capacity: 1, pokemon: ['BetaOne'] },
+        { houseId: 'S1', size: 'medium', capacity: 2, pokemon: ['AlphaOne', 'AlphaTwo'] },
+        { houseId: 'M1', size: 'small', capacity: 1, pokemon: ['BetaOne'] },
       ],
       unhoused: [],
     }
@@ -113,7 +113,7 @@ describe('HomeView', () => {
 
   it('displays unhoused pokemon section', async () => {
     const solverResult: SolverResult = {
-      houses: [{ houseIndex: 1, size: 'small', capacity: 1, pokemon: ['AlphaOne'] }],
+      houses: [{ houseId: 'S1', size: 'small', capacity: 1, pokemon: ['AlphaOne'] }],
       unhoused: ['AlphaTwo', 'BetaOne'],
     }
     mockSolve.mockResolvedValueOnce(solverResult)
@@ -132,8 +132,8 @@ describe('HomeView', () => {
   it('displays empty houses', async () => {
     const solverResult: SolverResult = {
       houses: [
-        { houseIndex: 1, size: 'large', capacity: 4, pokemon: ['AlphaOne'] },
-        { houseIndex: 2, size: 'small', capacity: 1, pokemon: [] },
+        { houseId: 'S1', size: 'large', capacity: 4, pokemon: ['AlphaOne'] },
+        { houseId: 'M1', size: 'small', capacity: 1, pokemon: [] },
       ],
       unhoused: [],
     }
@@ -186,8 +186,8 @@ describe('HomeView', () => {
 
     const wrapper = await mountHome()
     const cartStore = useCartStore()
-    cartStore.items.set('1:Punching Bag', {
-      houseIndex: 1,
+    cartStore.items.set('S1:Punching Bag', {
+      houseId: 'S1',
       quantity: 2,
       picturePath: null,
       isCraftable: true,
@@ -203,7 +203,7 @@ describe('HomeView', () => {
     const call = setItem.mock.calls.find(([key]) => key === 'pokehousing_saved_queries')
     expect(call).toBeDefined()
     const saved = JSON.parse(call![1] as string)
-    expect(saved[0].cart).toEqual([{ houseIndex: 1, name: 'Punching Bag', quantity: 2 }])
+    expect(saved[0].cart).toEqual([{ houseId: 'S1', name: 'Punching Bag', quantity: 2 }])
   })
 
   // @lat: [[ui#HomeView#Saved Queries#Restores cart from saved query]]
@@ -215,7 +215,7 @@ describe('HomeView', () => {
       medium: 0,
       large: 0,
       pokemon: ['AlphaOne'],
-      cart: [{ houseIndex: 1, name: 'Punching Bag', quantity: 3 }],
+      cart: [{ houseId: 'S1', name: 'Punching Bag', quantity: 3 }],
     }
     vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([entry]))
 
@@ -227,53 +227,57 @@ describe('HomeView', () => {
     await flushPromises()
 
     expect(restoreItemsSpy).toHaveBeenCalledWith([
-      { houseIndex: 1, name: 'Punching Bag', quantity: 3 },
+      { houseId: 'S1', name: 'Punching Bag', quantity: 3 },
     ])
   })
 
-  // @lat: [[ui#HomeView#Progress Tracking#Saves checkbox state with query]]
-  it('saves checkbox state with saved query', async () => {
+  // @lat: [[ui#HomeView#Pinning#Saves pin state with query]]
+  it('saves pin state with saved query', async () => {
     const setItem = vi.spyOn(Storage.prototype, 'setItem')
 
     const wrapper = await mountHome()
-    const progressStore = useProgressStore()
-    progressStore.toggleHouse(1)
-    progressStore.togglePokemon(2, 'AlphaTwo')
+    const pinStore = usePinStore()
+    pinStore.pinHouse('S1', ['AlphaOne'])
+    pinStore.togglePokemonPin('M1', 'AlphaTwo')
 
     wrapper.vm.confirmSave()
 
     const call = setItem.mock.calls.find(([key]) => key === 'pokehousing_saved_queries')
     expect(call).toBeDefined()
     const saved = JSON.parse(call![1] as string)
-    expect(saved[0].checkedHouses).toEqual([1])
-    expect(saved[0].checkedPokemon).toEqual(['2:AlphaTwo'])
+    expect(saved[0].pinnedHouses).toContain('S1')
+    expect(saved[0].pinnedPokemon).toContain('S1:AlphaOne')
+    expect(saved[0].pinnedPokemon).toContain('M1:AlphaTwo')
   })
 
-  // @lat: [[ui#HomeView#Progress Tracking#Restores checkbox state from query]]
-  it('restores checkbox state from saved query', async () => {
+  // @lat: [[ui#HomeView#Pinning#Restores pin state from query]]
+  it('restores pin state from saved query', async () => {
     const entry = {
-      title: 'With progress',
+      title: 'With pins',
       timestamp: 1700000000001,
+      version: 2,
       small: 1,
       medium: 0,
       large: 0,
       pokemon: ['AlphaOne'],
-      checkedHouses: [1],
-      checkedPokemon: ['1:AlphaOne'],
+      pinnedHouses: ['S1'],
+      pinnedPokemon: ['S1:AlphaOne'],
+      houseRegistry: [{ id: 'S1', size: 'small' }],
+      houseCounters: { small: 1, medium: 0, large: 0 },
     }
     vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([entry]))
 
     const wrapper = await mountHome()
-    const progressStore = useProgressStore()
+    const pinStore = usePinStore()
     const cartStore = useCartStore()
     vi.spyOn(cartStore, 'restoreItems').mockResolvedValue(undefined)
 
     wrapper.vm.selectedTimestamp = 1700000000001
     await flushPromises()
 
-    expect(progressStore.isHouseChecked(1)).toBe(true)
-    expect(progressStore.isPokemonChecked(1, 'AlphaOne')).toBe(true)
-    expect(progressStore.isHouseChecked(2)).toBe(false)
+    expect(pinStore.isHousePinned('S1')).toBe(true)
+    expect(pinStore.isPokemonPinned('S1', 'AlphaOne')).toBe(true)
+    expect(pinStore.isHousePinned('S2')).toBe(false)
   })
 
   // @lat: [[ui#HomeView#Saved Queries#Shows title in restore dropdown]]
@@ -303,7 +307,7 @@ describe('HomeView', () => {
     vi.mocked(loadPokemonData).mockResolvedValue(sharedFavoriteData)
 
     const solverResult: SolverResult = {
-      houses: [{ houseIndex: 1, size: 'medium', capacity: 2, pokemon: ['FitOne', 'FitTwo'] }],
+      houses: [{ houseId: 'S1', size: 'medium', capacity: 2, pokemon: ['FitOne', 'FitTwo'] }],
       unhoused: [],
     }
     mockSolve.mockResolvedValueOnce(solverResult)
@@ -328,7 +332,7 @@ describe('HomeView', () => {
     vi.mocked(loadPokemonData).mockResolvedValue(cardFavoriteData)
 
     const solverResult: SolverResult = {
-      houses: [{ houseIndex: 1, size: 'small', capacity: 1, pokemon: ['Solo'] }],
+      houses: [{ houseId: 'S1', size: 'small', capacity: 1, pokemon: ['Solo'] }],
       unhoused: [],
     }
     mockSolve.mockResolvedValueOnce(solverResult)

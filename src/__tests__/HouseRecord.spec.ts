@@ -31,7 +31,7 @@ describe('HouseRecord', () => {
 
   it('shows shared habitats badge when 2+ pokemon share the same habitat', () => {
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'medium',
       capacity: 2,
       pokemon: ['AlphaOne', 'AlphaTwo'],
@@ -55,7 +55,7 @@ describe('HouseRecord', () => {
 
   it('hides shared habitats section when pokemon have different habitats', () => {
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'medium',
       capacity: 2,
       pokemon: ['AlphaOne', 'BetaOne'],
@@ -74,7 +74,7 @@ describe('HouseRecord', () => {
 
   it('hides shared habitats section for single occupant', () => {
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'small',
       capacity: 1,
       pokemon: ['AlphaOne'],
@@ -93,7 +93,7 @@ describe('HouseRecord', () => {
 
   it('passes habitat prop to each pokemon card', () => {
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'medium',
       capacity: 2,
       pokemon: ['AlphaOne', 'AlphaTwo'],
@@ -115,7 +115,7 @@ describe('HouseRecord', () => {
 
   it('shows shared habitats for multiple pairs (e.g., 3 pokemon with 2 habitats)', () => {
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'large',
       capacity: 4,
       pokemon: ['AlphaOne', 'AlphaTwo', 'GammaOne'],
@@ -140,7 +140,7 @@ describe('HouseRecord', () => {
 
   it('renders with correct data-testid on house card', () => {
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'small',
       capacity: 1,
       pokemon: [],
@@ -164,7 +164,7 @@ describe('HouseRecord', () => {
       FitTwo: { image: '', favorites: ['Exercise', 'Cleanliness'], habitat: 'Dark' },
     }
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'medium',
       capacity: 2,
       pokemon: ['FitOne', 'FitTwo'],
@@ -197,7 +197,7 @@ describe('HouseRecord', () => {
       FireTwo: { image: '', favorites: ['Lots of Fire', 'Group Activities', 'Stone Stuff'] },
     }
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'medium',
       capacity: 2,
       pokemon: ['FireOne', 'FireTwo'],
@@ -217,7 +217,7 @@ describe('HouseRecord', () => {
 
   it('shows recommended items for a single occupant when favorites map to catalog entries', async () => {
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'small',
       capacity: 1,
       pokemon: ['Solo'],
@@ -241,7 +241,7 @@ describe('HouseRecord', () => {
       UniqueTwo: { image: '', favorites: ['Cleanliness'] },
     }
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'medium',
       capacity: 2,
       pokemon: ['UniqueOne', 'UniqueTwo'],
@@ -267,7 +267,7 @@ describe('HouseRecord', () => {
       },
     }
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'medium',
       capacity: 2,
       pokemon: ['PlannerOne', 'PlannerTwo'],
@@ -303,7 +303,7 @@ describe('HouseRecord', () => {
       FitTwo: { image: '', favorites: ['Exercise'] },
     }
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'medium',
       capacity: 2,
       pokemon: ['FitOne', 'FitTwo'],
@@ -315,7 +315,7 @@ describe('HouseRecord', () => {
 
     await wrapper.find('[data-testid="shared-favorite-badge"]').trigger('click')
 
-    expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise', 1]])
+    expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise', 'S1']])
   })
 
   it('emits favoriteClicked when a pokemon card favorite badge is clicked', async () => {
@@ -323,7 +323,7 @@ describe('HouseRecord', () => {
       FitOne: { image: '', favorites: ['Exercise'] },
     }
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'small',
       capacity: 1,
       pokemon: ['FitOne'],
@@ -335,7 +335,7 @@ describe('HouseRecord', () => {
 
     await wrapper.find('[data-testid="fave-badge"]').trigger('click')
 
-    expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise', 1]])
+    expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise', 'S1']])
   })
 
   it('shows craftable badge for items that have recipes', async () => {
@@ -344,7 +344,7 @@ describe('HouseRecord', () => {
       FitOne: { image: '', favorites: ['Exercise'] },
     }
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'small',
       capacity: 1,
       pokemon: ['FitOne'],
@@ -366,7 +366,7 @@ describe('HouseRecord', () => {
       ShinyOne: { image: '', favorites: ['Shiny Stuff'] },
     }
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'small',
       capacity: 1,
       pokemon: ['ShinyOne'],
@@ -388,7 +388,7 @@ describe('HouseRecord', () => {
       FitOne: { image: '', favorites: ['Exercise'] },
     }
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'small',
       capacity: 1,
       pokemon: ['FitOne'],
@@ -410,7 +410,7 @@ describe('HouseRecord', () => {
       FitOne: { image: '', favorites: ['Exercise'] },
     }
     const house: HouseAssignment = {
-      houseIndex: 1,
+      houseId: 'S1',
       size: 'small',
       capacity: 1,
       pokemon: ['FitOne'],

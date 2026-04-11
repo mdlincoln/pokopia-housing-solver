@@ -10,6 +10,7 @@ import {
 } from '@/items'
 import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
+import { usePinStore } from '@/stores/pins'
 import { useProgressStore } from '@/stores/progress'
 import {
   BBadge,
@@ -32,14 +33,19 @@ const props = defineProps<{
 }>()
 
 const cartStore = useCartStore()
+const pinStore = usePinStore()
 const progressStore = useProgressStore()
 
 const emit = defineEmits<{
-  favoriteClicked: [favorite: string, houseIndex: number]
+  favoriteClicked: [favorite: string, houseId: string]
 }>()
 
 function handleFavoriteClick(favorite: string) {
-  emit('favoriteClicked', favorite, props.house.houseIndex)
+  emit('favoriteClicked', favorite, props.house.houseId)
+}
+
+function toggleHousePin() {
+  pinStore.toggleHousePin(props.house.houseId, props.house.pokemon)
 }
 
 const sharedFavorites = computed(() => {
@@ -82,7 +88,7 @@ const sharedHabitats = computed(() => {
     }))
 })
 
-const houseCartItems = computed(() => cartStore.itemsByHouse.get(props.house.houseIndex) ?? [])
+const houseCartItems = computed(() => cartStore.itemsByHouse.get(props.house.houseId) ?? [])
 
 interface FlatRow {
   favorites: string
@@ -111,18 +117,18 @@ const flatRows = computed<FlatRow[]>(() => {
   <BListGroupItem
     class="house-card"
     data-testid="house-card"
-    :class="{ 'checked-off': progressStore.isHouseChecked(house.houseIndex) }"
+    :class="{ 'checked-off': pinStore.isHousePinned(house.houseId) }"
   >
     <h5 class="mb-1 house-title">
       <input
         type="checkbox"
-        :checked="progressStore.isHouseChecked(house.houseIndex)"
+        :checked="pinStore.isHousePinned(house.houseId)"
         class="form-check-input me-2"
         data-testid="progress-checkbox-house"
-        @change="progressStore.toggleHouse(house.houseIndex)"
-        title="Checkbox to keep track of your progress building and housing your Pokemon"
+        @change="toggleHousePin"
+        title="Pin this house and all its pokemon so they stay when re-solving"
       />
-      {{ house.size }} house #{{ house.houseIndex }}
+      {{ house.size }} house {{ house.houseId }}
     </h5>
     <p class="text-muted mb-2 house-meta">
       <span v-if="sharedHabitats.length" class="mt-2" data-testid="shared-habitats">
@@ -164,9 +170,9 @@ const flatRows = computed<FlatRow[]>(() => {
         :image="pokemonData[name]!.image"
         :favorites="pokemonData[name]!.favorites"
         :habitat="pokemonData[name]?.habitat"
-        :checked="progressStore.isPokemonChecked(house.houseIndex, name)"
+        :checked="pinStore.isPokemonPinned(house.houseId, name)"
         @favorite-clicked="handleFavoriteClick"
-        @toggle="progressStore.togglePokemon(house.houseIndex, name)"
+        @toggle="pinStore.togglePokemonPin(house.houseId, name)"
       />
     </BCardGroup>
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
@@ -208,7 +214,7 @@ const flatRows = computed<FlatRow[]>(() => {
                 variant="outline-success"
                 class="cart-add-btn"
                 data-testid="add-to-cart"
-                @click="cartStore.addItem(house.houseIndex, row.item.name)"
+                @click="cartStore.addItem(house.houseId, row.item.name)"
                 >+</BButton
               >
             </BTd>
@@ -252,15 +258,15 @@ const flatRows = computed<FlatRow[]>(() => {
           v-for="item in houseCartItems"
           :key="item.name"
           class="d-flex align-items-center gap-2 py-1 px-0"
-          :class="{ 'checked-off': progressStore.isCartItemChecked(house.houseIndex, item.name) }"
+          :class="{ 'checked-off': progressStore.isCartItemChecked(house.houseId, item.name) }"
           data-testid="house-cart-item"
         >
           <input
             type="checkbox"
-            :checked="progressStore.isCartItemChecked(house.houseIndex, item.name)"
+            :checked="progressStore.isCartItemChecked(house.houseId, item.name)"
             class="form-check-input"
             data-testid="progress-checkbox-cart-item"
-            @change="progressStore.toggleCartItem(house.houseIndex, item.name)"
+            @change="progressStore.toggleCartItem(house.houseId, item.name)"
           />
           <img
             v-if="item.picturePath"
@@ -271,7 +277,7 @@ const flatRows = computed<FlatRow[]>(() => {
           <span
             :class="{
               'text-decoration-line-through': progressStore.isCartItemChecked(
-                house.houseIndex,
+                house.houseId,
                 item.name,
               ),
             }"

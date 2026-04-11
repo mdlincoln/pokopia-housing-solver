@@ -10,7 +10,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 interface CartEntry {
-  houseIndex: number
+  houseId: string
   quantity: number
   picturePath: string | null
   isCraftable: boolean
@@ -19,7 +19,7 @@ interface CartEntry {
 }
 
 export interface CartItem {
-  houseIndex: number
+  houseId: string
   name: string
   quantity: number
   picturePath: string | null
@@ -29,8 +29,8 @@ export interface CartItem {
   flavorText: string | null
 }
 
-function cartKey(houseIndex: number, name: string) {
-  return `${houseIndex}:${name}`
+function cartKey(houseId: string, name: string) {
+  return `${houseId}:${name}`
 }
 
 export const useCartStore = defineStore('cart', () => {
@@ -45,7 +45,7 @@ export const useCartStore = defineStore('cart', () => {
 
   const itemList = computed<CartItem[]>(() =>
     Array.from(items.value.entries()).map(([key, entry]) => ({
-      houseIndex: entry.houseIndex,
+      houseId: entry.houseId,
       name: key.slice(key.indexOf(':') + 1),
       quantity: entry.quantity,
       picturePath: entry.picturePath,
@@ -57,12 +57,12 @@ export const useCartStore = defineStore('cart', () => {
   )
 
   const itemsByHouse = computed(() => {
-    const grouped = new Map<number, CartItem[]>()
+    const grouped = new Map<string, CartItem[]>()
     for (const item of itemList.value) {
-      let list = grouped.get(item.houseIndex)
+      let list = grouped.get(item.houseId)
       if (!list) {
         list = []
-        grouped.set(item.houseIndex, list)
+        grouped.set(item.houseId, list)
       }
       list.push(item)
     }
@@ -77,8 +77,8 @@ export const useCartStore = defineStore('cart', () => {
     aggregated.value = await getAggregatedIngredients(entries)
   }
 
-  async function addItem(houseIndex: number, name: string) {
-    const key = cartKey(houseIndex, name)
+  async function addItem(houseId: string, name: string) {
+    const key = cartKey(houseId, name)
     const existing = items.value.get(key)
     if (existing) {
       existing.quantity++
@@ -88,7 +88,7 @@ export const useCartStore = defineStore('cart', () => {
         getItemMetadata(name),
       ])
       items.value.set(key, {
-        houseIndex,
+        houseId,
         quantity: 1,
         picturePath,
         isCraftable: metadata.isCraftable,
@@ -103,7 +103,7 @@ export const useCartStore = defineStore('cart', () => {
   }
 
   async function restoreItems(
-    entries: Array<{ houseIndex?: number; name: string; quantity: number }>,
+    entries: Array<{ houseId?: string; houseIndex?: number; name: string; quantity: number }>,
   ) {
     items.value.clear()
     recipes.value.clear()
@@ -114,20 +114,20 @@ export const useCartStore = defineStore('cart', () => {
     }
 
     const results = await Promise.all(
-      entries.map(async ({ houseIndex, name, quantity }) => {
-        const hi = houseIndex ?? 0
+      entries.map(async ({ houseId, houseIndex, name, quantity }) => {
+        const id = houseId ?? String(houseIndex ?? 0)
         const [picturePath, metadata, recipe] = await Promise.all([
           getItemPicturePath(name),
           getItemMetadata(name),
           getRecipeForItem(name),
         ])
-        return { houseIndex: hi, name, quantity, picturePath, metadata, recipe }
+        return { houseId: id, name, quantity, picturePath, metadata, recipe }
       }),
     )
 
-    for (const { houseIndex, name, quantity, picturePath, metadata, recipe } of results) {
-      items.value.set(cartKey(houseIndex, name), {
-        houseIndex,
+    for (const { houseId, name, quantity, picturePath, metadata, recipe } of results) {
+      items.value.set(cartKey(houseId, name), {
+        houseId,
         quantity,
         picturePath,
         isCraftable: metadata.isCraftable,
@@ -140,21 +140,21 @@ export const useCartStore = defineStore('cart', () => {
     await recomputeAggregated()
   }
 
-  function removeItem(houseIndex: number, name: string) {
-    items.value.delete(cartKey(houseIndex, name))
+  function removeItem(houseId: string, name: string) {
+    items.value.delete(cartKey(houseId, name))
     recomputeAggregated()
   }
 
-  async function incrementItem(houseIndex: number, name: string) {
-    const entry = items.value.get(cartKey(houseIndex, name))
+  async function incrementItem(houseId: string, name: string) {
+    const entry = items.value.get(cartKey(houseId, name))
     if (entry) {
       entry.quantity++
       await recomputeAggregated()
     }
   }
 
-  async function decrementItem(houseIndex: number, name: string) {
-    const key = cartKey(houseIndex, name)
+  async function decrementItem(houseId: string, name: string) {
+    const key = cartKey(houseId, name)
     const entry = items.value.get(key)
     if (!entry) return
     entry.quantity--

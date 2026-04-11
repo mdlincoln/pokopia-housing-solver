@@ -34,30 +34,30 @@ const progressStore = useProgressStore()
 
       <div data-testid="cart-items">
         <div
-          v-for="[houseIndex, houseItems] in cart.itemsByHouse"
-          :key="houseIndex"
+          v-for="[houseId, houseItems] in cart.itemsByHouse"
+          :key="houseId"
           class="mb-3"
           data-testid="cart-house-group"
         >
-          <h6 class="cart-house-heading">House #{{ houseIndex }}</h6>
+          <h6 class="cart-house-heading">House {{ houseId }}</h6>
           <BListGroup flush>
             <BListGroupItem
               v-for="item in houseItems"
-              :key="`${item.houseIndex}:${item.name}`"
+              :key="`${item.houseId}:${item.name}`"
               class="cart-item"
               :class="{
-                'checked-off': progressStore.isCartItemChecked(item.houseIndex, item.name),
+                'checked-off': progressStore.isCartItemChecked(item.houseId, item.name),
               }"
               data-testid="cart-item"
             >
               <div class="d-flex align-items-center gap-2 mb-1">
                 <input
                   type="checkbox"
-                  :checked="progressStore.isCartItemChecked(item.houseIndex, item.name)"
+                  :checked="progressStore.isCartItemChecked(item.houseId, item.name)"
                   class="form-check-input"
                   data-testid="progress-checkbox-cart-item"
                   title="Check off this item once acquired"
-                  @change="progressStore.toggleCartItem(item.houseIndex, item.name)"
+                  @change="progressStore.toggleCartItem(item.houseId, item.name)"
                 />
                 <img
                   v-if="item.picturePath"
@@ -71,7 +71,7 @@ const progressStore = useProgressStore()
                     data-testid="item-name"
                     :class="{
                       'text-decoration-line-through': progressStore.isCartItemChecked(
-                        item.houseIndex,
+                        item.houseId,
                         item.name,
                       ),
                     }"
@@ -98,7 +98,7 @@ const progressStore = useProgressStore()
                     size="sm"
                     variant="outline-secondary"
                     data-testid="cart-decrement"
-                    @click="cart.decrementItem(item.houseIndex, item.name)"
+                    @click="cart.decrementItem(item.houseId, item.name)"
                   >
                     &minus;
                   </BButton>
@@ -107,7 +107,7 @@ const progressStore = useProgressStore()
                     size="sm"
                     variant="outline-secondary"
                     data-testid="cart-increment"
-                    @click="cart.incrementItem(item.houseIndex, item.name)"
+                    @click="cart.incrementItem(item.houseId, item.name)"
                   >
                     +
                   </BButton>
@@ -115,7 +115,7 @@ const progressStore = useProgressStore()
                     size="sm"
                     variant="outline-danger"
                     data-testid="cart-remove"
-                    @click="cart.removeItem(item.houseIndex, item.name)"
+                    @click="cart.removeItem(item.houseId, item.name)"
                   >
                     &times;
                   </BButton>
