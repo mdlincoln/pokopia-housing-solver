@@ -525,3 +525,97 @@ test.describe('URL Hash Sharing', () => {
     await expect(page.getByTestId('progress-checkbox-pokemon').first()).toBeChecked()
   })
 })
+
+test.describe('State Migration', () => {
+  const STORAGE_KEY = 'pokehousing_saved_queries'
+
+  // @lat: [[ui#HomeView#Saved Queries#Loads legacy entry without checkbox fields]]
+  test('old entry without checkedHouses/checkedPokemon restores with all boxes unchecked', async ({ page }) => {
+    test.setTimeout(40_000)
+
+    const legacyEntry = {
+      title: 'Legacy save',
+      timestamp: 1700000000000,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['Bulbasaur'],
+      // no checkedHouses, checkedPokemon, checkedCartItems
+    }
+    await page.addInitScript(
+      ({ key, value }) => localStorage.setItem(key, value),
+      { key: STORAGE_KEY, value: JSON.stringify([legacyEntry]) },
+    )
+
+    await page.goto('/')
+
+    const select = page.locator('#saved-queries-select')
+    await expect(select).toBeVisible({ timeout: 5000 })
+    await select.selectOption({ value: String(legacyEntry.timestamp) })
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+
+    // All progress checkboxes must default to unchecked
+    await expect(page.getByTestId('progress-checkbox-house').first()).not.toBeChecked()
+    await expect(page.getByTestId('progress-checkbox-pokemon').first()).not.toBeChecked()
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#Loads legacy cart entry without houseIndex]]
+  test('old cart entry without houseIndex is restored and visible in the cart', async ({ page }) => {
+    test.setTimeout(40_000)
+
+    const legacyEntry = {
+      title: 'Legacy cart',
+      timestamp: 1700000000001,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['Bulbasaur'],
+      cart: [{ name: 'Berry Pots', quantity: 3 }], // no houseIndex
+    }
+    await page.addInitScript(
+      ({ key, value }) => localStorage.setItem(key, value),
+      { key: STORAGE_KEY, value: JSON.stringify([legacyEntry]) },
+    )
+
+    await page.goto('/')
+
+    const select = page.locator('#saved-queries-select')
+    await expect(select).toBeVisible({ timeout: 5000 })
+    await select.selectOption({ value: String(legacyEntry.timestamp) })
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+
+    // Cart item is restored with the saved quantity
+    await expect(page.getByTestId('cart-items')).toBeVisible({ timeout: 5000 })
+    await expect(page.getByTestId('cart-quantity')).toHaveText('3')
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#Loads legacy entry with no cart field]]
+  test('old entry with no cart field at all restores without error', async ({ page }) => {
+    test.setTimeout(40_000)
+
+    const legacyEntry = {
+      title: '',
+      timestamp: 1700000000002,
+      small: 1,
+      medium: 1,
+      large: 0,
+      pokemon: ['Bulbasaur', 'Ivysaur'],
+      // no cart field at all
+    }
+    await page.addInitScript(
+      ({ key, value }) => localStorage.setItem(key, value),
+      { key: STORAGE_KEY, value: JSON.stringify([legacyEntry]) },
+    )
+
+    await page.goto('/')
+
+    const select = page.locator('#saved-queries-select')
+    await expect(select).toBeVisible({ timeout: 5000 })
+    await select.selectOption({ value: String(legacyEntry.timestamp) })
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+    await expect(page.getByTestId('results')).toContainText('Ivysaur')
+
+    // Cart should be empty
+    await expect(page.getByTestId('cart-empty')).toBeVisible({ timeout: 2000 })
+  })
+})

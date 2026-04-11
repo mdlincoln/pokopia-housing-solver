@@ -58,6 +58,18 @@ Verifies that cart entries encoded in the hash are restored into the shopping ca
 
 Verifies that `checkedHouses` and `checkedPokemon` encoded in the hash are restored so the correct progress checkboxes appear checked.
 
+#### Loads legacy entry without checkbox fields
+
+Verifies that a saved entry from before checkbox tracking was added (missing `checkedHouses`, `checkedPokemon`, `checkedCartItems`) restores successfully with all progress checkboxes unchecked.
+
+#### Loads legacy cart entry without houseIndex
+
+Verifies that a saved cart entry from before per-house cart tracking (missing `houseIndex` on cart items) restores the items into the cart with the correct quantity.
+
+#### Loads legacy entry with no cart field
+
+Verifies that a saved entry with no `cart` field at all restores the housing configuration and leaves the cart empty without errors.
+
 #### Focuses input on modal open
 
 Verifies that when the save modal is opened, the title input receives keyboard focus immediately so the user can start typing without clicking.
