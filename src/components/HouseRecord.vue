@@ -119,7 +119,7 @@ watch(
 )
 
 interface FlatRow {
-  favorites: string
+  favorites: string[]
   item: ItemDetails
   span: number
   isFirst: boolean
@@ -130,7 +130,7 @@ const flatRows = computed<FlatRow[]>(() => {
   for (const cluster of recommendedItems.value) {
     cluster.items.forEach((item, idx) => {
       result.push({
-        favorites: cluster.favorites.join(', '),
+        favorites: cluster.favorites,
         item,
         span: cluster.items.length,
         isFirst: idx === 0,
@@ -248,10 +248,25 @@ const flatRows = computed<FlatRow[]>(() => {
             <BTh
               v-if="row.isFirst"
               :rowspan="row.span"
-              class="align-top text-muted fw-normal small"
+              class="align-top"
               data-testid="item-cluster-favorites"
-              >{{ row.favorites }}</BTh
             >
+              <BBadge
+                v-for="fav in row.favorites"
+                :key="fav"
+                :variant="fulfilledFavorites.has(fav) ? 'success' : 'danger'"
+                pill
+                class="me-1 mb-1 favorite-pill"
+                role="button"
+                tabindex="0"
+                data-testid="cluster-favorite-badge"
+                @click="handleFavoriteClick(fav)"
+                @keydown.enter.prevent="handleFavoriteClick(fav)"
+                @keydown.space.prevent="handleFavoriteClick(fav)"
+              >
+                {{ fulfilledFavorites.has(fav) ? '✓' : '✗' }} {{ fav }}
+              </BBadge>
+            </BTh>
             <BTd>
               <BButton
                 size="sm"
