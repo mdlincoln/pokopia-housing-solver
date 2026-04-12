@@ -61,13 +61,21 @@ CREATE TABLE IF NOT EXISTS items (
   name         TEXT UNIQUE NOT NULL,
   category     TEXT,
   picture_path TEXT,
-  flavor_text  TEXT
+  flavor_text  TEXT,
+  tag          TEXT
 );
 
 CREATE TABLE IF NOT EXISTS item_favorites (
   item_id       INTEGER NOT NULL REFERENCES items(id),
   favorite_name TEXT    NOT NULL REFERENCES favorites(name),
   PRIMARY KEY (item_id, favorite_name)
+);
+
+CREATE TABLE IF NOT EXISTS item_recipe (
+  item_id       INTEGER NOT NULL REFERENCES items(id),
+  ingredient_id INTEGER NOT NULL REFERENCES items(id),
+  count         INTEGER NOT NULL,
+  PRIMARY KEY (item_id, ingredient_id)
 );
 
 CREATE TABLE IF NOT EXISTS adjacency (

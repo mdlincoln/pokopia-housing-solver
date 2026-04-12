@@ -2,6 +2,12 @@
 
 Functions about Pokopia items that can be used to fulfil Pokemon favorites when placed in households. SQL queries are centralized in [[queries]] — these functions contain only clustering and selection logic.
 
+## Database schema
+
+The `items` table has columns for id, name, category, picture_path, flavor_text, and tag (nullable). See [[scripts/build-sqlite.js]] for the full schema definition.
+
+The `tag` field contains Pokopia item tags (e.g., "Relaxation", "Toy", "Decoration") scraped from serebii.net via [[scripts/scrape-item-tags.js]].
+
 ## idealItems
 
 Maps a household's shared favorites to the best furniture items. See [[src/queries.ts#idealItems]].
@@ -31,3 +37,9 @@ Given a favorite list, it deduplicates favorites case-insensitively, groups item
 Chooses up to three clusters that maximize total covered favorites without any overlap between selected clusters. See [[src/items.ts#selectTopNonOverlappingClusters]].
 
 The selector enforces pairwise-disjoint favorites across chosen clusters, maximizing household coverage under that constraint. If multiple selections have equal coverage, it uses deterministic tie-breaks to keep stable results.
+
+## Scraping item tags
+
+[[scripts/scrape-item-tags.js]] populates the `tag` column by scraping all item pages from serebii.net. The script is resumable and rate-limited at 1500ms intervals.
+
+It enumerates item URLs from the `<select name="SelectURL">` dropdown, fetches each page, parses the Category/Tag header row, and updates the database directly. Items that already have a non-null tag are skipped.
