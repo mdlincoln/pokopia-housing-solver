@@ -38,11 +38,13 @@ Builds interchangeable item clusters keyed by the exact favorites each item fulf
 
 Given a favorite list, it deduplicates favorites case-insensitively, groups items by the sorted set of fulfilled favorites, and returns `ItemCluster[]` ranked by favorite coverage descending. Coverage ties are broken alphabetically by cluster favorite key. Each cluster's `items` is `ItemDetails[]` — carrying craftable status, category, and flavor text from the DB query.
 
-## selectTopNonOverlappingClusters
+## clusterTaggedItemsForHouse
 
-Chooses up to three clusters that maximize total covered favorites without any overlap between selected clusters. See [[src/items.ts#selectTopNonOverlappingClusters]].
+Selects items with tag in {Relaxation, Decoration, Toy} that cover at least one favorite of the house's pokemon, groups them into clusters, and ranks by score. See [[src/items.ts#clusterTaggedItemsForHouse]] and [[src/queries.ts#taggedItemsForHouseFavorites]].
 
-The selector enforces pairwise-disjoint favorites across chosen clusters, maximizing household coverage under that constraint. If multiple selections have equal coverage, it uses deterministic tie-breaks to keep stable results.
+`allFavorites` is the flat list with duplicates — if two pokemon share a favorite it appears twice, and the score for clusters covering that favorite is proportionally higher. Score = sum of per-favorite pokemon counts across the cluster's covered favorites. Clusters are sorted score desc → favorites.length desc → alphabetical key. Items within each cluster are sorted alphabetically.
+
+This is the function called by [[ui#House]] to populate recommended items instead of the earlier `clusterItemsByFavorites` + `selectTopNonOverlappingClusters` flow. No cap on the number of clusters shown.
 
 ## Scraping item tags
 

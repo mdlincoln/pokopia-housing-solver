@@ -18,29 +18,17 @@ vi.mock('@/db', async () => {
 })
 import {
   clusterItemsByFavorites,
+  clusterTaggedItemsForHouse,
   favoritesForItem,
   favoritesToItems,
   idealItems,
   itemsForFavorite,
-  selectTopNonOverlappingClusters,
-  type ItemCluster,
   type ItemDetails,
   type ItemScore,
 } from '../items'
 
 function scoreOf(results: ItemScore[], item: string): number | undefined {
   return results.find((r) => r.item === item)?.score
-}
-
-function makeItem(name: string): ItemDetails {
-  return {
-    name,
-    isCraftable: false,
-    category: null,
-    flavorText: null,
-    picturePath: null,
-    tag: null,
-  }
 }
 
 function itemNames(items: ItemDetails[]): string[] {
@@ -294,57 +282,43 @@ describe('clusterItemsByFavorites', () => {
   })
 })
 
-describe('selectTopNonOverlappingClusters', () => {
-  it('selects a non-overlapping set with the greatest total coverage', async () => {
-    const clusters: ItemCluster[] = [
-      { favorites: ['A', 'B'], items: [makeItem('AB')] },
-      { favorites: ['A'], items: [makeItem('A')] },
-      { favorites: ['C', 'D'], items: [makeItem('CD')] },
-      { favorites: ['E'], items: [makeItem('E')] },
-    ]
-
-    const result = await selectTopNonOverlappingClusters(clusters, 3)
-    expect(result.map((cluster) => cluster.favorites)).toEqual([['A', 'B'], ['C', 'D'], ['E']])
-  })
-
-  it('never returns overlapping favorites', async () => {
-    const clusters: ItemCluster[] = [
-      { favorites: ['A', 'B'], items: [makeItem('AB')] },
-      { favorites: ['B', 'C'], items: [makeItem('BC')] },
-      { favorites: ['D'], items: [makeItem('D')] },
-    ]
-
-    const result = await selectTopNonOverlappingClusters(clusters, 3)
-    const used = new Set<string>()
+// @lat: [[items#clusterTaggedItemsForHouse]]
+describe('clusterTaggedItemsForHouse', () => {
+  it('returns only items with relaxation, decoration, or toy tags', async () => {
+    // 'exercise' has both tagged (Punching Bag / Toy) and untagged items in the catalog
+    const result = await clusterTaggedItemsForHouse(['exercise'])
+    expect(result.length).toBeGreaterThan(0)
+    const validTags = new Set(['Relaxation', 'Decoration', 'Toy'])
     for (const cluster of result) {
-      for (const favorite of cluster.favorites) {
-        const key = favorite.toLowerCase()
-        expect(used.has(key)).toBe(false)
-        used.add(key)
+      for (const item of cluster.items) {
+        expect(item.tag).not.toBeNull()
+        expect(validTags.has(item.tag!)).toBe(true)
       }
     }
   })
 
-  it('returns at most limit clusters', async () => {
-    const clusters: ItemCluster[] = [
-      { favorites: ['A'], items: [makeItem('A')] },
-      { favorites: ['B'], items: [makeItem('B')] },
-      { favorites: ['C'], items: [makeItem('C')] },
-      { favorites: ['D'], items: [makeItem('D')] },
-    ]
-
-    const result = await selectTopNonOverlappingClusters(clusters, 3)
-    expect(result).toHaveLength(3)
+  it('groups items by the set of house favorites they cover', async () => {
+    // exercise → Punching Bag only; cleanliness → separate items
+    const result = await clusterTaggedItemsForHouse(['exercise', 'cleanliness'])
+    const favoriteKeys = result.map((c) => c.favorites.join(','))
+    expect(favoriteKeys).toContain('exercise')
+    expect(favoriteKeys).toContain('cleanliness')
   })
 
-  it('is deterministic across equivalent coverage ties', async () => {
-    const clusters: ItemCluster[] = [
-      { favorites: ['B'], items: [makeItem('B')] },
-      { favorites: ['A'], items: [makeItem('A')] },
-      { favorites: ['C'], items: [makeItem('C')] },
-    ]
+  it('scores clusters higher when more pokemon share the covered favorites', async () => {
+    // 2× exercise + 1× cleanliness: exercise cluster scores 2, cleanliness scores 1
+    const result = await clusterTaggedItemsForHouse(['exercise', 'exercise', 'cleanliness'])
+    expect(result.length).toBeGreaterThan(0)
+    // exercise cluster (score 2) must appear before cleanliness cluster (score 1)
+    const exerciseIdx = result.findIndex((c) => c.favorites.includes('exercise'))
+    const cleanlinessIdx = result.findIndex((c) => c.favorites.includes('cleanliness'))
+    expect(exerciseIdx).toBeGreaterThanOrEqual(0)
+    expect(cleanlinessIdx).toBeGreaterThanOrEqual(0)
+    expect(exerciseIdx).toBeLessThan(cleanlinessIdx)
+  })
 
-    const result = await selectTopNonOverlappingClusters(clusters, 2)
-    expect(result.map((cluster) => cluster.favorites[0])).toEqual(['A', 'B'])
+  it('returns an empty array when no favorites match tagged items', async () => {
+    const result = await clusterTaggedItemsForHouse(['not a real favorite'])
+    expect(result).toHaveLength(0)
   })
 })

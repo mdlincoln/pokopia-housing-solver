@@ -2,12 +2,7 @@
 import { assetPath } from '@/assetPath'
 import PokemonCard from '@/components/PokemonCard.vue'
 import { HABITAT_VARIANT } from '@/habitats'
-import {
-  clusterItemsByFavorites,
-  selectTopNonOverlappingClusters,
-  type ItemCluster,
-  type ItemDetails,
-} from '@/items'
+import { clusterTaggedItemsForHouse, type ItemCluster, type ItemDetails } from '@/items'
 import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
@@ -59,13 +54,12 @@ const recommendedItems = ref<ItemCluster[]>([])
 watch(
   () => props.house.pokemon,
   async (pokemon) => {
-    const favorites = pokemon.flatMap((name) => props.pokemonData[name]?.favorites ?? [])
-    if (favorites.length === 0) {
+    const allFavorites = pokemon.flatMap((name) => props.pokemonData[name]?.favorites ?? [])
+    if (allFavorites.length === 0) {
       recommendedItems.value = []
       return
     }
-    const clusters = await clusterItemsByFavorites(favorites)
-    recommendedItems.value = await selectTopNonOverlappingClusters(clusters, 3)
+    recommendedItems.value = await clusterTaggedItemsForHouse(allFavorites)
   },
   { deep: true, immediate: true },
 )

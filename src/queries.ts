@@ -82,6 +82,58 @@ export interface ItemScore {
   score: number
 }
 
+export interface TaggedItemResult extends ItemDetails {
+  coveredFavorites: string[]
+}
+
+// @lat: [[items#clusterTaggedItemsForHouse]]
+export async function taggedItemsForHouseFavorites(
+  allFavorites: string[],
+): Promise<TaggedItemResult[]> {
+  const db = await getDb()
+  const uniqueFavs = new Set(allFavorites.map((f) => f.toLowerCase()))
+  const itemMap = new Map<string, { details: ItemDetails; coveredFavs: Set<string> }>()
+
+  for (const fav of uniqueFavs) {
+    const rows = db.exec(
+      `SELECT i.name, i.category, i.flavor_text, i.picture_path, i.tag,
+              CASE WHEN COUNT(r.ingredient_id) > 0 THEN 1 ELSE 0 END AS is_craftable
+       FROM items i
+       JOIN item_favorites IF ON i.id = IF.item_id
+       LEFT JOIN item_recipe r ON r.item_id = i.id
+       WHERE IF.favorite_name = ?
+         AND LOWER(i.tag) IN ('relaxation', 'decoration', 'toy')
+       GROUP BY i.id, i.name, i.category, i.flavor_text, i.picture_path, i.tag`,
+      [fav],
+    )[0]
+    if (!rows) continue
+    for (const row of rows.values) {
+      const name = row[0] as string
+      let entry = itemMap.get(name)
+      if (!entry) {
+        entry = {
+          details: {
+            name,
+            category: (row[1] as string | null) ?? null,
+            flavorText: (row[2] as string | null) ?? null,
+            picturePath: (row[3] as string | null) ?? null,
+            tag: (row[4] as string | null) ?? null,
+            isCraftable: (row[5] as number) === 1,
+          },
+          coveredFavs: new Set(),
+        }
+        itemMap.set(name, entry)
+      }
+      entry.coveredFavs.add(fav)
+    }
+  }
+
+  return Array.from(itemMap.values()).map(({ details, coveredFavs }) => ({
+    ...details,
+    coveredFavorites: [...coveredFavs].sort(),
+  }))
+}
+
 // @lat: [[items#idealItems]]
 export async function idealItems(favorites: string[]): Promise<ItemScore[]> {
   const db = await getDb()

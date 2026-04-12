@@ -255,7 +255,8 @@ describe('HouseRecord', () => {
     expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
   })
 
-  it('renders at most three recommended clusters with non-overlapping favorites', async () => {
+  it('shows only relaxation, decoration, and toy tagged items without a cluster cap', async () => {
+    // Tag-filtered results: no 3-cluster limit, all items must have relevant tags
     const pokemonData: PokemonData = {
       PlannerOne: {
         image: '',
@@ -280,20 +281,13 @@ describe('HouseRecord', () => {
 
     const labels = wrapper.findAll('[data-testid="item-cluster-favorites"]')
     expect(labels.length).toBeGreaterThan(0)
-    expect(labels.length).toBeLessThanOrEqual(3)
 
-    const seen = new Set<string>()
-    for (const label of labels) {
-      const favorites = label
-        .text()
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean)
-      for (const favorite of favorites) {
-        const key = favorite.toLowerCase()
-        expect(seen.has(key)).toBe(false)
-        seen.add(key)
-      }
+    // All displayed items must carry a relevant tag
+    const tagBadges = wrapper.findAll('[data-testid="item-tag-badge"]')
+    expect(tagBadges.length).toBeGreaterThan(0)
+    const validTags = new Set(['Relaxation', 'Decoration', 'Toy'])
+    for (const badge of tagBadges) {
+      expect(validTags.has(badge.text())).toBe(true)
     }
   })
 

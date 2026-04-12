@@ -22,9 +22,9 @@ Case-insensitive lookup via normalized favorite name. Returns `ItemDetails[]` in
 
 ## getItemMetadata
 
-Returns craftable status, category, and flavor text for a single item by name. See [[src/queries.ts#getItemMetadata]].
+Returns craftable status, category, flavor text, and tag for a single item by name. See [[src/queries.ts#getItemMetadata]].
 
-Case-insensitive lookup. Returns `{ isCraftable, category, flavorText }`. Used by the cart store when a new item is first added so the cart can display badges and tooltips. Returns all-null/false defaults if the item is not found.
+Case-insensitive lookup. Returns `{ isCraftable, category, flavorText, tag }`. Used by the cart store when a new item is first added so the cart can display badges and tooltips. Returns all-null/false defaults if the item is not found.
 
 ## favoritesForItem
 
@@ -37,6 +37,12 @@ Case-insensitive item name lookup; results are alphabetically sorted as returned
 Scores items by how many of the given favorites they fulfill. See [[src/queries.ts#idealItems]].
 
 Loops over each favorite, queries matching items, and accumulates counts. Duplicate favorites in the input increase the score for items that fulfill that favorite. Returns `ItemScore[]` omitting any items with zero matches.
+
+## taggedItemsForHouseFavorites
+
+Queries items filtered to tag IN ('relaxation', 'decoration', 'toy') that cover at least one favorite of the house's pokemon. See [[src/queries.ts#taggedItemsForHouseFavorites]].
+
+Accepts `allFavorites: string[]` (with duplicates for score weighting). Runs one SQL query per unique favorite with a `LOWER(i.tag) IN (...)` filter. Returns `TaggedItemResult[]` — `ItemDetails` extended with `coveredFavorites: string[]` listing which house favorites each item covers. Used by [[items#clusterTaggedItemsForHouse]].
 
 ## getItemPicturePath
 

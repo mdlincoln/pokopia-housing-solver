@@ -136,7 +136,7 @@ Habitat-to-badge-variant mappings for both `HouseRecord` and `PokemonCard` come 
 
 Shared favorite pills and pokemon-card favorite pills are interactive and emit a favorite-selection event to HomeView, which opens the item lookup modal.
 
-House recommendations use all favorites from pokemon assigned to that house (not only shared favorites). The recommendation list shows up to three item-category clusters selected by [[items#selectTopNonOverlappingClusters]], ensuring selected clusters do not overlap favorites while maximizing total favorites covered. Favorites are passed directly to `clusterItemsByFavorites`, which handles deduplication internally.
+House recommendations use all favorites from pokemon assigned to that house (not only shared favorites). The recommendation list shows all item clusters returned by [[items#clusterTaggedItemsForHouse]], filtered to items tagged Relaxation, Decoration, or Toy and ranked by score (sum of pokemon-favorite matches).
 
 Each recommended item has a small `+` button (`data-testid="add-to-cart"`) that calls `cartStore.addItem(houseId, itemName)` to add it to the shopping cart for that house. The same `+` button appears on each item row in the favorite items modal in HomeView, passing the originating house ID.
 

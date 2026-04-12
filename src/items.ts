@@ -1,7 +1,17 @@
-import { idealItems, itemsForFavorite, type ItemDetails } from '@/queries'
+import {
+  idealItems,
+  itemsForFavorite,
+  taggedItemsForHouseFavorites,
+  type ItemDetails,
+} from '@/queries'
 
-export type { ItemDetails, ItemScore } from '@/queries'
-export { favoritesForItem, idealItems, itemsForFavorite } from '@/queries'
+export type { ItemDetails, ItemScore, TaggedItemResult } from '@/queries'
+export {
+  favoritesForItem,
+  idealItems,
+  itemsForFavorite,
+  taggedItemsForHouseFavorites,
+} from '@/queries'
 
 export interface FavoriteCount {
   favorite: string
@@ -83,59 +93,46 @@ export async function clusterItemsByFavorites(favorites: string[]): Promise<Item
   return Array.from(groups.values()).sort(compareClusters)
 }
 
-// @lat: [[items#selectTopNonOverlappingClusters]]
-export async function selectTopNonOverlappingClusters(
-  clusters: ItemCluster[],
-  limit = 3,
-): Promise<ItemCluster[]> {
-  const sorted = [...clusters].sort(compareClusters)
-  let best: ItemCluster[] = []
-  let bestCoverage = -1
-  let bestSignature = ''
+// @lat: [[items#clusterTaggedItemsForHouse]]
+export async function clusterTaggedItemsForHouse(allFavorites: string[]): Promise<ItemCluster[]> {
+  const normalized = allFavorites.map((f) => f.toLowerCase())
 
-  function evaluateSelection(selection: ItemCluster[]) {
-    const coverage = selection.reduce((sum, cluster) => sum + cluster.favorites.length, 0)
-    const signature = selection.map(clusterKey).join('||')
-    if (coverage > bestCoverage) {
-      bestCoverage = coverage
-      best = [...selection]
-      bestSignature = signature
-      return
-    }
-    if (coverage < bestCoverage) return
-    if (selection.length > best.length) {
-      best = [...selection]
-      bestSignature = signature
-      return
-    }
-    if (selection.length < best.length) return
-    if (signature.localeCompare(bestSignature) < 0) {
-      best = [...selection]
-      bestSignature = signature
-    }
+  // Count occurrences of each favorite (duplicates = multiple pokemon share it)
+  const favCounts = new Map<string, number>()
+  for (const fav of normalized) {
+    favCounts.set(fav, (favCounts.get(fav) ?? 0) + 1)
   }
 
-  function walk(index: number, selection: ItemCluster[], usedFavorites: Set<string>) {
-    if (selection.length === limit || index === sorted.length) {
-      evaluateSelection(selection)
-      return
+  const items = await taggedItemsForHouseFavorites(normalized)
+
+  // Group items by their sorted covered-favorites key
+  const groups = new Map<string, ItemCluster>()
+  for (const item of items) {
+    const key = item.coveredFavorites.join('\0')
+    let group = groups.get(key)
+    if (!group) {
+      group = { favorites: item.coveredFavorites, items: [] }
+      groups.set(key, group)
     }
-
-    walk(index + 1, selection, usedFavorites)
-
-    const candidate = sorted[index]!
-    const normalized = candidate.favorites.map((favorite) => favorite.toLowerCase())
-    if (normalized.some((favorite) => usedFavorites.has(favorite))) {
-      return
-    }
-
-    for (const favorite of normalized) usedFavorites.add(favorite)
-    selection.push(candidate)
-    walk(index + 1, selection, usedFavorites)
-    selection.pop()
-    for (const favorite of normalized) usedFavorites.delete(favorite)
+    group.items.push(item)
   }
 
-  walk(0, [], new Set<string>())
-  return best
+  // Score a cluster by summing pokemon-favorite match counts across its covered favorites
+  function clusterScore(cluster: ItemCluster): number {
+    return cluster.favorites.reduce((sum, fav) => sum + (favCounts.get(fav) ?? 0), 0)
+  }
+
+  // Sort items within each cluster alphabetically
+  for (const cluster of groups.values()) {
+    cluster.items.sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  // Sort clusters: score desc → favorites.length desc → alphabetical key
+  return Array.from(groups.values()).sort((a, b) => {
+    const scoreDiff = clusterScore(b) - clusterScore(a)
+    if (scoreDiff !== 0) return scoreDiff
+    const lenDiff = b.favorites.length - a.favorites.length
+    if (lenDiff !== 0) return lenDiff
+    return a.favorites.join('\0').localeCompare(b.favorites.join('\0'))
+  })
 }
