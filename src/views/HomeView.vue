@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { assetPath } from '@/assetPath'
 import HouseRecord from '@/components/HouseRecord.vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
-import { assetPath } from '@/assetPath'
 import { favoritesForItem, itemsForFavorite } from '@/items'
 import { loadAdjacencyMap, loadPokemonData } from '@/queries'
 import { solve, type AdjacencyMap, type PokemonData, type SolverResult } from '@/solver'
@@ -485,15 +485,6 @@ defineExpose({
 
   <section v-if="result" data-testid="results" class="mt-4 results-section">
     <h2 class="section-heading">Results</h2>
-    <BListGroup class="w-100 results-list" flush>
-      <HouseRecord
-        v-for="house in result.houses"
-        :key="house.houseId"
-        :house="house"
-        :pokemon-data="pokemonData!"
-        @favorite-clicked="openFavoriteItemsModal"
-      />
-    </BListGroup>
 
     <BAlert
       v-if="result.unhoused.length"
@@ -507,6 +498,16 @@ defineExpose({
         <li v-for="name in result.unhoused" :key="name">{{ name }}</li>
       </ul>
     </BAlert>
+
+    <BListGroup class="w-100 results-list" flush>
+      <HouseRecord
+        v-for="house in result.houses"
+        :key="house.houseId"
+        :house="house"
+        :pokemon-data="pokemonData!"
+        @favorite-clicked="openFavoriteItemsModal"
+      />
+    </BListGroup>
   </section>
 
   <BModal
