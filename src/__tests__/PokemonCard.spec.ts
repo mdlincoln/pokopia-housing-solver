@@ -102,4 +102,69 @@ describe('PokemonCard', () => {
 
     expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise']])
   })
+
+  it('favorite badges have no success variant when fulfilledFavorites is not provided', () => {
+    const wrapper = mount(PokemonCard, {
+      props: {
+        name: 'TestMon',
+        image: 'test.png',
+        favorites: ['Exercise', 'Cleanliness'],
+      },
+    })
+
+    const badges = wrapper.findAll('[data-testid="fave-badge"]')
+    expect(badges).toHaveLength(2)
+    for (const badge of badges) {
+      expect(badge.classes()).not.toContain('text-bg-success')
+    }
+  })
+
+  it('fulfilled favorite badge turns success; unfulfilled badge stays default', () => {
+    const wrapper = mount(PokemonCard, {
+      props: {
+        name: 'TestMon',
+        image: 'test.png',
+        favorites: ['Exercise', 'Cleanliness'],
+        fulfilledFavorites: new Set(['exercise']),
+      },
+    })
+
+    const badges = wrapper.findAll('[data-testid="fave-badge"]')
+    expect(badges).toHaveLength(2)
+    const exerciseBadge = badges.find((b) => b.text() === 'Exercise')!
+    const cleanlinessBadge = badges.find((b) => b.text() === 'Cleanliness')!
+    expect(exerciseBadge.classes()).toContain('text-bg-success')
+    expect(cleanlinessBadge.classes()).not.toContain('text-bg-success')
+  })
+
+  it('fulfilled favorites matching is case-insensitive', () => {
+    const wrapper = mount(PokemonCard, {
+      props: {
+        name: 'TestMon',
+        image: 'test.png',
+        favorites: ['Shiny Stuff'],
+        fulfilledFavorites: new Set(['shiny stuff']),
+      },
+    })
+
+    const badge = wrapper.find('[data-testid="fave-badge"]')
+    expect(badge.classes()).toContain('text-bg-success')
+  })
+
+  it('all favorite badges turn success when all are fulfilled', () => {
+    const wrapper = mount(PokemonCard, {
+      props: {
+        name: 'TestMon',
+        image: 'test.png',
+        favorites: ['Exercise', 'Cleanliness', 'Shiny Stuff'],
+        fulfilledFavorites: new Set(['exercise', 'cleanliness', 'shiny stuff']),
+      },
+    })
+
+    const badges = wrapper.findAll('[data-testid="fave-badge"]')
+    expect(badges).toHaveLength(3)
+    for (const badge of badges) {
+      expect(badge.classes()).toContain('text-bg-success')
+    }
+  })
 })

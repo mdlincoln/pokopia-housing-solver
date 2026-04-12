@@ -13,6 +13,7 @@ vi.mock('@/db', async () => {
 
 import HouseRecord from '@/components/HouseRecord.vue'
 import type { HouseAssignment, PokemonData } from '@/solver'
+import { useCartStore } from '@/stores/cart'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -396,6 +397,141 @@ describe('HouseRecord', () => {
     const catBadge = wrapper.find('[data-testid="item-category-badge"]')
     expect(catBadge.exists()).toBe(true)
     expect(catBadge.text()).toBe('Outdoor')
+  })
+
+  it('tag fulfillment row always shows Relaxation, Toy, and Decoration badges', () => {
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['AlphaOne'],
+    }
+
+    const wrapper = mount(HouseRecord, {
+      props: { house, pokemonData: testPokemonData },
+    })
+
+    const row = wrapper.find('[data-testid="tag-fulfillment-status"]')
+    expect(row.exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tag-status-relaxation"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tag-status-toy"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tag-status-decoration"]').exists()).toBe(true)
+  })
+
+  it('tag badges are secondary before any cart items are added', () => {
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['AlphaOne'],
+    }
+
+    const wrapper = mount(HouseRecord, {
+      props: { house, pokemonData: testPokemonData },
+    })
+
+    for (const tag of ['relaxation', 'toy', 'decoration']) {
+      const badge = wrapper.find(`[data-testid="tag-status-${tag}"]`)
+      expect(badge.classes()).toContain('text-bg-secondary')
+      expect(badge.classes()).not.toContain('text-bg-success')
+    }
+  })
+
+  it('tag badge turns success after adding a cart item with that tag', async () => {
+    // Punching Bag (Exercise) has the Toy tag and appears in tagged recommendations
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+
+    // Find the first recommended item's tag badge to know which tag it carries
+    const tagBadge = wrapper.find('[data-testid="item-tag-badge"]')
+    expect(tagBadge.exists()).toBe(true)
+    const tagText = tagBadge.text().toLowerCase()
+
+    // Confirm that tag status badge starts as secondary
+    const statusBadge = wrapper.find(`[data-testid="tag-status-${tagText}"]`)
+    expect(statusBadge.classes()).toContain('text-bg-secondary')
+
+    // Add the item to cart — get its name from the recommended list
+    const itemName = wrapper.find('[data-testid="item-name"]').text()
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', itemName)
+    await flushPromises()
+
+    expect(statusBadge.classes()).toContain('text-bg-success')
+    expect(statusBadge.classes()).not.toContain('text-bg-secondary')
+  })
+
+  it('fulfilled favorite badges turn success after adding a covering cart item', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+
+    // Before adding any cart items, the Exercise badge should not be success
+    const favBadge = wrapper.find('[data-testid="fave-badge"]')
+    expect(favBadge.text()).toBe('Exercise')
+    expect(favBadge.classes()).not.toContain('text-bg-success')
+
+    // Add an Exercise item to the cart
+    const itemName = wrapper.find('[data-testid="item-name"]').text()
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', itemName)
+    await flushPromises()
+
+    expect(favBadge.classes()).toContain('text-bg-success')
+  })
+
+  it('fulfilled favorites do not bleed across houses', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+      FitTwo: { image: '', favorites: ['Exercise'] },
+    }
+    const houseA: HouseAssignment = {
+      houseId: 'A1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+    const houseB: HouseAssignment = {
+      houseId: 'B1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitTwo'],
+    }
+
+    const wrapperA = mount(HouseRecord, { props: { house: houseA, pokemonData } })
+    const wrapperB = mount(HouseRecord, { props: { house: houseB, pokemonData } })
+    await flushPromises()
+
+    // Add item only to house A
+    const itemName = wrapperA.find('[data-testid="item-name"]').text()
+    const cartStore = useCartStore()
+    await cartStore.addItem('A1', itemName)
+    await flushPromises()
+
+    const badgeA = wrapperA.find('[data-testid="fave-badge"]')
+    const badgeB = wrapperB.find('[data-testid="fave-badge"]')
+
+    expect(badgeA.classes()).toContain('text-bg-success')
+    expect(badgeB.classes()).not.toContain('text-bg-success')
   })
 
   it('shows flavor text as title attribute on item name', async () => {

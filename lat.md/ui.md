@@ -168,6 +168,26 @@ Verifies that opening a house's recommended items list shows at least one `item-
 
 Verifies that clicking a shared-favorite badge and opening the modal shows `item-craftable-badge` elements on items in the list.
 
+#### Tag fulfillment row always present
+
+The tag row (`tag-fulfillment-status`) and all three tag status badges (`tag-status-relaxation`, `tag-status-toy`, `tag-status-decoration`) are always rendered regardless of cart state.
+
+#### Tag badges start secondary
+
+Before any cart items are added, all three tag status badges carry `variant="secondary"`.
+
+#### Tag badge turns success after item added
+
+After calling `cartStore.addItem` for an item with a given tag, the corresponding tag status badge switches to `variant="success"`.
+
+#### Fulfilled favorite badge turns success
+
+Before adding cart items a pokemon's favorite badge has no success variant. After adding a cart item whose favorites include that pokemon's favorite, the badge turns `variant="success"`.
+
+#### Fulfilled favorites do not bleed across houses
+
+Adding a cart item to one house's slot does not cause another house's favorite badges to turn success.
+
 ### Test Selectors
 
 Test selectors use `data-testid` attributes so tests do not depend on Bootstrap CSS classes.
