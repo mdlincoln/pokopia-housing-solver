@@ -71,8 +71,8 @@ describe('HomeView', () => {
   it('renders the form with house inputs and submit button', async () => {
     const wrapper = await mountHome()
 
-    const inputs = wrapper.findAll('input[type="number"]')
-    expect(inputs).toHaveLength(3)
+    const spinbuttons = wrapper.findAll('[role="spinbutton"]')
+    expect(spinbuttons).toHaveLength(3)
 
     expect(wrapper.find('[data-testid="results"]').exists()).toBe(false)
   })

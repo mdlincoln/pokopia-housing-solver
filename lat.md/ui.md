@@ -16,7 +16,7 @@ The main page at `/` in `src/views/HomeView.vue`, built with Bootstrap Vue Next 
 
 ### Form
 
-Users set house counts via `BFormInput` (type number) in a `BRow` grid and select pokemon with an autocomplete multi-select. Results update automatically via Vue `watch` whenever inputs change — there is no submit button.
+Users set house counts via `BFormSpinbutton` (`role="spinbutton"`) in a `BRow` grid and select pokemon with an autocomplete multi-select. Results update automatically via Vue `watch` whenever inputs change — there is no submit button.
 
 Asset URLs are constructed by the shared helper `src/assetPath.ts` (`assetPath(fileName)` returns `BASE_URL + fileName`). Both `HomeView` and `PokemonCard` import from this module.
 
