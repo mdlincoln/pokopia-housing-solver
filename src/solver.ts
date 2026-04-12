@@ -466,6 +466,12 @@ export async function solve(
 ): Promise<SolverResult> {
   const numHouses = houses.length
 
+  // Normalize: sort pokemonNames so output is deterministic regardless of input order.
+  // All downstream tie-breaks (submatrix indexing, Set/Map iteration, stable sorts)
+  // are consistent for any permutation of the same set of pokemon.
+
+  pokemonNames = [...pokemonNames].sort()
+
   // Validate pokemon names
   for (const name of pokemonNames) {
     if (!pokemonData[name]) {

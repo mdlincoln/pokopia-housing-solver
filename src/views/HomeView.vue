@@ -284,6 +284,16 @@ watch(
   { deep: true },
 )
 
+function clearAll() {
+  pinStore.clear()
+  progressStore.restoreProgress({})
+  houseStore.clear()
+  small.value = 0
+  medium.value = 0
+  large.value = 0
+  selectedPokemon.value = []
+}
+
 function loadSample() {
   pinStore.clear()
   progressStore.restoreProgress({})
@@ -398,6 +408,7 @@ defineExpose({
     </BCard>
 
     <div class="d-flex gap-2 align-items-start flex-wrap mb-3 action-row">
+      <BButton variant="outline-danger" class="beach-button" @click="clearAll"> Clear all </BButton>
       <BButton
         variant="outline-secondary"
         class="beach-button"

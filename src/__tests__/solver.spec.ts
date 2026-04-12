@@ -655,3 +655,25 @@ describe('pinned assignments', () => {
     expect(l1.pokemon).not.toContain('BetaTwo')
   }, 30_000)
 })
+
+describe('input order independence', () => {
+  it('produces the same assignment regardless of input pokemon order', async () => {
+    const houses = makeHouses({ small: 0, medium: 2, large: 0 })
+    const names: string[] = ['AlphaOne', 'AlphaTwo', 'BetaOne', 'BetaTwo']
+    const reversed = [...names].reverse()
+    const shuffled = [names[2]!, names[0]!, names[3]!, names[1]!]
+
+    const [r1, r2, r3] = await Promise.all([
+      solve(names, houses, testData, testDataFixture),
+      solve(reversed, houses, testData, testDataFixture),
+      solve(shuffled, houses, testData, testDataFixture),
+    ])
+
+    // All three should produce identical pokemon-per-house groupings
+    const housemates = (r: SolverResult) =>
+      r.houses.map((h) => [...h.pokemon].sort().join(',')).sort()
+
+    expect(housemates(r2)).toEqual(housemates(r1))
+    expect(housemates(r3)).toEqual(housemates(r1))
+  }, 30_000)
+})

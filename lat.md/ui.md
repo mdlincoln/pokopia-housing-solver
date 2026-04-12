@@ -20,7 +20,7 @@ Users set house counts via `BFormInput` (type number) in a `BRow` grid and selec
 
 Asset URLs are constructed by the shared helper `src/assetPath.ts` (`assetPath(fileName)` returns `BASE_URL + fileName`). Both `HomeView` and `PokemonCard` import from this module.
 
-A "Show a sample island" button prefills the form with 1 small, 3 medium, 2 large houses and 13 randomly chosen pokemon. It is disabled until pokemon data has loaded. It also clears pins, progress, and the house registry before loading the new sample.
+A "Clear all" button resets the form to a blank state: all house counts to 0, selected pokemon to none, and clears pins, progress, and the house registry. A "Show a sample island" button prefills the form with 1 small, 3 medium, 2 large houses and 13 randomly chosen pokemon. It is disabled until pokemon data has loaded. It also clears pins, progress, and the house registry before loading the new sample.
 
 On mount, calls `loadPokemonData()` and `loadAdjacencyMap()` from [[queries]] (which internally uses `src/db.ts` / sql.js WASM) to populate `pokemonData` and `adjacencyMap`. The dev server serves the WASM file from `node_modules/sql.js/dist/sql-wasm.wasm` via a Vite middleware; production builds copy it to `dist/wasm/`. The solver runs whenever both datasets are loaded and at least one house is configured; otherwise results are hidden.
 

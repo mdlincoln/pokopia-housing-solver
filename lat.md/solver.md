@@ -10,7 +10,7 @@ The solver exposes a single async `solve` function and supporting types via [[sr
 
 The function accepts five arguments describing the optimization problem.
 
-- `pokemonNames: string[]` — names matching pokemon rows in `public/pokehousing.sqlite`
+- `pokemonNames: string[]` — names matching pokemon rows in `public/pokehousing.sqlite`; sorted alphabetically at the start of `solve()` so output is deterministic regardless of input order
 - `houses: HouseWithId[]` — array of `{ id: string, size: string, capacity: number }` objects from the house registry store
 - `pokemonData: PokemonData` — the favorites dataset keyed by pokemon name (loaded from SQLite by HomeView)
 - `adjacencyMap?: AdjacencyMap` — optional precomputed compatibility map (`Map<string, Map<string, number | null>>`); enables the clustering phases
