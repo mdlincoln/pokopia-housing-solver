@@ -158,6 +158,7 @@ const flatRows = computed<FlatRow[]>(() => {
       />
       {{ house.size }} house {{ house.houseId }}
     </h5>
+    <h6>House-wide needs</h6>
     <p class="text-muted mb-2 house-meta">
       <span v-if="sharedHabitats.length" class="mt-2" data-testid="shared-habitats">
         <BBadge
@@ -191,6 +192,18 @@ const flatRows = computed<FlatRow[]>(() => {
       </span>
     </p>
 
+    <div class="my-2 d-flex gap-2" data-testid="tag-fulfillment-status">
+      <BBadge
+        v-for="tag in ITEM_TAGS"
+        :key="tag"
+        :variant="fulfilledTags.has(tag.toLowerCase()) ? 'success' : 'danger'"
+        pill
+        :data-testid="`tag-status-${tag.toLowerCase()}`"
+      >
+        {{ fulfilledTags.has(tag.toLowerCase()) ? '✓' : '✗' }} {{ tag }}
+      </BBadge>
+    </div>
+
     <BCardGroup v-if="house.pokemon.length > 0">
       <PokemonCard
         v-for="name in house.pokemon"
@@ -206,18 +219,6 @@ const flatRows = computed<FlatRow[]>(() => {
       />
     </BCardGroup>
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
-
-    <div class="mt-2 d-flex gap-2" data-testid="tag-fulfillment-status">
-      <BBadge
-        v-for="tag in ITEM_TAGS"
-        :key="tag"
-        :variant="fulfilledTags.has(tag.toLowerCase()) ? 'success' : 'danger'"
-        pill
-        :data-testid="`tag-status-${tag.toLowerCase()}`"
-      >
-        {{ fulfilledTags.has(tag.toLowerCase()) ? '✓' : '✗' }} {{ tag }}
-      </BBadge>
-    </div>
 
     <details
       v-if="recommendedItems.length"

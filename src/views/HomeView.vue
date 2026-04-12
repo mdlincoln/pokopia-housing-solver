@@ -146,6 +146,7 @@ const selectedFavoriteItemRows = ref<
     isCraftable: boolean
     category: string | null
     flavorText: string | null
+    tag: string | null
   }[]
 >([])
 
@@ -165,6 +166,7 @@ watch(selectedFavorite, async (favorite) => {
       isCraftable: detail.isCraftable,
       category: detail.category,
       flavorText: detail.flavorText,
+      tag: detail.tag,
       otherFavorites: (await favoritesForItem(detail.name)).filter(
         (f) => f.toLowerCase() !== lower,
       ),
@@ -532,6 +534,7 @@ defineExpose({
           <BTh>Item</BTh>
           <BTh>Craft</BTh>
           <BTh>Category</BTh>
+          <BTh>Tag</BTh>
           <BTh>Also fulfills</BTh>
         </BTr>
       </BThead>
@@ -567,6 +570,11 @@ defineExpose({
           <BTd>
             <BBadge v-if="row.category" variant="warning" pill data-testid="item-category-badge">{{
               row.category
+            }}</BBadge>
+          </BTd>
+          <BTd>
+            <BBadge v-if="row.tag" variant="info" pill data-testid="item-tag-badge">{{
+              row.tag
             }}</BBadge>
           </BTd>
           <BTd>
