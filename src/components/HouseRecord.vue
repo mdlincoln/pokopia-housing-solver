@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { assetPath } from '@/assetPath'
+import FavoriteBadge from '@/components/FavoriteBadge.vue'
 import PokemonCard from '@/components/PokemonCard.vue'
 import { HABITAT_VARIANT } from '@/habitats'
 import {
@@ -173,22 +174,15 @@ const flatRows = computed<FlatRow[]>(() => {
         </BBadge>
       </span>
       <span v-if="sharedFavorites.length" class="mt-2">
-        <BBadge
+        <FavoriteBadge
           v-for="item in sharedFavorites"
           :key="item.favorite"
-          :variant="fulfilledFavorites.has(item.favorite.toLowerCase()) ? 'success' : 'danger'"
-          pill
-          class="me-1 favorite-pill"
-          role="button"
-          tabindex="0"
+          :favorite="item.favorite"
+          :fulfilled="fulfilledFavorites.has(item.favorite.toLowerCase())"
+          :count="item.count"
           data-testid="shared-favorite-badge"
-          @click="handleFavoriteClick(item.favorite)"
-          @keydown.enter.prevent="handleFavoriteClick(item.favorite)"
-          @keydown.space.prevent="handleFavoriteClick(item.favorite)"
-        >
-          {{ fulfilledFavorites.has(item.favorite.toLowerCase()) ? '✓' : '✗' }}
-          {{ item.favorite }} &times;{{ item.count }}
-        </BBadge>
+          @click="handleFavoriteClick"
+        />
       </span>
     </p>
 
@@ -252,21 +246,14 @@ const flatRows = computed<FlatRow[]>(() => {
               class="align-top"
               data-testid="item-cluster-favorites"
             >
-              <BBadge
+              <FavoriteBadge
                 v-for="fav in row.favorites"
                 :key="fav"
-                :variant="fulfilledFavorites.has(fav) ? 'success' : 'danger'"
-                pill
-                class="me-1 mb-1 favorite-pill"
-                role="button"
-                tabindex="0"
+                :favorite="fav"
+                :fulfilled="fulfilledFavorites.has(fav)"
                 data-testid="cluster-favorite-badge"
-                @click="handleFavoriteClick(fav)"
-                @keydown.enter.prevent="handleFavoriteClick(fav)"
-                @keydown.space.prevent="handleFavoriteClick(fav)"
-              >
-                {{ fulfilledFavorites.has(fav) ? '✓' : '✗' }} {{ fav }}
-              </BBadge>
+                @click="handleFavoriteClick"
+              />
             </BTh>
             <BTd>
               <BButton

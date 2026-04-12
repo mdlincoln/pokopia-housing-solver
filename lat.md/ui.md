@@ -134,7 +134,17 @@ Each `PokemonCard` receives the pokemon's `habitat` prop, which it renders as a 
 
 Habitat-to-badge-variant mappings for both `HouseRecord` and `PokemonCard` come from the shared constant `HABITAT_VARIANT` in `src/habitats.ts`.
 
-Shared favorite pills and pokemon-card favorite pills are interactive and emit a favorite-selection event to HomeView, which opens the item lookup modal.
+Shared favorite pills, cluster-favorites pills, and pokemon-card favorite pills are all rendered via the shared `FavoriteBadge` component (`src/components/FavoriteBadge.vue`). They are interactive and emit a favorite-selection event to HomeView, which opens the item lookup modal.
+
+### FavoriteBadge
+
+A reusable pill badge component used wherever a fulfilled/unfulfilled interactive favorite badge is needed.
+
+Props: `favorite: string` (display name), `fulfilled?: boolean` (drives variant and icon), `informational?: boolean` (renders `variant="secondary"` with no prefix — overrides `fulfilled`; used for reference-only badges), `count?: number` (renders `×N` suffix for shared-favorites). The `data-testid` attribute is forwarded to the root element via Vue attribute inheritance. Emits `click(favorite: string)` on click or Enter/Space keydown.
+
+When `fulfilled` is `true` renders `variant="success"` with a `✓` prefix; when `false` renders `variant="danger"` with a `✗` prefix; when `informational` is set renders `variant="secondary"` with no prefix. Note: Vue's boolean prop casting converts absent `fulfilled` to `false`, so pass `informational` explicitly when no fulfillment state applies.
+
+Used at four sites: `PokemonCard` per-pokemon favorites (`data-testid="fave-badge"`), `HouseRecord` shared favorites (`data-testid="shared-favorite-badge"`, passes `count`), `HouseRecord` cluster favorites (`data-testid="cluster-favorite-badge"`), and `HomeView` "Also fulfills" column in the items modal (`data-testid="favorite-item-related-favorite-pill"`, uses `informational`). Clicking an "Also fulfills" badge calls `openFavoriteItemsModal` to navigate the modal to that favorite.
 
 House recommendations use all favorites from pokemon assigned to that house (not only shared favorites). The recommendation list shows all item clusters returned by [[items#clusterTaggedItemsForHouse]], filtered to items tagged Relaxation, Decoration, or Toy and ranked by score (sum of pokemon-favorite matches).
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { assetPath } from '@/assetPath'
+import FavoriteBadge from '@/components/FavoriteBadge.vue'
 import HouseRecord from '@/components/HouseRecord.vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
 import { favoritesForItem, itemsForFavorite } from '@/items'
@@ -583,14 +584,14 @@ defineExpose({
               class="d-inline-flex gap-1 flex-wrap"
               data-testid="favorite-item-related-favorites"
             >
-              <BBadge
+              <FavoriteBadge
                 v-for="favorite in row.otherFavorites"
                 :key="`${row.item}-${favorite}`"
-                variant="secondary"
-                pill
+                :favorite="favorite"
+                informational
                 data-testid="favorite-item-related-favorite-pill"
-                >{{ favorite }}</BBadge
-              >
+                @click="openFavoriteItemsModal(favorite, selectedFavoriteHouseId)"
+              />
             </span>
           </BTd>
         </BTr>

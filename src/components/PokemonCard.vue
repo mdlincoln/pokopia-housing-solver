@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { assetPath } from '@/assetPath'
+import FavoriteBadge from '@/components/FavoriteBadge.vue'
 import { HABITAT_VARIANT } from '@/habitats'
 import { BBadge, BCard, BCardBody, BCardImg, BCol, BRow } from 'bootstrap-vue-next'
 import { computed } from 'vue'
@@ -58,22 +59,14 @@ const habitatVariant = computed(() =>
             </BBadge>
           </div>
           <div v-if="favorites">
-            <BBadge
+            <FavoriteBadge
               v-for="fav in favorites"
               :key="fav"
-              :variant="fulfilledFavorites?.has(fav.toLowerCase()) ? 'success' : 'danger'"
-              pill
-              class="me-1 mb-1 favorite-pill"
+              :favorite="fav"
+              :fulfilled="fulfilledFavorites?.has(fav.toLowerCase()) ?? false"
               data-testid="fave-badge"
-              role="button"
-              tabindex="0"
-              title="Click to view items that fulfill this favorite"
-              @click="handleFavoriteClick(fav)"
-              @keydown.enter.prevent="handleFavoriteClick(fav)"
-              @keydown.space.prevent="handleFavoriteClick(fav)"
-            >
-              {{ fulfilledFavorites?.has(fav.toLowerCase()) ? '✓' : '✗' }} {{ fav }}
-            </BBadge>
+              @click="handleFavoriteClick"
+            />
           </div>
         </BCardBody>
       </BCol>
