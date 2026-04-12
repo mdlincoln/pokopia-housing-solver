@@ -10,6 +10,7 @@ const props = defineProps<{
   favorites: string[]
   habitat?: string
   checked?: boolean
+  fulfilledFavorites?: Set<string>
 }>()
 
 const emit = defineEmits<{
@@ -60,6 +61,7 @@ const habitatVariant = computed(() =>
             <BBadge
               v-for="fav in favorites"
               :key="fav"
+              :variant="fulfilledFavorites?.has(fav.toLowerCase()) ? 'success' : undefined"
               pill
               class="me-1 mb-1 favorite-pill"
               data-testid="fave-badge"

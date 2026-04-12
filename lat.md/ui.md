@@ -140,6 +140,10 @@ House recommendations use all favorites from pokemon assigned to that house (not
 
 Each recommended item has a small `+` button (`data-testid="add-to-cart"`) that calls `cartStore.addItem(houseId, itemName)` to add it to the shopping cart for that house. The same `+` button appears on each item row in the favorite items modal in HomeView, passing the originating house ID.
 
+`HouseRecord` passes a `fulfilledFavorites` prop (a `Set<string>` of lowercased favorite names) to each `PokemonCard`. This set is computed by watching `houseCartItems` and calling `favoritesForItem` for each cart item. `PokemonCard` renders each favorite badge with `variant="success"` if that favorite (lowercased) is in the set, and the default variant otherwise.
+
+A tag fulfillment row (`data-testid="tag-fulfillment-status"`) is rendered below the pokemon cards, above the recommended items. It always shows three `BBadge` pills for "Relaxation", "Toy", and "Decoration". Each uses `variant="success"` once at least one cart item with that tag has been added to the house, and `variant="secondary"` otherwise. The fulfilled tags set is computed inline from `houseCartItems` using the `tag` field already present on `CartItem`.
+
 Below the recommended items, a "Shopping list" section (`data-testid="house-cart-items"`) appears when the house has cart items. Each item shows a progress checkbox (`data-testid="progress-checkbox-cart-item"`), thumbnail, quantity, and name. Checking an item applies `checked-off` opacity/grayscale and `text-decoration-line-through` on the name. The same checkbox state is shared with the sidebar via the progress store.
 
 ### Item Metadata Display
@@ -168,7 +172,7 @@ Verifies that clicking a shared-favorite badge and opening the modal shows `item
 
 Test selectors use `data-testid` attributes so tests do not depend on Bootstrap CSS classes.
 
-Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, `favorite-item-related-favorite-pill`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-name`, `item-craftable-badge`, `item-category-badge`, `progress-checkbox-house`, `progress-checkbox-pokemon`, `progress-checkbox-cart-item`, `cart-house-group`, `house-cart-items`, and `house-cart-item`.
+Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, `favorite-item-related-favorite-pill`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-name`, `item-craftable-badge`, `item-category-badge`, `item-tag-badge`, `progress-checkbox-house`, `progress-checkbox-pokemon`, `progress-checkbox-cart-item`, `cart-house-group`, `house-cart-items`, `house-cart-item`, `tag-fulfillment-status`, `tag-status-relaxation`, `tag-status-toy`, and `tag-status-decoration`.
 
 ## ShoppingCart
 

@@ -2,7 +2,12 @@
 import { assetPath } from '@/assetPath'
 import PokemonCard from '@/components/PokemonCard.vue'
 import { HABITAT_VARIANT } from '@/habitats'
-import { clusterTaggedItemsForHouse, type ItemCluster, type ItemDetails } from '@/items'
+import {
+  clusterTaggedItemsForHouse,
+  favoritesForItem,
+  type ItemCluster,
+  type ItemDetails,
+} from '@/items'
 import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
@@ -83,6 +88,33 @@ const sharedHabitats = computed(() => {
 })
 
 const houseCartItems = computed(() => cartStore.itemsByHouse.get(props.house.houseId) ?? [])
+
+const ITEM_TAGS = ['Relaxation', 'Toy', 'Decoration'] as const
+
+const fulfilledTags = computed(
+  () =>
+    new Set(
+      houseCartItems.value
+        .map((item) => item.tag)
+        .filter((t): t is string => !!t)
+        .map((t) => t.toLowerCase()),
+    ),
+)
+
+const fulfilledFavorites = ref<Set<string>>(new Set())
+
+watch(
+  houseCartItems,
+  async (items) => {
+    if (items.length === 0) {
+      fulfilledFavorites.value = new Set()
+      return
+    }
+    const allFavs = await Promise.all(items.map((item) => favoritesForItem(item.name)))
+    fulfilledFavorites.value = new Set(allFavs.flat().map((f) => f.toLowerCase()))
+  },
+  { deep: true, immediate: true },
+)
 
 interface FlatRow {
   favorites: string
@@ -165,11 +197,24 @@ const flatRows = computed<FlatRow[]>(() => {
         :favorites="pokemonData[name]!.favorites"
         :habitat="pokemonData[name]?.habitat"
         :checked="pinStore.isPokemonPinned(house.houseId, name)"
+        :fulfilled-favorites="fulfilledFavorites"
         @favorite-clicked="handleFavoriteClick"
         @toggle="pinStore.togglePokemonPin(house.houseId, name)"
       />
     </BCardGroup>
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
+
+    <div class="mt-2 d-flex gap-2" data-testid="tag-fulfillment-status">
+      <BBadge
+        v-for="tag in ITEM_TAGS"
+        :key="tag"
+        :variant="fulfilledTags.has(tag.toLowerCase()) ? 'success' : 'secondary'"
+        pill
+        :data-testid="`tag-status-${tag.toLowerCase()}`"
+      >
+        {{ tag }}
+      </BBadge>
+    </div>
 
     <details
       v-if="recommendedItems.length"
