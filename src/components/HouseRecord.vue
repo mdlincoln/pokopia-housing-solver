@@ -173,7 +173,7 @@ const flatRows = computed<FlatRow[]>(() => {
         <BBadge
           v-for="item in sharedFavorites"
           :key="item.favorite"
-          variant="info"
+          :variant="fulfilledFavorites.has(item.favorite.toLowerCase()) ? 'success' : 'danger'"
           pill
           class="me-1 favorite-pill"
           role="button"
@@ -183,6 +183,7 @@ const flatRows = computed<FlatRow[]>(() => {
           @keydown.enter.prevent="handleFavoriteClick(item.favorite)"
           @keydown.space.prevent="handleFavoriteClick(item.favorite)"
         >
+          {{ fulfilledFavorites.has(item.favorite.toLowerCase()) ? '✓' : '✗' }}
           {{ item.favorite }} &times;{{ item.count }}
         </BBadge>
       </span>
@@ -208,11 +209,11 @@ const flatRows = computed<FlatRow[]>(() => {
       <BBadge
         v-for="tag in ITEM_TAGS"
         :key="tag"
-        :variant="fulfilledTags.has(tag.toLowerCase()) ? 'success' : 'secondary'"
+        :variant="fulfilledTags.has(tag.toLowerCase()) ? 'success' : 'danger'"
         pill
         :data-testid="`tag-status-${tag.toLowerCase()}`"
       >
-        {{ tag }}
+        {{ fulfilledTags.has(tag.toLowerCase()) ? '✓' : '✗' }} {{ tag }}
       </BBadge>
     </div>
 

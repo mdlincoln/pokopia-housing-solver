@@ -103,7 +103,7 @@ describe('PokemonCard', () => {
     expect(wrapper.emitted('favoriteClicked')).toEqual([['Exercise']])
   })
 
-  it('favorite badges have no success variant when fulfilledFavorites is not provided', () => {
+  it('favorite badges are danger when fulfilledFavorites is not provided', () => {
     const wrapper = mount(PokemonCard, {
       props: {
         name: 'TestMon',
@@ -115,11 +115,12 @@ describe('PokemonCard', () => {
     const badges = wrapper.findAll('[data-testid="fave-badge"]')
     expect(badges).toHaveLength(2)
     for (const badge of badges) {
+      expect(badge.classes()).toContain('text-bg-danger')
       expect(badge.classes()).not.toContain('text-bg-success')
     }
   })
 
-  it('fulfilled favorite badge turns success; unfulfilled badge stays default', () => {
+  it('fulfilled favorite badge turns success; unfulfilled badge stays danger', () => {
     const wrapper = mount(PokemonCard, {
       props: {
         name: 'TestMon',
@@ -131,9 +132,10 @@ describe('PokemonCard', () => {
 
     const badges = wrapper.findAll('[data-testid="fave-badge"]')
     expect(badges).toHaveLength(2)
-    const exerciseBadge = badges.find((b) => b.text() === 'Exercise')!
-    const cleanlinessBadge = badges.find((b) => b.text() === 'Cleanliness')!
+    const exerciseBadge = badges.find((b) => b.text().includes('Exercise'))!
+    const cleanlinessBadge = badges.find((b) => b.text().includes('Cleanliness'))!
     expect(exerciseBadge.classes()).toContain('text-bg-success')
+    expect(cleanlinessBadge.classes()).toContain('text-bg-danger')
     expect(cleanlinessBadge.classes()).not.toContain('text-bg-success')
   })
 

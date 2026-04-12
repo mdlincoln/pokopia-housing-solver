@@ -418,7 +418,7 @@ describe('HouseRecord', () => {
     expect(wrapper.find('[data-testid="tag-status-decoration"]').exists()).toBe(true)
   })
 
-  it('tag badges are secondary before any cart items are added', () => {
+  it('tag badges are danger before any cart items are added', () => {
     const house: HouseAssignment = {
       houseId: 'S1',
       size: 'small',
@@ -432,7 +432,7 @@ describe('HouseRecord', () => {
 
     for (const tag of ['relaxation', 'toy', 'decoration']) {
       const badge = wrapper.find(`[data-testid="tag-status-${tag}"]`)
-      expect(badge.classes()).toContain('text-bg-secondary')
+      expect(badge.classes()).toContain('text-bg-danger')
       expect(badge.classes()).not.toContain('text-bg-success')
     }
   })
@@ -457,9 +457,9 @@ describe('HouseRecord', () => {
     expect(tagBadge.exists()).toBe(true)
     const tagText = tagBadge.text().toLowerCase()
 
-    // Confirm that tag status badge starts as secondary
+    // Confirm that tag status badge starts as danger
     const statusBadge = wrapper.find(`[data-testid="tag-status-${tagText}"]`)
-    expect(statusBadge.classes()).toContain('text-bg-secondary')
+    expect(statusBadge.classes()).toContain('text-bg-danger')
 
     // Add the item to cart — get its name from the recommended list
     const itemName = wrapper.find('[data-testid="item-name"]').text()
@@ -468,7 +468,7 @@ describe('HouseRecord', () => {
     await flushPromises()
 
     expect(statusBadge.classes()).toContain('text-bg-success')
-    expect(statusBadge.classes()).not.toContain('text-bg-secondary')
+    expect(statusBadge.classes()).not.toContain('text-bg-danger')
   })
 
   it('fulfilled favorite badges turn success after adding a covering cart item', async () => {
@@ -485,9 +485,10 @@ describe('HouseRecord', () => {
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
 
-    // Before adding any cart items, the Exercise badge should not be success
+    // Before adding any cart items, the Exercise badge should be danger (unfulfilled)
     const favBadge = wrapper.find('[data-testid="fave-badge"]')
-    expect(favBadge.text()).toBe('Exercise')
+    expect(favBadge.text()).toContain('Exercise')
+    expect(favBadge.classes()).toContain('text-bg-danger')
     expect(favBadge.classes()).not.toContain('text-bg-success')
 
     // Add an Exercise item to the cart

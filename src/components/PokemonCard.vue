@@ -61,7 +61,7 @@ const habitatVariant = computed(() =>
             <BBadge
               v-for="fav in favorites"
               :key="fav"
-              :variant="fulfilledFavorites?.has(fav.toLowerCase()) ? 'success' : undefined"
+              :variant="fulfilledFavorites?.has(fav.toLowerCase()) ? 'success' : 'danger'"
               pill
               class="me-1 mb-1 favorite-pill"
               data-testid="fave-badge"
@@ -72,7 +72,7 @@ const habitatVariant = computed(() =>
               @keydown.enter.prevent="handleFavoriteClick(fav)"
               @keydown.space.prevent="handleFavoriteClick(fav)"
             >
-              {{ fav }}
+              {{ fulfilledFavorites?.has(fav.toLowerCase()) ? '✓' : '✗' }} {{ fav }}
             </BBadge>
           </div>
         </BCardBody>
