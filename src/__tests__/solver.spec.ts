@@ -11,6 +11,7 @@ import {
   type HouseWithId,
   type HousingConfig,
   type PokemonData,
+  type SolverResult,
 } from '../solver'
 
 // Helper to convert matrix to AdjacencyMap
