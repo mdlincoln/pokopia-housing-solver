@@ -89,6 +89,8 @@ const sharedHabitats = computed(() => {
 
 const houseCartItems = computed(() => cartStore.itemsByHouse.get(props.house.houseId) ?? [])
 
+const houseCartItemNames = computed(() => new Set(houseCartItems.value.map((item) => item.name)))
+
 const ITEM_TAGS = ['Relaxation', 'Toy', 'Decoration'] as const
 
 const fulfilledTags = computed(
@@ -229,6 +231,7 @@ const flatRows = computed<FlatRow[]>(() => {
             <BTh>Favorites</BTh>
             <BTh></BTh>
             <BTh></BTh>
+            <BTh></BTh>
             <BTh>Item</BTh>
             <BTh>Craft</BTh>
             <BTh>Category</BTh>
@@ -258,6 +261,9 @@ const flatRows = computed<FlatRow[]>(() => {
                 @click="cartStore.addItem(house.houseId, row.item.name)"
                 >+</BButton
               >
+            </BTd>
+            <BTd class="text-success fw-bold" data-testid="item-in-cart-check">
+              {{ houseCartItemNames.has(row.item.name) ? '✓' : '' }}
             </BTd>
             <BTd class="ps-0">
               <img

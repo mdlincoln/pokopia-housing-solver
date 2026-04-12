@@ -500,6 +500,41 @@ describe('HouseRecord', () => {
     expect(favBadge.classes()).toContain('text-bg-success')
   })
 
+  it('recommended item row shows checkmark when item is in cart, clears when removed', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+
+    const itemName = wrapper.find('[data-testid="item-name"]').text()
+    const cartStore = useCartStore()
+
+    // Before adding: no checkmark
+    const checkCells = wrapper.findAll('[data-testid="item-in-cart-check"]')
+    const targetCell = checkCells.find(
+      (_, i) => wrapper.findAll('[data-testid="item-name"]')[i]?.text() === itemName,
+    )!
+    expect(targetCell.text().trim()).toBe('')
+
+    // After adding: checkmark appears
+    await cartStore.addItem('S1', itemName)
+    await flushPromises()
+    expect(targetCell.text().trim()).toBe('✓')
+
+    // After removing: checkmark clears
+    cartStore.removeItem('S1', itemName)
+    await flushPromises()
+    expect(targetCell.text().trim()).toBe('')
+  })
+
   it('fulfilled favorites do not bleed across houses', async () => {
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['Exercise'] },
