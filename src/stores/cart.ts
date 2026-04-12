@@ -16,6 +16,7 @@ interface CartEntry {
   isCraftable: boolean
   category: string | null
   flavorText: string | null
+  tag: string | null
 }
 
 export interface CartItem {
@@ -27,6 +28,7 @@ export interface CartItem {
   isCraftable: boolean
   category: string | null
   flavorText: string | null
+  tag: string | null
 }
 
 function cartKey(houseId: string, name: string) {
@@ -53,6 +55,7 @@ export const useCartStore = defineStore('cart', () => {
       isCraftable: entry.isCraftable,
       category: entry.category,
       flavorText: entry.flavorText,
+      tag: entry.tag,
     })),
   )
 
@@ -94,6 +97,7 @@ export const useCartStore = defineStore('cart', () => {
         isCraftable: metadata.isCraftable,
         category: metadata.category,
         flavorText: metadata.flavorText,
+        tag: metadata.tag,
       })
       if (!recipes.value.has(name)) {
         recipes.value.set(name, await getRecipeForItem(name))
@@ -133,6 +137,7 @@ export const useCartStore = defineStore('cart', () => {
         isCraftable: metadata.isCraftable,
         category: metadata.category,
         flavorText: metadata.flavorText,
+        tag: metadata.tag,
       })
       recipes.value.set(name, recipe)
     }

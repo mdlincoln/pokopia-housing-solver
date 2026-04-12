@@ -7,6 +7,7 @@ export interface ItemDetails {
   category: string | null
   flavorText: string | null
   picturePath: string | null
+  tag: string | null
 }
 
 // @lat: [[items#itemsForFavorite]]
@@ -14,13 +15,13 @@ export async function itemsForFavorite(favorite: string): Promise<ItemDetails[]>
   const db = await getDb()
   const normalized = favorite.toLowerCase()
   const rows = db.exec(
-    `SELECT i.name, i.category, i.flavor_text, i.picture_path,
+    `SELECT i.name, i.category, i.flavor_text, i.picture_path, i.tag,
             CASE WHEN COUNT(r.ingredient_id) > 0 THEN 1 ELSE 0 END AS is_craftable
      FROM items i
      JOIN item_favorites IF ON i.id = IF.item_id
      LEFT JOIN item_recipe r ON r.item_id = i.id
      WHERE IF.favorite_name = ?
-     GROUP BY i.id, i.name, i.category, i.flavor_text, i.picture_path`,
+     GROUP BY i.id, i.name, i.category, i.flavor_text, i.picture_path, i.tag`,
     [normalized],
   )[0]
   if (!rows) return []
@@ -29,16 +30,20 @@ export async function itemsForFavorite(favorite: string): Promise<ItemDetails[]>
     category: (row[1] as string | null) ?? null,
     flavorText: (row[2] as string | null) ?? null,
     picturePath: (row[3] as string | null) ?? null,
-    isCraftable: (row[4] as number) === 1,
+    tag: (row[4] as string | null) ?? null,
+    isCraftable: (row[5] as number) === 1,
   }))
 }
 
-export async function getItemMetadata(
-  itemName: string,
-): Promise<{ isCraftable: boolean; category: string | null; flavorText: string | null }> {
+export async function getItemMetadata(itemName: string): Promise<{
+  isCraftable: boolean
+  category: string | null
+  flavorText: string | null
+  tag: string | null
+}> {
   const db = await getDb()
   const rows = db.exec(
-    `SELECT i.category, i.flavor_text,
+    `SELECT i.category, i.flavor_text, i.tag,
             CASE WHEN COUNT(r.ingredient_id) > 0 THEN 1 ELSE 0 END AS is_craftable
      FROM items i
      LEFT JOIN item_recipe r ON r.item_id = i.id
@@ -47,12 +52,13 @@ export async function getItemMetadata(
     [itemName.toLowerCase()],
   )[0]
   if (!rows || rows.values.length === 0)
-    return { isCraftable: false, category: null, flavorText: null }
+    return { isCraftable: false, category: null, flavorText: null, tag: null }
   const row = rows.values[0]!
   return {
     category: (row[0] as string | null) ?? null,
     flavorText: (row[1] as string | null) ?? null,
-    isCraftable: (row[2] as number) === 1,
+    tag: (row[2] as string | null) ?? null,
+    isCraftable: (row[3] as number) === 1,
   }
 }
 

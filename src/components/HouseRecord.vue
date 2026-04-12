@@ -192,6 +192,7 @@ const flatRows = computed<FlatRow[]>(() => {
             <BTh>Item</BTh>
             <BTh>Craft</BTh>
             <BTh>Category</BTh>
+            <BTh>Tag</BTh>
           </BTr>
         </BThead>
         <BTbody>
@@ -245,6 +246,11 @@ const flatRows = computed<FlatRow[]>(() => {
                 data-testid="item-category-badge"
                 >{{ row.item.category }}</BBadge
               >
+            </BTd>
+            <BTd>
+              <BBadge v-if="row.item.tag" variant="info" pill data-testid="item-tag-badge">{{
+                row.item.tag
+              }}</BBadge>
             </BTd>
           </BTr>
         </BTbody>

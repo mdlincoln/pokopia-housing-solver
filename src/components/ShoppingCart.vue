@@ -91,6 +91,9 @@ const progressStore = useProgressStore()
                       data-testid="item-category-badge"
                       >{{ item.category }}</BBadge
                     >
+                    <BBadge v-if="item.tag" variant="info" pill data-testid="item-tag-badge">{{
+                      item.tag
+                    }}</BBadge>
                   </div>
                 </div>
                 <div class="d-flex align-items-center gap-1 cart-controls">

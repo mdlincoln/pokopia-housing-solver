@@ -193,6 +193,7 @@ describe('HomeView', () => {
       isCraftable: true,
       category: 'Outdoor',
       flavorText: null,
+      tag: null,
     })
 
     wrapper.vm.small = 1

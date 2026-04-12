@@ -33,7 +33,14 @@ function scoreOf(results: ItemScore[], item: string): number | undefined {
 }
 
 function makeItem(name: string): ItemDetails {
-  return { name, isCraftable: false, category: null, flavorText: null, picturePath: null }
+  return {
+    name,
+    isCraftable: false,
+    category: null,
+    flavorText: null,
+    picturePath: null,
+    tag: null,
+  }
 }
 
 function itemNames(items: ItemDetails[]): string[] {

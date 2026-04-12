@@ -4,9 +4,15 @@ Functions about Pokopia items that can be used to fulfil Pokemon favorites when 
 
 ## Database schema
 
-The `items` table has columns for id, name, category, picture_path, flavor_text, and tag (nullable). See [[scripts/build-sqlite.js]] for the full schema definition.
+The `items` table has columns for id, name, category, picture_path, flavor_text, and tag (nullable).
 
 The `tag` field contains Pokopia item tags (e.g., "Relaxation", "Toy", "Decoration") scraped from serebii.net via [[scripts/scrape-item-tags.js]].
+
+## ItemDetails
+
+The `ItemDetails` interface includes `name`, `isCraftable`, `category`, `flavorText`, `picturePath`, and `tag` (nullable). The `tag` field is displayed as an info-variant pill badge in all item displays.
+
+Tag pills appear in the recommended items table ([[ui#House]]) and in shopping cart item rows ([[ui#ShoppingCart]]).
 
 ## idealItems
 
