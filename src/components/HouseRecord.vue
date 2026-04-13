@@ -31,7 +31,7 @@ function toggleHousePin() {
 }
 
 const sharedFavorites = computed(() => {
-  if (props.house.pokemon.length < 2) return []
+  if (props.house.pokemon.length < 1) return []
   const sets = props.house.pokemon.map((name) => new Set(props.pokemonData[name]?.favorites ?? []))
   return rankHouseFavorites(sets)
 })
@@ -52,7 +52,7 @@ watch(
 )
 
 const sharedHabitats = computed(() => {
-  if (props.house.pokemon.length < 2) return []
+  if (props.house.pokemon.length < 1) return []
   const habitatCounts = new Map<string, number>()
   for (const name of props.house.pokemon) {
     const habitat = props.pokemonData[name]?.habitat
@@ -61,7 +61,7 @@ const sharedHabitats = computed(() => {
     }
   }
   return Array.from(habitatCounts.entries())
-    .filter(([, count]) => count >= 2)
+    .filter(([, count]) => count >= 1)
     .map(([habitat, count]) => ({
       habitat,
       count,

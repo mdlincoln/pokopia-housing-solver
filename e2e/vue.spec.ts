@@ -624,6 +624,6 @@ test.describe('Pinning', () => {
 
     // The small house input should have min=1 now
     const smallInput = page.locator('#house-small')
-    await expect(smallInput).toHaveAttribute('min', '1')
+    await expect(smallInput).toHaveAttribute('aria-valuemin', '1')
   })
 })

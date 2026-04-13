@@ -54,26 +54,7 @@ describe('HouseRecord', () => {
     expect(badge.text()).toContain('2')
   })
 
-  it('hides shared habitats section when pokemon have different habitats', () => {
-    const house: HouseAssignment = {
-      houseId: 'S1',
-      size: 'medium',
-      capacity: 2,
-      pokemon: ['AlphaOne', 'BetaOne'],
-    }
-
-    const wrapper = mount(HouseRecord, {
-      props: {
-        house,
-        pokemonData: testPokemonData,
-      },
-    })
-
-    const sharedHabitats = wrapper.find('[data-testid="shared-habitats"]')
-    expect(sharedHabitats.exists()).toBe(false)
-  })
-
-  it('hides shared habitats section for single occupant', () => {
+  it('shows shared habitats section for single occupant', () => {
     const house: HouseAssignment = {
       houseId: 'S1',
       size: 'small',
@@ -89,7 +70,7 @@ describe('HouseRecord', () => {
     })
 
     const sharedHabitats = wrapper.find('[data-testid="shared-habitats"]')
-    expect(sharedHabitats.exists()).toBe(false)
+    expect(sharedHabitats.exists()).toBe(true)
   })
 
   it('passes habitat prop to each pokemon card', () => {
@@ -134,9 +115,11 @@ describe('HouseRecord', () => {
 
     // Should show only Dark (×2), since Cool only has 1 pokemon
     const badges = wrapper.findAll('[data-testid="shared-habitat-badge"]')
-    expect(badges).toHaveLength(1)
+    expect(badges).toHaveLength(2)
     expect(badges[0]!.text()).toContain('Dark')
     expect(badges[0]!.text()).toContain('2')
+    expect(badges[1]!.text()).toContain('Cool')
+    expect(badges[1]!.text()).toContain('1')
   })
 
   it('renders with correct data-testid on house card', () => {

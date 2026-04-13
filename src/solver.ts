@@ -369,7 +369,7 @@ export function rankHouseFavorites(
     }
   }
   return Array.from(freq.entries())
-    .filter(([, count]) => count >= 2)
+    .filter(([, count]) => count >= 1)
     .map(([favorite, count]) => ({ favorite, count }))
     .sort((a, b) => b.count - a.count)
 }
