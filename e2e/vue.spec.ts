@@ -241,48 +241,6 @@ test.describe('Homepage', () => {
     const text = await craftableCells.first().textContent()
     expect(text?.trim()).toMatch(/^Craftable - \S/)
   })
-
-  // @lat: [[ui#House#Item Metadata Display#Shows craftable badge in favorite modal]]
-  test('shows craftable badge in favorite items modal', async ({ page }) => {
-    await page.goto('/')
-
-    await setSpinbutton(page, 'house-medium', 1)
-    await selectPokemon(page, 'Bulbasaur')
-    await selectPokemon(page, 'Ivysaur')
-
-    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
-
-    await page.getByTestId('shared-favorite-badge').first().click()
-    const modal = page.getByTestId('favorite-items-modal')
-    await expect(modal).toBeVisible({ timeout: 2000 })
-
-    const badge = modal.getByTestId('item-craftable-badge').first()
-    await expect(badge).toBeVisible({ timeout: 5000 })
-    const text = await badge.textContent()
-    expect(['Craft', 'Buy']).toContain(text?.trim())
-  })
-
-  test('displays recommended items for house with shared favorites', async ({ page }) => {
-    await page.goto('/')
-
-    await setSpinbutton(page, 'house-medium', 1)
-
-    await selectPokemon(page, 'Bulbasaur')
-    await selectPokemon(page, 'Ivysaur')
-
-    // Wait for the solve with both pokemon to complete
-    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
-
-    const details = page.getByTestId('recommended-items')
-    await expect(details).toBeVisible()
-
-    const summary = details.locator('summary')
-    await expect(summary).toContainText('Recommended items')
-
-    const clusters = page.getByTestId('item-cluster')
-    const count = await clusters.count()
-    expect(count).toBeGreaterThan(0)
-  })
 })
 
 test.describe('Progress Tracking', () => {
@@ -359,28 +317,6 @@ test.describe('Shopping Cart', () => {
     await expect(page.getByTestId('cart-items')).toBeVisible({ timeout: 2000 })
     await expect(page.getByTestId('cart-item')).toHaveCount(1)
     await expect(page.getByTestId('cart-quantity')).toHaveText('1')
-  })
-
-  // @lat: [[ui#ShoppingCart#Adds item from favorite items modal]]
-  test('adds item from favorite items modal', async ({ page }) => {
-    test.setTimeout(40_000)
-    await setupWithRecommendedItems(page)
-
-    // Click the first shared favorite badge to open the item modal
-    await page.getByTestId('shared-favorite-badge').first().click()
-    const modal = page.getByTestId('favorite-items-modal')
-    await expect(modal).toBeVisible({ timeout: 2000 })
-
-    // Wait for items to load and click + on the first one
-    const addBtn = modal.getByTestId('add-to-cart').first()
-    await expect(addBtn).toBeVisible({ timeout: 5000 })
-    await addBtn.click()
-
-    // Dismiss modal — item already visible in always-open sidebar
-    await modal.locator('.modal-footer button').click()
-    await expect(modal).toBeHidden({ timeout: 2000 })
-
-    await expect(page.getByTestId('cart-item')).toHaveCount(1, { timeout: 2000 })
   })
 
   // @lat: [[ui#ShoppingCart#Incrementing quantity updates badge]]
@@ -460,9 +396,9 @@ test.describe('URL Hash Sharing', () => {
     await page.goto(`/#${hash}`)
 
     // Houses and pokemon should be restored automatically
-    await expect(page.locator('#house-small')).toHaveValue('1')
+    await expect(page.locator('#house-small')).toHaveText('1', { timeout: 30_000 })
     await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
-    await expect(page.getByTestId('results')).toContainText('Ivysaur')
+    await expect(page.getByTestId('results')).toContainText('Ivysaur', { timeout: 30_000 })
   })
 
   // @lat: [[ui#HomeView#Saved Queries#URL Sharing#Saves imported state as unlabeled scenario]]

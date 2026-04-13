@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import { assetPath } from '@/assetPath'
-import FavoriteBadge from '@/components/FavoriteBadge.vue'
 import HouseRecord from '@/components/HouseRecord.vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
-import { favoritesForItem, itemsForFavorite } from '@/items'
 import { loadAdjacencyMap, loadPokemonData } from '@/queries'
 import { solve, type AdjacencyMap, type PokemonData, type SolverResult } from '@/solver'
 import { useCartStore } from '@/stores/cart'
@@ -12,25 +9,18 @@ import { usePinStore } from '@/stores/pins'
 import { useProgressStore } from '@/stores/progress'
 import {
   BAlert,
-  BBadge,
   BButton,
   BCard,
   BCardBody,
   BCol,
   BFormGroup,
   BFormInput,
-  BFormSpinbutton,
   BFormSelect,
+  BFormSpinbutton,
   BListGroup,
   BModal,
   BRow,
   BSpinner,
-  BTableSimple,
-  BTbody,
-  BTd,
-  BTh,
-  BThead,
-  BTr,
 } from 'bootstrap-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 
@@ -135,46 +125,7 @@ const selectedTimestamp = ref<number | null>(null)
 const queryTitle = ref('')
 const showSaveModal = ref(false)
 const saveSuccess = ref(false)
-const selectedFavorite = ref('')
-const selectedFavoriteHouseId = ref('')
-const showFavoriteItemsModal = ref(false)
 
-const selectedFavoriteItems = ref<string[]>([])
-const selectedFavoriteItemRows = ref<
-  {
-    item: string
-    picturePath: string | null
-    otherFavorites: string[]
-    isCraftable: boolean
-    category: string | null
-    flavorText: string | null
-    tag: string | null
-  }[]
->([])
-
-watch(selectedFavorite, async (favorite) => {
-  if (!favorite) {
-    selectedFavoriteItems.value = []
-    selectedFavoriteItemRows.value = []
-    return
-  }
-  const items = await itemsForFavorite(favorite)
-  selectedFavoriteItems.value = items.map((d) => d.name)
-  const lower = favorite.toLowerCase()
-  selectedFavoriteItemRows.value = await Promise.all(
-    items.map(async (detail) => ({
-      item: detail.name,
-      picturePath: detail.picturePath,
-      isCraftable: detail.isCraftable,
-      category: detail.category,
-      flavorText: detail.flavorText,
-      tag: detail.tag,
-      otherFavorites: (await favoritesForItem(detail.name)).filter(
-        (f) => f.toLowerCase() !== lower,
-      ),
-    })),
-  )
-})
 function openSaveModal() {
   queryTitle.value = ''
   showSaveModal.value = true
@@ -204,12 +155,6 @@ function confirmSave() {
   setTimeout(() => {
     saveSuccess.value = false
   }, 3000)
-}
-
-function openFavoriteItemsModal(favorite: string, houseId: string) {
-  selectedFavorite.value = favorite
-  selectedFavoriteHouseId.value = houseId
-  showFavoriteItemsModal.value = true
 }
 
 async function restoreState(query: SharedState) {
@@ -366,10 +311,6 @@ defineExpose({
   queryTitle,
   confirmSave,
   selectedTimestamp,
-  selectedFavorite,
-  selectedFavoriteItems,
-  selectedFavoriteItemRows,
-  showFavoriteItemsModal,
 })
 </script>
 
@@ -381,17 +322,17 @@ defineExpose({
         <BRow class="g-3">
           <BCol sm="4">
             <BFormGroup label="Small (1 slot)" label-for="house-small">
-              <BFormSpinbutton id="house-small" v-model="small" min="0" />
+              <BFormSpinbutton id="house-small" v-model="small" :min="minSmall" />
             </BFormGroup>
           </BCol>
           <BCol sm="4">
             <BFormGroup label="Medium (2 slots)" label-for="house-medium">
-              <BFormSpinbutton id="house-medium" v-model="medium" min="0" />
+              <BFormSpinbutton id="house-medium" v-model="medium" :min="minMedium" />
             </BFormGroup>
           </BCol>
           <BCol sm="4">
             <BFormGroup label="Large (4 slots)" label-for="house-large">
-              <BFormSpinbutton id="house-large" v-model="large" min="0" />
+              <BFormSpinbutton id="house-large" v-model="large" :min="minLarge" />
             </BFormGroup>
           </BCol>
         </BRow>
@@ -504,97 +445,7 @@ defineExpose({
         :key="house.houseId"
         :house="house"
         :pokemon-data="pokemonData!"
-        @favorite-clicked="openFavoriteItemsModal"
       />
     </BListGroup>
   </section>
-
-  <BModal
-    v-model="showFavoriteItemsModal"
-    :title="`Items for ${selectedFavorite}`"
-    ok-only
-    ok-title="Close"
-    ok-variant="primary"
-    data-testid="favorite-items-modal"
-  >
-    <BTableSimple
-      v-if="selectedFavoriteItems.length"
-      small
-      borderless
-      class="mb-0"
-      data-testid="favorite-items-list"
-    >
-      <BThead>
-        <BTr>
-          <BTh></BTh>
-          <BTh></BTh>
-          <BTh>Item</BTh>
-          <BTh>Craft</BTh>
-          <BTh>Category</BTh>
-          <BTh>Tag</BTh>
-          <BTh>Also fulfills</BTh>
-        </BTr>
-      </BThead>
-      <BTbody>
-        <BTr v-for="row in selectedFavoriteItemRows" :key="row.item">
-          <BTd>
-            <BButton
-              size="sm"
-              variant="outline-success"
-              class="cart-add-btn"
-              data-testid="add-to-cart"
-              @click="cartStore.addItem(selectedFavoriteHouseId, row.item)"
-              >+</BButton
-            >
-          </BTd>
-          <BTd class="ps-0">
-            <img
-              v-if="row.picturePath"
-              :src="assetPath(row.picturePath)"
-              :alt="row.item"
-              class="item-thumbnail"
-            />
-          </BTd>
-          <BTd :title="row.flavorText ?? undefined" data-testid="item-name">{{ row.item }}</BTd>
-          <BTd>
-            <BBadge
-              :variant="row.isCraftable ? 'success' : 'secondary'"
-              pill
-              data-testid="item-craftable-badge"
-              >{{ row.isCraftable ? 'Craft' : 'Buy' }}</BBadge
-            >
-          </BTd>
-          <BTd>
-            <BBadge v-if="row.category" variant="warning" pill data-testid="item-category-badge">{{
-              row.category
-            }}</BBadge>
-          </BTd>
-          <BTd>
-            <BBadge v-if="row.tag" variant="info" pill data-testid="item-tag-badge">{{
-              row.tag
-            }}</BBadge>
-          </BTd>
-          <BTd>
-            <span
-              v-if="row.otherFavorites.length"
-              class="d-inline-flex gap-1 flex-wrap"
-              data-testid="favorite-item-related-favorites"
-            >
-              <FavoriteBadge
-                v-for="favorite in row.otherFavorites"
-                :key="`${row.item}-${favorite}`"
-                :favorite="favorite"
-                informational
-                data-testid="favorite-item-related-favorite-pill"
-                @click="openFavoriteItemsModal(favorite, selectedFavoriteHouseId)"
-              />
-            </span>
-          </BTd>
-        </BTr>
-      </BTbody>
-    </BTableSimple>
-    <p v-else class="text-muted mb-0" data-testid="favorite-items-empty">
-      No items found for this favorite.
-    </p>
-  </BModal>
 </template>

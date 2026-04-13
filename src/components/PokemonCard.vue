@@ -19,10 +19,6 @@ const emit = defineEmits<{
   toggle: []
 }>()
 
-function handleFavoriteClick(favorite: string) {
-  emit('favoriteClicked', favorite)
-}
-
 const imgURL = computed(() => assetPath(props.image))
 
 const habitatVariant = computed(() =>
@@ -65,7 +61,6 @@ const habitatVariant = computed(() =>
               :favorite="fav"
               :fulfilled="fulfilledFavorites?.has(fav.toLowerCase()) ?? false"
               data-testid="fave-badge"
-              @click="handleFavoriteClick"
             />
           </div>
         </BCardBody>

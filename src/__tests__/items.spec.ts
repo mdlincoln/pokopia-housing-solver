@@ -1,4 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
+import {
+  clusterItemsByFavorites,
+  clusterTaggedItemsForHouse,
+  favoritesForItem,
+  favoritesToItems,
+  idealItems,
+  type ItemDetails,
+  type ItemScore,
+} from '../items'
 
 vi.mock('@/db', async () => {
   const { default: initSqlJs } = await import('sql.js')
@@ -16,16 +25,6 @@ vi.mock('@/db', async () => {
     },
   }
 })
-import {
-  clusterItemsByFavorites,
-  clusterTaggedItemsForHouse,
-  favoritesForItem,
-  favoritesToItems,
-  idealItems,
-  itemsForFavorite,
-  type ItemDetails,
-  type ItemScore,
-} from '../items'
 
 function scoreOf(results: ItemScore[], item: string): number | undefined {
   return results.find((r) => r.item === item)?.score
@@ -34,48 +33,6 @@ function scoreOf(results: ItemScore[], item: string): number | undefined {
 function itemNames(items: ItemDetails[]): string[] {
   return items.map((d) => d.name)
 }
-
-describe('itemsForFavorite', () => {
-  it('returns items for a known favorite', async () => {
-    const result = await itemsForFavorite('Exercise')
-    expect(itemNames(result)).toContain('Punching Bag')
-  })
-
-  it('includes craftable status, category, and flavor text', async () => {
-    const result = await itemsForFavorite('Exercise')
-    const bag = result.find((d) => d.name === 'Punching Bag')
-    expect(bag).toBeDefined()
-    expect(bag!.isCraftable).toBe(true)
-    expect(bag!.category).toBe('Outdoor')
-    expect(bag!.flavorText).toBeTruthy()
-  })
-
-  it('includes picturePath in ItemDetails', async () => {
-    const result = await itemsForFavorite('Exercise')
-    const bag = result.find((d) => d.name === 'Punching Bag')
-    expect(bag).toBeDefined()
-    expect('picturePath' in bag!).toBe(true)
-  })
-
-  it('marks non-craftable items correctly', async () => {
-    // Shiny stuff includes non-craftable Meteor Lamps
-    const result = await itemsForFavorite('shiny stuff')
-    const lamp = result.find((d) => d.name === 'Red Meteor Lamp')
-    expect(lamp).toBeDefined()
-    expect(lamp!.isCraftable).toBe(false)
-  })
-
-  it('is case-insensitive', async () => {
-    const r1 = await itemsForFavorite('exercise')
-    const r2 = await itemsForFavorite('Exercise')
-    expect(r1).toEqual(r2)
-  })
-
-  it('returns empty list for unknown favorite', async () => {
-    const result = await itemsForFavorite('Not A Real Favorite')
-    expect(result).toEqual([])
-  })
-})
 
 describe('favoritesForItem', () => {
   it('returns all favorites fulfilled by a known item', async () => {

@@ -200,7 +200,7 @@ Adding a cart item to one house's slot does not cause another house's favorite b
 
 Test selectors use `data-testid` attributes so tests do not depend on Bootstrap CSS classes.
 
-Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, `favorite-item-related-favorite-pill`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-in-cart-check`, `item-name`, `item-craftability`, `item-craftable-badge`, `item-category-badge`, `item-tag-badge`, `progress-checkbox-house`, `progress-checkbox-pokemon`, `progress-checkbox-cart-item`, `cart-house-group`, `house-cart-items`, `house-cart-item`, `tag-fulfillment-status`, `tag-status-relaxation`, `tag-status-toy`, and `tag-status-decoration`.
+Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-in-cart-check`, `item-name`, `item-craftability`, `item-craftable-badge`, `item-category-badge`, `item-tag-badge`, `progress-checkbox-house`, `progress-checkbox-pokemon`, `progress-checkbox-cart-item`, `cart-house-group`, `house-cart-items`, `house-cart-item`, `tag-fulfillment-status`, `tag-status-relaxation`, `tag-status-toy`, and `tag-status-decoration`.
 
 ## ShoppingCart
 

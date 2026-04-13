@@ -13,8 +13,8 @@ import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/so
 import { useCartStore } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
 import { useProgressStore } from '@/stores/progress'
-import { BBadge, BButton, BCardGroup, BListGroup, BListGroupItem, BTable } from 'bootstrap-vue-next'
 import type { BTableSortBy } from 'bootstrap-vue-next'
+import { BBadge, BButton, BCardGroup, BListGroup, BListGroupItem, BTable } from 'bootstrap-vue-next'
 import { computed, ref, watch, watchEffect } from 'vue'
 
 const props = defineProps<{
@@ -25,14 +25,6 @@ const props = defineProps<{
 const cartStore = useCartStore()
 const pinStore = usePinStore()
 const progressStore = useProgressStore()
-
-const emit = defineEmits<{
-  favoriteClicked: [favorite: string, houseId: string]
-}>()
-
-function handleFavoriteClick(favorite: string) {
-  emit('favoriteClicked', favorite, props.house.houseId)
-}
 
 function toggleHousePin() {
   pinStore.toggleHousePin(props.house.houseId, props.house.pokemon)
@@ -217,7 +209,6 @@ watchEffect(() => {
           :fulfilled="fulfilledFavorites.has(item.favorite.toLowerCase())"
           :count="item.count"
           data-testid="shared-favorite-badge"
-          @click="handleFavoriteClick"
         />
       </span>
     </p>
@@ -244,7 +235,6 @@ watchEffect(() => {
         :habitat="pokemonData[name]?.habitat"
         :checked="pinStore.isPokemonPinned(house.houseId, name)"
         :fulfilled-favorites="fulfilledFavorites"
-        @favorite-clicked="handleFavoriteClick"
         @toggle="pinStore.togglePokemonPin(house.houseId, name)"
       />
     </BCardGroup>
