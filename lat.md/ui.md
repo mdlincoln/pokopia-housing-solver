@@ -154,7 +154,7 @@ Each recommended item has a small `+` button (`data-testid="add-to-cart"`) that 
 
 A tag fulfillment row (`data-testid="tag-fulfillment-status"`) is rendered below the pokemon cards, above the recommended items. It always shows three `BBadge` pills for "Relaxation", "Toy", and "Decoration". Each uses `variant="success"` with a `✓` prefix once at least one cart item with that tag has been added to the house, and `variant="danger"` with a `✗` prefix otherwise. The fulfilled tags set is computed inline from `houseCartItems` using the `tag` field already present on `CartItem`.
 
-Below the recommended items, a "Shopping list" section (`data-testid="house-cart-items"`) appears when the house has cart items. Each item shows a progress checkbox (`data-testid="progress-checkbox-cart-item"`), thumbnail, quantity, and name. Checking an item applies `checked-off` opacity/grayscale and `text-decoration-line-through` on the name. The same checkbox state is shared with the sidebar via the progress store.
+House cards still derive fulfillment state from house-scoped cart items, but they no longer render a duplicate per-house shopping list. Item quantities, progress checkboxes, and checked-off styling live only in the sidebar cart while the house card keeps the add-to-cart affordance and fulfillment summaries.
 
 ### Item Metadata Display
 
@@ -200,7 +200,7 @@ Adding a cart item to one house's slot does not cause another house's favorite b
 
 Test selectors use `data-testid` attributes so tests do not depend on Bootstrap CSS classes.
 
-Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-in-cart-check`, `item-name`, `item-craftability`, `item-craftable-badge`, `item-category-badge`, `item-tag-badge`, `progress-checkbox-house`, `progress-checkbox-pokemon`, `progress-checkbox-cart-item`, `cart-house-group`, `house-cart-items`, `house-cart-item`, `tag-fulfillment-status`, `tag-status-relaxation`, `tag-status-toy`, and `tag-status-decoration`.
+Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-in-cart-check`, `item-name`, `item-craftability`, `item-craftable-badge`, `item-category-badge`, `item-tag-badge`, `progress-checkbox-house`, `progress-checkbox-pokemon`, `progress-checkbox-cart-item`, `cart-house-group`, `tag-fulfillment-status`, `tag-status-relaxation`, `tag-status-toy`, and `tag-status-decoration`.
 
 ## ShoppingCart
 
@@ -210,7 +210,7 @@ Uses `responsive="lg"` so it renders as a sticky inline sidebar (pushing main co
 
 At lg+, Bootstrap's default `.offcanvas-lg` CSS makes the offcanvas-body a flex row and hides the offcanvas header — both are overridden in `tropical-theme.css`. The sidebar uses `display: flex; flex-direction: column` so the header is fixed at the top and the body scrolls independently (`overflow-y: auto`). The header is restored with a sky-to-mint gradient background and ocean-blue border. The panel background is a sky-to-sand gradient with a left border and soft shadow to distinguish it from the main content.
 
-Items are grouped by house (`data-testid="cart-house-group"`), with a heading showing the house ID. Each cart item has a progress checkbox (`data-testid="progress-checkbox-cart-item"`) that toggles the `.checked-off` visual treatment and `text-decoration-line-through` on the item name via the progress store. The same checkbox state is shared with the house card's shopping list section. Items also show a small picture thumbnail, the item name (with flavor text as a native `title` tooltip), craftable/buy and category badges (see [[ui#House#Item Metadata Display]]), quantity controls (− / + / ×), and a nested ingredient list. Below all house groups, aggregated totals across all items are shown as a `BListGroup`. Item and ingredient pictures are served via `assetPath()`. Items with no recipe show "(no recipe)" in muted text.
+Items are grouped by house (`data-testid="cart-house-group"`), with a heading showing the house ID. Each cart item has a progress checkbox (`data-testid="progress-checkbox-cart-item"`) that toggles the `.checked-off` visual treatment and `text-decoration-line-through` on the item name via the progress store. Items also show a small picture thumbnail, the item name (with flavor text as a native `title` tooltip), craftable/buy and category badges (see [[ui#House#Item Metadata Display]]), quantity controls (− / + / ×), and a nested ingredient list. Below all house groups, aggregated totals across all items are shown as a `BListGroup`. Item and ingredient pictures are served via `assetPath()`. Items with no recipe show "(no recipe)" in muted text.
 
 The sidebar has no toggle button or close button — it is permanently visible. Height is `100vh` so it fills the full viewport even when the cart is empty.
 

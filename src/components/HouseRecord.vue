@@ -12,9 +12,8 @@ import {
 import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
-import { useProgressStore } from '@/stores/progress'
 import type { BTableSortBy } from 'bootstrap-vue-next'
-import { BBadge, BButton, BCardGroup, BListGroup, BListGroupItem, BTable } from 'bootstrap-vue-next'
+import { BBadge, BButton, BCardGroup, BListGroupItem, BTable } from 'bootstrap-vue-next'
 import { computed, ref, watch, watchEffect } from 'vue'
 
 const props = defineProps<{
@@ -24,7 +23,6 @@ const props = defineProps<{
 
 const cartStore = useCartStore()
 const pinStore = usePinStore()
-const progressStore = useProgressStore()
 
 function toggleHousePin() {
   pinStore.toggleHousePin(props.house.houseId, props.house.pokemon)
@@ -248,7 +246,6 @@ watchEffect(() => {
       <summary>Recommended items</summary>
       <BTable
         small
-        borderless
         :fields="tableFields"
         :items="tableItems"
         v-model:sort-by="sortBy"
@@ -298,42 +295,5 @@ watchEffect(() => {
         </template>
       </BTable>
     </details>
-
-    <div v-if="houseCartItems.length" class="mt-3" data-testid="house-cart-items">
-      <h6 class="text-muted small mb-2">Shopping list</h6>
-      <BListGroup flush>
-        <BListGroupItem
-          v-for="item in houseCartItems"
-          :key="item.name"
-          class="d-flex align-items-center gap-2 py-1 px-0"
-          :class="{ 'checked-off': progressStore.isCartItemChecked(house.houseId, item.name) }"
-          data-testid="house-cart-item"
-        >
-          <input
-            type="checkbox"
-            :checked="progressStore.isCartItemChecked(house.houseId, item.name)"
-            class="form-check-input"
-            data-testid="progress-checkbox-cart-item"
-            @change="progressStore.toggleCartItem(house.houseId, item.name)"
-          />
-          <img
-            v-if="item.picturePath"
-            :src="assetPath(item.picturePath)"
-            :alt="item.name"
-            class="item-thumbnail"
-          />
-          <span
-            :class="{
-              'text-decoration-line-through': progressStore.isCartItemChecked(
-                house.houseId,
-                item.name,
-              ),
-            }"
-          >
-            {{ item.quantity }}&times; {{ item.name }}
-          </span>
-        </BListGroupItem>
-      </BListGroup>
-    </div>
   </BListGroupItem>
 </template>
