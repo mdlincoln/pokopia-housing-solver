@@ -158,7 +158,7 @@ describe('HouseRecord', () => {
     expect(card.exists()).toBe(true)
   })
 
-  it('shows recommended items clustered by favorites', async () => {
+  it('shows recommended items as one row per item', async () => {
     // Both pokemon share 'Exercise' and 'Cleanliness' — real catalog favorites
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['Exercise', 'Cleanliness'], habitat: 'Dark' },
@@ -179,20 +179,12 @@ describe('HouseRecord', () => {
     const details = wrapper.find('[data-testid="recommended-items"]')
     expect(details.exists()).toBe(true)
 
-    const clusters = wrapper.findAll('[data-testid="item-cluster"]')
-    expect(clusters.length).toBeGreaterThan(0)
-
-    // Each cluster should show its favorites as text
-    const firstCluster = clusters[0]!
-    const clusterText = firstCluster.text()
-    // Exercise items and Cleanliness items exist — favorites are stored lowercase
-    const lower = clusterText.toLowerCase()
-    expect(lower.includes('exercise') || lower.includes('cleanliness')).toBe(true)
+    const itemNames = wrapper.findAll('[data-testid="item-name"]')
+    expect(itemNames.length).toBeGreaterThan(0)
   })
 
-  it('ranks clusters by number of favorites descending', async () => {
+  it('shows recommended items for multiple favorites', async () => {
     // Both share 'Lots of Fire', 'Group Activities', and 'Stone Stuff'
-    // which produce clusters of different sizes
     const pokemonData: PokemonData = {
       FireOne: { image: '', favorites: ['Lots of Fire', 'Group Activities', 'Stone Stuff'] },
       FireTwo: { image: '', favorites: ['Lots of Fire', 'Group Activities', 'Stone Stuff'] },
@@ -209,11 +201,8 @@ describe('HouseRecord', () => {
     })
     await flushPromises()
 
-    const clusters = wrapper.findAll('[data-testid="item-cluster"]')
-    expect(clusters.length).toBeGreaterThan(1)
-
-    // Count commas+1 in cluster label to estimate favorites count — first should have >= second
-    // (Clusters with more favorites are listed first)
+    const itemNames = wrapper.findAll('[data-testid="item-name"]')
+    expect(itemNames.length).toBeGreaterThan(0)
   })
 
   it('shows recommended items for a single occupant when favorites map to catalog entries', async () => {
@@ -279,9 +268,6 @@ describe('HouseRecord', () => {
       props: { house, pokemonData },
     })
     await flushPromises()
-
-    const labels = wrapper.findAll('[data-testid="item-cluster-favorites"]')
-    expect(labels.length).toBeGreaterThan(0)
 
     // All displayed items must carry a relevant tag
     const tagBadges = wrapper.findAll('[data-testid="item-tag-badge"]')
@@ -350,9 +336,9 @@ describe('HouseRecord', () => {
     await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
     await flushPromises()
 
-    const badge = wrapper.find('[data-testid="item-craftable-badge"]')
-    expect(badge.exists()).toBe(true)
-    expect(badge.text()).toBe('Craft')
+    const cell = wrapper.find('[data-testid="item-craftability"]')
+    expect(cell.exists()).toBe(true)
+    expect(cell.text()).toMatch(/^Craftable/)
   })
 
   it('shows Buy badge for items without recipes', async () => {
@@ -372,9 +358,9 @@ describe('HouseRecord', () => {
     await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
     await flushPromises()
 
-    const badges = wrapper.findAll('[data-testid="item-craftable-badge"]')
-    const buyBadge = badges.find((b) => b.text() === 'Buy')
-    expect(buyBadge).toBeDefined()
+    const cells = wrapper.findAll('[data-testid="item-craftability"]')
+    const buyCell = cells.find((c) => c.text() === 'Buy')
+    expect(buyCell).toBeDefined()
   })
 
   it('shows category badge for items with a category', async () => {
@@ -394,9 +380,9 @@ describe('HouseRecord', () => {
     await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
     await flushPromises()
 
-    const catBadge = wrapper.find('[data-testid="item-category-badge"]')
-    expect(catBadge.exists()).toBe(true)
-    expect(catBadge.text()).toBe('Outdoor')
+    const craftCell = wrapper.find('[data-testid="item-craftability"]')
+    expect(craftCell.exists()).toBe(true)
+    expect(craftCell.text()).toContain('Outdoor')
   })
 
   it('tag fulfillment row always shows Relaxation, Toy, and Decoration badges', () => {

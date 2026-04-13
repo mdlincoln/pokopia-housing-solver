@@ -201,8 +201,8 @@ test.describe('Homepage', () => {
     expect(weezingInMedium && venonatInMedium).toBe(false)
   })
 
-  // @lat: [[ui#House#Item Metadata Display#Shows craftable badge on recommended items]]
-  test('shows craftable and buy badges on recommended items', async ({ page }) => {
+  // @lat: [[ui#House#Item Metadata Display#Shows craftability text on recommended items]]
+  test('shows craftable and buy text on recommended items', async ({ page }) => {
     await page.goto('/')
 
     await setSpinbutton(page, 'house-medium', 1)
@@ -215,15 +215,15 @@ test.describe('Homepage', () => {
     await expect(details).toBeVisible()
     await details.locator('summary').click()
 
-    // At least one item must have a craftable or buy badge
-    const craftBadge = page.getByTestId('item-craftable-badge').first()
-    await expect(craftBadge).toBeVisible({ timeout: 5000 })
-    const text = await craftBadge.textContent()
-    expect(['Craft', 'Buy']).toContain(text?.trim())
+    // At least one item must have a craftability cell with "Craftable" or "Buy"
+    const craftCell = page.getByTestId('item-craftability').first()
+    await expect(craftCell).toBeVisible({ timeout: 5000 })
+    const text = await craftCell.textContent()
+    expect(text?.trim()).toMatch(/^(Craftable|Buy)/)
   })
 
-  // @lat: [[ui#House#Item Metadata Display#Shows category badge on recommended items]]
-  test('shows category badge on recommended items', async ({ page }) => {
+  // @lat: [[ui#House#Item Metadata Display#Shows craftability includes category for craftable items]]
+  test('shows category inside craftability cell on recommended items', async ({ page }) => {
     await page.goto('/')
 
     await setSpinbutton(page, 'house-small', 1)
@@ -235,7 +235,11 @@ test.describe('Homepage', () => {
     await expect(details).toBeVisible()
     await details.locator('summary').click()
 
-    await expect(page.getByTestId('item-category-badge').first()).toBeVisible({ timeout: 5000 })
+    // A craftable item's craftability cell should include "Craftable - {category}"
+    const craftableCells = page.getByTestId('item-craftability').filter({ hasText: /^Craftable/ })
+    await expect(craftableCells.first()).toBeVisible({ timeout: 5000 })
+    const text = await craftableCells.first().textContent()
+    expect(text?.trim()).toMatch(/^Craftable - \S/)
   })
 
   // @lat: [[ui#House#Item Metadata Display#Shows craftable badge in favorite modal]]

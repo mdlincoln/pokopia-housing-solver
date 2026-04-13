@@ -13,20 +13,9 @@ import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/so
 import { useCartStore } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
 import { useProgressStore } from '@/stores/progress'
-import {
-  BBadge,
-  BButton,
-  BCardGroup,
-  BListGroup,
-  BListGroupItem,
-  BTableSimple,
-  BTbody,
-  BTd,
-  BTh,
-  BThead,
-  BTr,
-} from 'bootstrap-vue-next'
-import { computed, ref, watch } from 'vue'
+import { BBadge, BButton, BCardGroup, BListGroup, BListGroupItem, BTable } from 'bootstrap-vue-next'
+import type { BTableSortBy } from 'bootstrap-vue-next'
+import { computed, ref, watch, watchEffect } from 'vue'
 
 const props = defineProps<{
   house: HouseAssignment
@@ -119,26 +108,73 @@ watch(
   { deep: true, immediate: true },
 )
 
-interface FlatRow {
-  favorites: string[]
+interface ItemRow {
   item: ItemDetails
-  span: number
-  isFirst: boolean
+  coveredFavorites: Set<string>
 }
 
-const flatRows = computed<FlatRow[]>(() => {
-  const result: FlatRow[] = []
+const itemRows = computed<ItemRow[]>(() => {
+  const rows: ItemRow[] = []
   for (const cluster of recommendedItems.value) {
-    cluster.items.forEach((item, idx) => {
-      result.push({
-        favorites: cluster.favorites,
-        item,
-        span: cluster.items.length,
-        isFirst: idx === 0,
-      })
-    })
+    for (const item of cluster.items) {
+      rows.push({ item, coveredFavorites: new Set(cluster.favorites) })
+    }
   }
-  return result
+  return rows
+})
+
+const houseFavoriteColumns = computed(() => {
+  const freq = new Map<string, number>()
+  for (const name of props.house.pokemon) {
+    for (const fav of props.pokemonData[name]?.favorites ?? []) {
+      const lower = fav.toLowerCase()
+      freq.set(lower, (freq.get(lower) ?? 0) + 1)
+    }
+  }
+  return Array.from(freq.entries())
+    .map(([favorite, count]) => ({ favorite, count }))
+    .sort((a, b) => b.count - a.count || a.favorite.localeCompare(b.favorite))
+})
+
+function craftabilityText(item: ItemDetails): string {
+  return item.isCraftable ? `Craftable - ${item.category ?? ''}`.trimEnd() : 'Buy'
+}
+
+const tableFields = computed(() => [
+  { key: 'name', label: 'Item', sortable: true },
+  { key: 'col_image', label: '', sortable: false },
+  { key: 'col_actions', label: '', sortable: false },
+  { key: 'craftability', label: 'Craftability', sortable: true },
+  { key: 'tag', label: 'Tag', sortable: true },
+  ...houseFavoriteColumns.value.map((col) => ({
+    key: `fav_${col.favorite}`,
+    label: col.favorite,
+    sortable: true,
+  })),
+])
+
+const tableItems = computed(() =>
+  itemRows.value.map(({ item, coveredFavorites }) => {
+    const row: Record<string, unknown> = {
+      itemData: item,
+      name: item.name,
+      craftability: craftabilityText(item),
+      tag: item.tag ?? '',
+    }
+    for (const col of houseFavoriteColumns.value) {
+      row[`fav_${col.favorite}`] = coveredFavorites.has(col.favorite) ? '✓' : ''
+    }
+    return row
+  }),
+)
+
+const sortBy = ref<BTableSortBy[]>([])
+
+watchEffect(() => {
+  const cols = houseFavoriteColumns.value
+  if (sortBy.value.length === 0 && cols.length > 0) {
+    sortBy.value = [{ key: `fav_${cols[0]!.favorite}`, order: 'desc' }]
+  }
 })
 </script>
 
@@ -220,90 +256,57 @@ const flatRows = computed<FlatRow[]>(() => {
       class="mt-3 house-recommendations"
     >
       <summary>Recommended items</summary>
-      <BTableSimple small borderless data-testid="recommended-items-list">
-        <BThead>
-          <BTr>
-            <BTh>Favorites</BTh>
-            <BTh></BTh>
-            <BTh></BTh>
-            <BTh></BTh>
-            <BTh>Item</BTh>
-            <BTh>Craft</BTh>
-            <BTh>Category</BTh>
-            <BTh>Tag</BTh>
-          </BTr>
-        </BThead>
-        <BTbody>
-          <BTr
-            v-for="(row, i) in flatRows"
-            :key="i"
-            :class="{ 'row-group-start': row.isFirst && i > 0 }"
-            :data-testid="row.isFirst ? 'item-cluster' : undefined"
+      <BTable
+        small
+        borderless
+        :fields="tableFields"
+        :items="tableItems"
+        v-model:sort-by="sortBy"
+        data-testid="recommended-items-list"
+      >
+        <template #cell(col_image)="{ item }">
+          <img
+            v-if="(item as any).itemData.picturePath"
+            :src="assetPath((item as any).itemData.picturePath)"
+            :alt="(item as any).itemData.name"
+            class="item-thumbnail"
+          />
+        </template>
+
+        <template #cell(col_actions)="{ item }">
+          <BButton
+            size="sm"
+            variant="outline-success"
+            class="cart-add-btn"
+            data-testid="add-to-cart"
+            @click="cartStore.addItem(house.houseId, (item as any).itemData.name)"
+            >+</BButton
           >
-            <BTh
-              v-if="row.isFirst"
-              :rowspan="row.span"
-              class="align-top"
-              data-testid="item-cluster-favorites"
-            >
-              <FavoriteBadge
-                v-for="fav in row.favorites"
-                :key="fav"
-                :favorite="fav"
-                :fulfilled="fulfilledFavorites.has(fav)"
-                data-testid="cluster-favorite-badge"
-                @click="handleFavoriteClick"
-              />
-            </BTh>
-            <BTd>
-              <BButton
-                size="sm"
-                variant="outline-success"
-                class="cart-add-btn"
-                data-testid="add-to-cart"
-                @click="cartStore.addItem(house.houseId, row.item.name)"
-                >+</BButton
-              >
-            </BTd>
-            <BTd class="text-success fw-bold" data-testid="item-in-cart-check">
-              {{ houseCartItemNames.has(row.item.name) ? '✓' : '' }}
-            </BTd>
-            <BTd class="ps-0">
-              <img
-                v-if="row.item.picturePath"
-                :src="assetPath(row.item.picturePath)"
-                :alt="row.item.name"
-                class="item-thumbnail"
-              />
-            </BTd>
-            <BTd :title="row.item.flavorText ?? undefined" data-testid="item-name">
-              {{ row.item.name }}
-            </BTd>
-            <BTd>
-              <BBadge
-                :variant="row.item.isCraftable ? 'success' : 'secondary'"
-                pill
-                data-testid="item-craftable-badge"
-                >{{ row.item.isCraftable ? 'Craft' : 'Buy' }}</BBadge
-              >
-            </BTd>
-            <BTd>
-              <BBadge
-                v-if="row.item.category"
-                variant="warning"
-                pill
-                data-testid="item-category-badge"
-                >{{ row.item.category }}</BBadge
-              >
-            </BTd>
-            <BTd>
-              <BBadge v-if="row.item.tag" variant="info" pill data-testid="item-tag-badge">{{
-                row.item.tag
-              }}</BBadge>
-            </BTd>
-          </BTr>
-        </BTbody>
-      </BTableSimple>
+          <span class="text-success fw-bold ms-1" data-testid="item-in-cart-check">
+            {{ houseCartItemNames.has((item as any).itemData.name) ? '✓' : '' }}
+          </span>
+        </template>
+
+        <template #cell(name)="{ item }">
+          <span :title="(item as any).itemData.flavorText ?? undefined" data-testid="item-name">{{
+            (item as any).itemData.name
+          }}</span>
+        </template>
+
+        <template #cell(craftability)="{ item }">
+          <span data-testid="item-craftability">{{ (item as any).craftability }}</span>
+        </template>
+
+        <template #cell(tag)="{ item }">
+          <BBadge
+            v-if="(item as any).itemData.tag"
+            variant="info"
+            pill
+            data-testid="item-tag-badge"
+            >{{ (item as any).itemData.tag }}</BBadge
+          >
+        </template>
+      </BTable>
     </details>
 
     <div v-if="houseCartItems.length" class="mt-3" data-testid="house-cart-items">

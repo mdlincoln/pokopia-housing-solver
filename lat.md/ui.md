@@ -158,21 +158,19 @@ Below the recommended items, a "Shopping list" section (`data-testid="house-cart
 
 ### Item Metadata Display
 
-Every place an item is shown — recommended items list, favorite items modal, and shopping cart — renders metadata columns from the DB using `BTableSimple` tables (Bootstrap Vue Next) with `borderless` and `small` props for minimal visual weight.
+Every place an item is shown — recommended items list, favorite items modal, and shopping cart — renders metadata columns from the DB using Bootstrap Vue Next table components with `borderless` and `small` props for minimal visual weight.
 
-The recommended items inside each house card use a single `BTableSimple` where each cluster's favorites label is a `<BTh :rowspan="N">` cell (data-testid `item-cluster-favorites`) spanning all N item rows of that cluster. The favorites cell renders one `BBadge` pill per favorite (`data-testid="cluster-favorite-badge"`) using the same fulfilled/unfulfilled styling as other favorite badges: `variant="success"` + `✓` prefix when the favorite is in `fulfilledFavorites`, `variant="danger"` + `✗` prefix otherwise. Each badge is also interactive — clicking emits `favoriteClicked` to open the items modal for that favorite. The row where the favorites `<BTh>` appears also carries `data-testid="item-cluster"`. Rows that start a new group (after the first) receive the CSS class `row-group-start`, which applies a `border-top: 1px solid var(--bs-border-color-translucent) !important` to separate groups from one another. The modal's item list uses a flat `BTableSimple` (no rowspan, one favorite per modal).
-
-Columns in both tables: picture thumbnail (`item-thumbnail` CSS, 32×32), item name with flavor text as native `title` tooltip (`data-testid="item-name"`), craftable badge (`data-testid="item-craftable-badge"`, "Craft" `variant="success"` / "Buy" `variant="secondary"`), category badge (`data-testid="item-category-badge"`, `variant="warning"`), and tag badge (`data-testid="item-tag-badge"`, `variant="info"`, only shown when non-null). The modal additionally has an "Also fulfills" column with related favorite pill badges.
+The recommended items inside each house card use a `BTable` with one row per item (no rowspan grouping). Columns are: item name with flavor text tooltip (`data-testid="item-name"`), picture thumbnail (`item-thumbnail` CSS, 32×32), add-to-cart button (`data-testid="add-to-cart"`) and in-cart checkmark (`data-testid="item-in-cart-check"`), craftability text (`data-testid="item-craftability"` — "Craftable - {category}" for craftable items, "Buy" otherwise), tag badge (`data-testid="item-tag-badge"`, `variant="info"`, only shown when non-null), and one column per distinct favorite of pokemon assigned to the house. Favorite columns are ordered by frequency (most-shared first, ties sorted alphabetically); each cell shows `✓` when the item covers that favorite, empty otherwise. The table is sorted by BTable's built-in sort; the default sort is the first favorite column descending so items covering the most-common favorite appear at the top. The modal's item list uses a flat `BTableSimple` (no per-favorite columns, one favorite per modal).
 
 All metadata — `isCraftable`, `category`, `flavorText`, and `picturePath` — is fetched in a single SQL query inside `itemsForFavorite` (via `ItemDetails`) so no extra round trips are needed for the recommended items or modal displays.
 
-#### Shows craftable badge on recommended items
+#### Shows craftability text on recommended items
 
-Verifies that opening a house's recommended items list shows at least one `item-craftable-badge` with text "Craft" or "Buy".
+Verifies that the recommended items list shows at least one `item-craftability` cell with text starting "Craftable" (for a craftable item) and at least one with text "Buy" (for a non-craftable item).
 
-#### Shows category badge on recommended items
+#### Shows craftability includes category for craftable items
 
-Verifies that opening a house's recommended items list shows at least one `item-category-badge`.
+Verifies that the `item-craftability` cell for a craftable item includes the item's category (e.g., "Craftable - Outdoor"), confirming category is surfaced without a separate badge.
 
 #### Shows craftable badge in favorite modal
 
@@ -202,7 +200,7 @@ Adding a cart item to one house's slot does not cause another house's favorite b
 
 Test selectors use `data-testid` attributes so tests do not depend on Bootstrap CSS classes.
 
-Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, `favorite-item-related-favorite-pill`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-in-cart-check`, `item-name`, `item-craftable-badge`, `item-category-badge`, `item-tag-badge`, `item-cluster`, `item-cluster-favorites`, `cluster-favorite-badge`, `progress-checkbox-house`, `progress-checkbox-pokemon`, `progress-checkbox-cart-item`, `cart-house-group`, `house-cart-items`, `house-cart-item`, `tag-fulfillment-status`, `tag-status-relaxation`, `tag-status-toy`, and `tag-status-decoration`.
+Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `favorite-items-modal`, `favorite-items-list`, `favorite-item-related-favorites`, `favorite-item-related-favorite-pill`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-in-cart-check`, `item-name`, `item-craftability`, `item-craftable-badge`, `item-category-badge`, `item-tag-badge`, `progress-checkbox-house`, `progress-checkbox-pokemon`, `progress-checkbox-cart-item`, `cart-house-group`, `house-cart-items`, `house-cart-item`, `tag-fulfillment-status`, `tag-status-relaxation`, `tag-status-toy`, and `tag-status-decoration`.
 
 ## ShoppingCart
 
