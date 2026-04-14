@@ -1,6 +1,6 @@
 # Items
 
-Functions about Pokopia items that can be used to fulfil Pokemon favorites when placed in households. SQL queries are centralized in [[queries]] — these functions contain only clustering and selection logic.
+Functions about Pokopia items that can be used to fulfil Pokemon favorites when placed in households. SQL queries are centralized in [[queries]] and this module re-exports the item lookup and recommendation helpers used by the UI.
 
 ## Database schema
 
@@ -38,13 +38,19 @@ Builds interchangeable item clusters keyed by the exact favorites each item fulf
 
 Given a favorite list, it deduplicates favorites case-insensitively, groups items by the sorted set of fulfilled favorites, and returns `ItemCluster[]` ranked by favorite coverage descending. Coverage ties are broken alphabetically by cluster favorite key. Each cluster's `items` is `ItemDetails[]` — carrying craftable status, category, and flavor text from the DB query.
 
-## clusterTaggedItemsForHouse
+## recommendedItemsForHouse
 
-Selects items with tag in {Relaxation, Decoration, Toy} that cover at least one favorite of the house's pokemon, groups them into clusters, and ranks by score. See [[src/items.ts#clusterTaggedItemsForHouse]] and [[src/queries.ts#taggedItemsForHouseFavorites]].
+Returns flat tagged recommendation rows for a house's favorites. See [[src/queries.ts#recommendedItemsForHouse]].
 
-`allFavorites` is the flat list with duplicates — if two pokemon share a favorite it appears twice, and the score for clusters covering that favorite is proportionally higher. Score = sum of per-favorite pokemon counts across the cluster's covered favorites. Clusters are sorted score desc → favorites.length desc → alphabetical key. Items within each cluster are sorted alphabetically.
+`allFavorites` is the flat list with duplicates, so if two pokemon share a favorite it appears twice and matching items receive a proportionally higher score. SQLite returns one row per item filtered to tags in {Relaxation, Decoration, Toy}, ordered by weighted score descending, covered-favorite count descending, and name ascending.
 
-This is the function called by [[ui#House]] to populate recommended items instead of the earlier `clusterItemsByFavorites` + `selectTopNonOverlappingClusters` flow. No cap on the number of clusters shown.
+Each row is `ItemDetails` plus one boolean field per distinct normalized favorite, keyed as `fav_<favorite>`. [[ui#House]] uses those dynamic fields directly to render the per-favorite table columns and success-highlighted covered cells without any regrouping step in TypeScript.
+
+## recommendedItemsForHouseWithStatus
+
+Returns the same flat tagged recommendation rows plus an `isRedundant` flag. See [[src/queries.ts#recommendedItemsForHouseWithStatus]].
+
+The query accepts the house's currently fulfilled favorites and represented tags, computes redundancy in SQLite, and lets [[ui#House]] partition active rows from the muted "Already covered" section without recalculating per-item coverage in Vue.
 
 ## Scraping item tags
 

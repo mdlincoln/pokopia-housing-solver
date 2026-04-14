@@ -228,8 +228,8 @@ describe('HouseRecord', () => {
     expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
   })
 
-  it('shows only relaxation, decoration, and toy tagged items without a cluster cap', async () => {
-    // Tag-filtered results: no 3-cluster limit, all items must have relevant tags
+  it('shows only relaxation, decoration, and toy tagged recommended items', async () => {
+    // Tag-filtered results: all displayed recommendations must have relevant tags
     const pokemonData: PokemonData = {
       PlannerOne: {
         image: '',
@@ -445,22 +445,90 @@ describe('HouseRecord', () => {
     const itemName = wrapper.find('[data-testid="item-name"]').text()
     const cartStore = useCartStore()
 
+    const checkmarkForItem = () => {
+      const names = wrapper.findAll('[data-testid="item-name"]')
+      const checks = wrapper.findAll('[data-testid="item-in-cart-check"]')
+      const index = names.findIndex((node) => node.text() === itemName)
+      return index >= 0 ? checks[index]!.text().trim() : undefined
+    }
+
     // Before adding: no checkmark
-    const checkCells = wrapper.findAll('[data-testid="item-in-cart-check"]')
-    const targetCell = checkCells.find(
-      (_, i) => wrapper.findAll('[data-testid="item-name"]')[i]?.text() === itemName,
-    )!
-    expect(targetCell.text().trim()).toBe('')
+    expect(checkmarkForItem()).toBe('')
 
     // After adding: checkmark appears
     await cartStore.addItem('S1', itemName)
     await flushPromises()
-    expect(targetCell.text().trim()).toBe('✓')
+    expect(checkmarkForItem()).toBe('✓')
 
     // After removing: checkmark clears
     cartStore.removeItem('S1', itemName)
     await flushPromises()
-    expect(targetCell.text().trim()).toBe('')
+    expect(checkmarkForItem()).toBe('')
+  })
+
+  it('favorite coverage cells use success background and no checkmark text', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
+    await flushPromises()
+
+    const successCells = wrapper.findAll('tbody td.table-success')
+    expect(successCells.length).toBeGreaterThan(0)
+    for (const cell of successCells) {
+      expect(cell.text().trim()).toBe('')
+    }
+  })
+
+  it('moves fully covered same-tag items into a grayed-out bottom section', async () => {
+    const pokemonData: PokemonData = {
+      Softie: { image: '', favorites: ['Soft stuff'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Softie'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="redundant-items-section"]').exists()).toBe(false)
+
+    const activeTable = wrapper.find('[data-testid="recommended-items-list"]')
+    const firstRecommendedName = activeTable.find('[data-testid="item-name"]').text()
+
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', firstRecommendedName)
+    await flushPromises()
+
+    const redundantSection = wrapper.find('[data-testid="redundant-items-section"]')
+    expect(redundantSection.exists()).toBe(true)
+    expect(redundantSection.classes()).toContain('opacity-50')
+    expect(redundantSection.find('[data-testid="redundant-items-list"]').exists()).toBe(true)
+
+    const redundantNames = redundantSection
+      .findAll('[data-testid="item-name"]')
+      .map((node) => node.text())
+    expect(redundantNames).toContain(firstRecommendedName)
+
+    const activeNames = wrapper
+      .find('[data-testid="recommended-items-list"]')
+      .findAll('[data-testid="item-name"]')
+      .map((node) => node.text())
+    expect(activeNames).not.toContain(firstRecommendedName)
   })
 
   it('fulfilled favorites do not bleed across houses', async () => {

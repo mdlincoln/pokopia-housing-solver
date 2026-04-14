@@ -4,10 +4,11 @@ import FavoriteBadge from '@/components/FavoriteBadge.vue'
 import PokemonCard from '@/components/PokemonCard.vue'
 import { HABITAT_VARIANT } from '@/habitats'
 import {
-  clusterTaggedItemsForHouse,
+  favoriteCoverageColumnKey,
   favoritesForItem,
-  type ItemCluster,
+  recommendedItemsForHouseWithStatus,
   type ItemDetails,
+  type RecommendedHouseItemWithStatus,
 } from '@/items'
 import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
@@ -33,21 +34,6 @@ const sharedFavorites = computed(() => {
   const sets = props.house.pokemon.map((name) => new Set(props.pokemonData[name]?.favorites ?? []))
   return rankHouseFavorites(sets)
 })
-
-const recommendedItems = ref<ItemCluster[]>([])
-
-watch(
-  () => props.house.pokemon,
-  async (pokemon) => {
-    const allFavorites = pokemon.flatMap((name) => props.pokemonData[name]?.favorites ?? [])
-    if (allFavorites.length === 0) {
-      recommendedItems.value = []
-      return
-    }
-    recommendedItems.value = await clusterTaggedItemsForHouse(allFavorites)
-  },
-  { deep: true, immediate: true },
-)
 
 const sharedHabitats = computed(() => {
   if (props.house.pokemon.length < 1) return []
@@ -85,33 +71,13 @@ const fulfilledTags = computed(
 
 const fulfilledFavorites = ref<Set<string>>(new Set())
 
-watch(
-  houseCartItems,
-  async (items) => {
-    if (items.length === 0) {
-      fulfilledFavorites.value = new Set()
-      return
-    }
-    const allFavs = await Promise.all(items.map((item) => favoritesForItem(item.name)))
-    fulfilledFavorites.value = new Set(allFavs.flat().map((f) => f.toLowerCase()))
-  },
-  { deep: true, immediate: true },
-)
-
-interface ItemRow {
-  item: ItemDetails
-  coveredFavorites: Set<string>
+interface TableItemRow extends Record<string, unknown> {
+  itemData: ItemDetails
+  name: string
+  craftability: string
+  tag: string
+  _cellVariants?: Record<string, 'success'>
 }
-
-const itemRows = computed<ItemRow[]>(() => {
-  const rows: ItemRow[] = []
-  for (const cluster of recommendedItems.value) {
-    for (const item of cluster.items) {
-      rows.push({ item, coveredFavorites: new Set(cluster.favorites) })
-    }
-  }
-  return rows
-})
 
 const houseFavoriteColumns = computed(() => {
   const freq = new Map<string, number>()
@@ -137,25 +103,99 @@ const tableFields = computed(() => [
   { key: 'craftability', label: 'Craftability', sortable: true },
   { key: 'tag', label: 'Tag', sortable: true },
   ...houseFavoriteColumns.value.map((col) => ({
-    key: `fav_${col.favorite}`,
+    key: favoriteCoverageColumnKey(col.favorite),
     label: col.favorite,
     sortable: true,
+    formatter: () => '',
   })),
 ])
 
-const tableItems = computed(() =>
-  itemRows.value.map(({ item, coveredFavorites }) => {
-    const row: Record<string, unknown> = {
-      itemData: item,
-      name: item.name,
-      craftability: craftabilityText(item),
-      tag: item.tag ?? '',
+const activeTableItems = ref<TableItemRow[]>([])
+
+const redundantTableItems = ref<TableItemRow[]>([])
+
+async function loadFulfilledFavoriteSet(items: { name: string }[]): Promise<Set<string>> {
+  if (items.length === 0) {
+    return new Set()
+  }
+
+  const allFavs = await Promise.all(items.map((item) => favoritesForItem(item.name)))
+  return new Set(allFavs.flat().map((favorite) => favorite.toLowerCase()))
+}
+
+function buildTableRow(item: RecommendedHouseItemWithStatus): TableItemRow {
+  const row: TableItemRow = {
+    itemData: item,
+    name: item.name,
+    craftability: craftabilityText(item),
+    tag: item.tag ?? '',
+  }
+  const cellVariants: Record<string, 'success'> = {}
+  for (const col of houseFavoriteColumns.value) {
+    const cellKey = favoriteCoverageColumnKey(col.favorite)
+    const isCovered = item[cellKey] === true
+    row[cellKey] = isCovered
+    if (isCovered) {
+      cellVariants[cellKey] = 'success'
     }
-    for (const col of houseFavoriteColumns.value) {
-      row[`fav_${col.favorite}`] = coveredFavorites.has(col.favorite) ? '✓' : ''
+  }
+  if (Object.keys(cellVariants).length > 0) {
+    row._cellVariants = cellVariants
+  }
+  return row
+}
+
+let recommendationRun = 0
+
+watch(
+  [() => props.house.pokemon, houseCartItems],
+  async ([pokemon, items]) => {
+    const run = ++recommendationRun
+    const fulfilledFavoriteSet = await loadFulfilledFavoriteSet(items)
+
+    if (run !== recommendationRun) {
+      return
     }
-    return row
-  }),
+
+    fulfilledFavorites.value = fulfilledFavoriteSet
+
+    const allFavorites = pokemon.flatMap((name) => props.pokemonData[name]?.favorites ?? [])
+    if (allFavorites.length === 0) {
+      activeTableItems.value = []
+      redundantTableItems.value = []
+      return
+    }
+
+    const representedTags = items
+      .map((item) => item.tag)
+      .filter((tag): tag is string => !!tag)
+      .map((tag) => tag.toLowerCase())
+
+    const recommendations = await recommendedItemsForHouseWithStatus(
+      allFavorites,
+      Array.from(fulfilledFavoriteSet),
+      representedTags,
+    )
+
+    if (run !== recommendationRun) {
+      return
+    }
+
+    const activeRows: TableItemRow[] = []
+    const redundantRows: TableItemRow[] = []
+    for (const recommendation of recommendations) {
+      const row = buildTableRow(recommendation)
+      if (recommendation.isRedundant) {
+        redundantRows.push(row)
+      } else {
+        activeRows.push(row)
+      }
+    }
+
+    activeTableItems.value = activeRows
+    redundantTableItems.value = redundantRows
+  },
+  { deep: true, immediate: true },
 )
 
 const sortBy = ref<BTableSortBy[]>([])
@@ -163,7 +203,7 @@ const sortBy = ref<BTableSortBy[]>([])
 watchEffect(() => {
   const cols = houseFavoriteColumns.value
   if (sortBy.value.length === 0 && cols.length > 0) {
-    sortBy.value = [{ key: `fav_${cols[0]!.favorite}`, order: 'desc' }]
+    sortBy.value = [{ key: favoriteCoverageColumnKey(cols[0]!.favorite), order: 'desc' }]
   }
 })
 </script>
@@ -239,15 +279,19 @@ watchEffect(() => {
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
 
     <details
-      v-if="recommendedItems.length"
+      v-if="activeTableItems.length || redundantTableItems.length"
       data-testid="recommended-items"
       class="mt-3 house-recommendations"
     >
       <summary>Recommended items</summary>
+      <p v-if="activeTableItems.length === 0" class="text-muted fst-italic mb-2">
+        All recommended favorites and tags are already covered for this house.
+      </p>
       <BTable
+        v-if="activeTableItems.length"
         small
         :fields="tableFields"
-        :items="tableItems"
+        :items="activeTableItems"
         v-model:sort-by="sortBy"
         data-testid="recommended-items-list"
       >
@@ -294,6 +338,66 @@ watchEffect(() => {
           >
         </template>
       </BTable>
+
+      <div
+        v-if="redundantTableItems.length"
+        class="mt-3 text-body-secondary opacity-50"
+        data-testid="redundant-items-section"
+      >
+        <h6 class="mb-2">Already covered</h6>
+        <p class="mb-2 small">
+          These items would not add any new favorite coverage or tag coverage for this house.
+        </p>
+        <BTable
+          small
+          :fields="tableFields"
+          :items="redundantTableItems"
+          data-testid="redundant-items-list"
+        >
+          <template #cell(col_image)="{ item }">
+            <img
+              v-if="(item as any).itemData.picturePath"
+              :src="assetPath((item as any).itemData.picturePath)"
+              :alt="(item as any).itemData.name"
+              class="item-thumbnail"
+            />
+          </template>
+
+          <template #cell(col_actions)="{ item }">
+            <BButton
+              size="sm"
+              variant="outline-success"
+              class="cart-add-btn"
+              data-testid="add-to-cart"
+              @click="cartStore.addItem(house.houseId, (item as any).itemData.name)"
+              >+</BButton
+            >
+            <span class="text-success fw-bold ms-1" data-testid="item-in-cart-check">
+              {{ houseCartItemNames.has((item as any).itemData.name) ? '✓' : '' }}
+            </span>
+          </template>
+
+          <template #cell(name)="{ item }">
+            <span :title="(item as any).itemData.flavorText ?? undefined" data-testid="item-name">{{
+              (item as any).itemData.name
+            }}</span>
+          </template>
+
+          <template #cell(craftability)="{ item }">
+            <span data-testid="item-craftability">{{ (item as any).craftability }}</span>
+          </template>
+
+          <template #cell(tag)="{ item }">
+            <BBadge
+              v-if="(item as any).itemData.tag"
+              variant="info"
+              pill
+              data-testid="item-tag-badge"
+              >{{ (item as any).itemData.tag }}</BBadge
+            >
+          </template>
+        </BTable>
+      </div>
     </details>
   </BListGroupItem>
 </template>

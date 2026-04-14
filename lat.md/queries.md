@@ -38,11 +38,19 @@ Scores items by how many of the given favorites they fulfill. See [[src/queries.
 
 Loops over each favorite, queries matching items, and accumulates counts. Duplicate favorites in the input increase the score for items that fulfill that favorite. Returns `ItemScore[]` omitting any items with zero matches.
 
-## taggedItemsForHouseFavorites
+## recommendedItemsForHouse
 
-Queries items filtered to tag IN ('relaxation', 'decoration', 'toy') that cover at least one favorite of the house's pokemon. See [[src/queries.ts#taggedItemsForHouseFavorites]].
+Queries flat tagged recommendation rows for a house's favorites. See [[src/queries.ts#recommendedItemsForHouse]].
 
-Accepts `allFavorites: string[]` (with duplicates for score weighting). Runs one SQL query per unique favorite with a `LOWER(i.tag) IN (...)` filter. Returns `TaggedItemResult[]` — `ItemDetails` extended with `coveredFavorites: string[]` listing which house favorites each item covers. Used by [[items#clusterTaggedItemsForHouse]].
+Accepts `allFavorites: string[]` with duplicates preserved for score weighting. The query builds a `house_favorites` CTE with per-favorite counts, filters to tags in `('relaxation', 'decoration', 'toy')`, and returns one row per matching item ordered by weighted score descending, distinct covered-favorite count descending, and name ascending.
+
+The SELECT list is assembled dynamically: for each distinct normalized favorite it adds a `MAX(CASE WHEN ...) AS "fav_<favorite>"` column. Each returned row therefore contains `ItemDetails` plus one boolean field per required favorite, which [[ui#House]] can render directly as table cells.
+
+## recommendedItemsForHouseWithStatus
+
+Queries the same flat tagged recommendation rows plus a redundancy flag. See [[src/queries.ts#recommendedItemsForHouseWithStatus]].
+
+Accepts `allFavorites`, `fulfilledFavorites`, and `fulfilledTags`. SQLite computes `isRedundant` as true only when every favorite covered by the item is already fulfilled for the house and the item's tag is already represented, so Vue can split rows into active and already-covered sections without recomputing coverage sets.
 
 ## getItemPicturePath
 

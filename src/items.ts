@@ -1,16 +1,25 @@
 import {
+  favoriteCoverageColumnKey,
   idealItems,
   itemsForFavorite,
-  taggedItemsForHouseFavorites,
+  recommendedItemsForHouse,
+  recommendedItemsForHouseWithStatus,
   type ItemDetails,
 } from '@/queries'
 
-export type { ItemDetails, ItemScore, TaggedItemResult } from '@/queries'
 export {
+  favoriteCoverageColumnKey,
   favoritesForItem,
   idealItems,
   itemsForFavorite,
-  taggedItemsForHouseFavorites,
+  recommendedItemsForHouse,
+  recommendedItemsForHouseWithStatus,
+} from '@/queries'
+export type {
+  ItemDetails,
+  ItemScore,
+  RecommendedHouseItem,
+  RecommendedHouseItemWithStatus,
 } from '@/queries'
 
 export interface FavoriteCount {
@@ -91,48 +100,4 @@ export async function clusterItemsByFavorites(favorites: string[]): Promise<Item
 
   // Rank by number of favorites covered (descending), then alphabetically by cluster key
   return Array.from(groups.values()).sort(compareClusters)
-}
-
-// @lat: [[items#clusterTaggedItemsForHouse]]
-export async function clusterTaggedItemsForHouse(allFavorites: string[]): Promise<ItemCluster[]> {
-  const normalized = allFavorites.map((f) => f.toLowerCase())
-
-  // Count occurrences of each favorite (duplicates = multiple pokemon share it)
-  const favCounts = new Map<string, number>()
-  for (const fav of normalized) {
-    favCounts.set(fav, (favCounts.get(fav) ?? 0) + 1)
-  }
-
-  const items = await taggedItemsForHouseFavorites(normalized)
-
-  // Group items by their sorted covered-favorites key
-  const groups = new Map<string, ItemCluster>()
-  for (const item of items) {
-    const key = item.coveredFavorites.join('\0')
-    let group = groups.get(key)
-    if (!group) {
-      group = { favorites: item.coveredFavorites, items: [] }
-      groups.set(key, group)
-    }
-    group.items.push(item)
-  }
-
-  // Score a cluster by summing pokemon-favorite match counts across its covered favorites
-  function clusterScore(cluster: ItemCluster): number {
-    return cluster.favorites.reduce((sum, fav) => sum + (favCounts.get(fav) ?? 0), 0)
-  }
-
-  // Sort items within each cluster alphabetically
-  for (const cluster of groups.values()) {
-    cluster.items.sort((a, b) => a.name.localeCompare(b.name))
-  }
-
-  // Sort clusters: score desc → favorites.length desc → alphabetical key
-  return Array.from(groups.values()).sort((a, b) => {
-    const scoreDiff = clusterScore(b) - clusterScore(a)
-    if (scoreDiff !== 0) return scoreDiff
-    const lenDiff = b.favorites.length - a.favorites.length
-    if (lenDiff !== 0) return lenDiff
-    return a.favorites.join('\0').localeCompare(b.favorites.join('\0'))
-  })
 }

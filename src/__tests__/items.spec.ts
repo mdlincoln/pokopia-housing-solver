@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   clusterItemsByFavorites,
-  clusterTaggedItemsForHouse,
+  favoriteCoverageColumnKey,
   favoritesForItem,
   favoritesToItems,
   idealItems,
+  recommendedItemsForHouse,
+  recommendedItemsForHouseWithStatus,
   type ItemDetails,
   type ItemScore,
 } from '../items'
@@ -239,43 +241,69 @@ describe('clusterItemsByFavorites', () => {
   })
 })
 
-// @lat: [[items#clusterTaggedItemsForHouse]]
-describe('clusterTaggedItemsForHouse', () => {
+describe('recommendedItemsForHouse', () => {
   it('returns only items with relaxation, decoration, or toy tags', async () => {
-    // 'exercise' has both tagged (Punching Bag / Toy) and untagged items in the catalog
-    const result = await clusterTaggedItemsForHouse(['exercise'])
+    const result = await recommendedItemsForHouse(['exercise'])
     expect(result.length).toBeGreaterThan(0)
     const validTags = new Set(['Relaxation', 'Decoration', 'Toy'])
-    for (const cluster of result) {
-      for (const item of cluster.items) {
-        expect(item.tag).not.toBeNull()
-        expect(validTags.has(item.tag!)).toBe(true)
-      }
+    for (const item of result) {
+      expect(item.tag).not.toBeNull()
+      expect(validTags.has(item.tag!)).toBe(true)
     }
   })
 
-  it('groups items by the set of house favorites they cover', async () => {
-    // exercise → Punching Bag only; cleanliness → separate items
-    const result = await clusterTaggedItemsForHouse(['exercise', 'cleanliness'])
-    const favoriteKeys = result.map((c) => c.favorites.join(','))
-    expect(favoriteKeys).toContain('exercise')
-    expect(favoriteKeys).toContain('cleanliness')
+  it('returns one dynamic boolean column per distinct favorite', async () => {
+    const result = await recommendedItemsForHouse(['exercise', 'cleanliness'])
+    expect(result.length).toBeGreaterThan(0)
+
+    const exerciseKey = favoriteCoverageColumnKey('exercise')
+    const cleanlinessKey = favoriteCoverageColumnKey('cleanliness')
+    const punchingBag = result.find((item) => item.name === 'Punching Bag')
+
+    expect(punchingBag).toBeDefined()
+    expect(punchingBag?.[exerciseKey]).toBe(true)
+    expect(punchingBag?.[cleanlinessKey]).toBe(false)
   })
 
-  it('scores clusters higher when more pokemon share the covered favorites', async () => {
-    // 2× exercise + 1× cleanliness: exercise cluster scores 2, cleanliness scores 1
-    const result = await clusterTaggedItemsForHouse(['exercise', 'exercise', 'cleanliness'])
-    expect(result.length).toBeGreaterThan(0)
-    // exercise cluster (score 2) must appear before cleanliness cluster (score 1)
-    const exerciseIdx = result.findIndex((c) => c.favorites.includes('exercise'))
-    const cleanlinessIdx = result.findIndex((c) => c.favorites.includes('cleanliness'))
-    expect(exerciseIdx).toBeGreaterThanOrEqual(0)
-    expect(cleanlinessIdx).toBeGreaterThanOrEqual(0)
-    expect(exerciseIdx).toBeLessThan(cleanlinessIdx)
+  it('weights ordering by duplicated favorites from the house input', async () => {
+    const result = await recommendedItemsForHouse(['exercise', 'exercise', 'cleanliness'])
+    const punchBagIndex = result.findIndex((item) => item.name === 'Punching Bag')
+    const waterBasinIndex = result.findIndex((item) => item.name === 'Water Basin')
+
+    expect(punchBagIndex).toBeGreaterThanOrEqual(0)
+    expect(waterBasinIndex).toBeGreaterThanOrEqual(0)
+    expect(punchBagIndex).toBeLessThan(waterBasinIndex)
   })
 
   it('returns an empty array when no favorites match tagged items', async () => {
-    const result = await clusterTaggedItemsForHouse(['not a real favorite'])
+    const result = await recommendedItemsForHouse(['not a real favorite'])
     expect(result).toHaveLength(0)
+  })
+})
+
+describe('recommendedItemsForHouseWithStatus', () => {
+  it('marks rows redundant when both favorite coverage and tag coverage are already satisfied', async () => {
+    const result = await recommendedItemsForHouseWithStatus(
+      ['soft stuff'],
+      ['soft stuff'],
+      ['relaxation'],
+    )
+
+    expect(result.length).toBeGreaterThan(0)
+    expect(result.some((item) => item.isRedundant)).toBe(true)
+    expect(result.some((item) => !item.isRedundant)).toBe(true)
+  })
+
+  it('does not mark rows redundant when the represented tag is missing', async () => {
+    const result = await recommendedItemsForHouseWithStatus(['soft stuff'], ['soft stuff'], [])
+
+    expect(result.length).toBeGreaterThan(0)
+    expect(result.every((item) => item.isRedundant === false)).toBe(true)
+  })
+
+  it('returns dynamic favorite coverage columns alongside redundancy status', async () => {
+    const result = await recommendedItemsForHouseWithStatus(['soft stuff'], [], [])
+    expect(result.length).toBeGreaterThan(0)
+    expect(result[0]?.[favoriteCoverageColumnKey('soft stuff')]).toBeTypeOf('boolean')
   })
 })
