@@ -2,11 +2,17 @@
 
 All SQLite read queries for `public/pokehousing.sqlite`. This is the single module that calls `getDb()` and `db.exec()`. Vue components and other modules must not contain SQL — they import from here instead. Lives in [[src/queries.ts]].
 
+## loadPokemonNames
+
+Loads the full sorted list of pokemon names for selection UI without hydrating the rest of each record. See [[src/queries.ts#loadPokemonNames]].
+
+Returns `string[]` ordered alphabetically by pokemon name. HomeView calls this once on mount so the autocomplete can work before favorites, habitat, and image data are loaded.
+
 ## loadPokemonData
 
-Loads all pokemon with their image paths, habitats, and favorites from the database. See [[src/queries.ts#loadPokemonData]].
+Loads pokemon image paths, habitats, and favorites for either the full catalog or a requested subset of names. See [[src/queries.ts#loadPokemonData]].
 
-Returns a `PokemonData` record keyed by pokemon name, with each entry holding `image`, `favorites`, and `habitat`. Uses a `GROUP_CONCAT` of `pokemon_favorites` joined to `pokemon`.
+Returns a `PokemonData` record keyed by pokemon name, with each entry holding `image`, `favorites`, and `habitat`. Uses a `GROUP_CONCAT` of `pokemon_favorites` joined to `pokemon`. HomeView now uses the optional names filter to hydrate only the currently selected pokemon after startup.
 
 ## loadAdjacencyMap
 

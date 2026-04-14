@@ -20,9 +20,11 @@ Users set house counts via `BFormSpinbutton` (`role="spinbutton"`) in a `BRow` g
 
 Asset URLs are constructed by the shared helper `src/assetPath.ts` (`assetPath(fileName)` returns `BASE_URL + fileName`). Both `HomeView` and `PokemonCard` import from this module.
 
-A "Clear all" button resets the form to a blank state: all house counts to 0, selected pokemon to none, and clears pins, progress, and the house registry. A "Show a sample island" button prefills the form with 1 small, 3 medium, 2 large houses and 13 randomly chosen pokemon. It is disabled until pokemon data has loaded. It also clears pins, progress, and the house registry before loading the new sample.
+A "Clear all" button resets the form to a blank state: all house counts to 0, selected pokemon to none, and clears pins, progress, and the house registry. A "Show a sample island" button prefills the form with 1 small, 3 medium, 2 large houses and 13 randomly chosen pokemon. It is disabled until the pokemon names catalog has loaded. It also clears pins, progress, and the house registry before loading the new sample.
 
-On mount, calls `loadPokemonData()` and `loadAdjacencyMap()` from [[queries]] (which internally uses `src/db.ts` / sql.js WASM) to populate `pokemonData` and `adjacencyMap`. The dev server serves the WASM file from `node_modules/sql.js/dist/sql-wasm.wasm` via a Vite middleware; production builds copy it to `dist/wasm/`. The solver runs whenever both datasets are loaded and at least one house is configured; otherwise results are hidden.
+On mount, calls `loadPokemonNames()` and `loadAdjacencyMap()` from [[queries]] (which internally uses `src/db.ts` / sql.js WASM) to populate the autocomplete catalog and adjacency map. The dev server serves the WASM file from `node_modules/sql.js/dist/sql-wasm.wasm` via a Vite middleware; production builds copy it to `dist/wasm/`.
+
+Pokemon favorites, habitat, and image data are hydrated lazily with `loadPokemonData(selectedNames)` only for the currently selected pokemon. HomeView keeps an in-memory `PokemonData` object for the selected set, removes entries locally when names are deselected, and waits for the selected set to be fully hydrated before running the solver. This keeps startup light while preserving the same downstream data contract for [[ui#House]].
 
 ### Saved Queries
 

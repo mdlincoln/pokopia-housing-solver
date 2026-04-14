@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import HouseRecord from '@/components/HouseRecord.vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
-import { loadAdjacencyMap, loadPokemonData } from '@/queries'
+import { loadAdjacencyMap, loadPokemonData, loadPokemonNames } from '@/queries'
 import { solve, type AdjacencyMap, type PokemonData, type SolverResult } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { useHouseStore } from '@/stores/houses'
@@ -29,10 +29,11 @@ const houseStore = useHouseStore()
 const pinStore = usePinStore()
 const progressStore = useProgressStore()
 
-const pokemonData = ref<PokemonData | null>(null)
+const pokemonNames = ref<string[]>([])
+const pokemonData = ref<PokemonData>({})
 const adjacencyData = ref<AdjacencyMap | null>(null)
-const pokemonNames = computed(() =>
-  pokemonData.value ? Object.keys(pokemonData.value).sort() : [],
+const hydratedPokemonReady = computed(() =>
+  selectedPokemon.value.every((name) => !!pokemonData.value[name]),
 )
 const selectedPokemon = ref<string[]>([])
 
@@ -55,7 +56,9 @@ const minLarge = computed(() => {
   return locked.large
 })
 
-const loading = ref(false)
+const hydratingPokemonData = ref(false)
+const solving = ref(false)
+const loading = computed(() => hydratingPokemonData.value || solving.value)
 const error = ref('')
 const result = ref<SolverResult | null>(null)
 
@@ -82,6 +85,65 @@ const STORAGE_KEY = 'pokehousing_saved_queries'
 type SharedState = Omit<SavedQuery, 'title' | 'timestamp'>
 
 let restoringFromUrl = false
+const pendingPokemonLoads = new Set<string>()
+
+function prunePokemonData(names: string[]) {
+  const nextPokemonData: PokemonData = {}
+  for (const name of names) {
+    const entry = pokemonData.value[name]
+    if (entry) {
+      nextPokemonData[name] = entry
+    }
+  }
+  const currentKeys = Object.keys(pokemonData.value)
+  const nextKeys = Object.keys(nextPokemonData)
+  if (
+    currentKeys.length === nextKeys.length &&
+    currentKeys.every((name) => Object.prototype.hasOwnProperty.call(nextPokemonData, name))
+  ) {
+    return
+  }
+  pokemonData.value = nextPokemonData
+}
+
+async function hydratePokemonSelection(names: string[]) {
+  prunePokemonData(names)
+
+  const missingNames = names.filter(
+    (name) => !pokemonData.value[name] && !pendingPokemonLoads.has(name),
+  )
+  if (missingNames.length === 0) {
+    hydratingPokemonData.value = pendingPokemonLoads.size > 0
+    return
+  }
+
+  hydratingPokemonData.value = true
+  for (const name of missingNames) {
+    pendingPokemonLoads.add(name)
+  }
+
+  try {
+    const loadedPokemon = await loadPokemonData(missingNames)
+    const selected = new Set(selectedPokemon.value)
+    const nextPokemonData: PokemonData = { ...pokemonData.value }
+    for (const [name, entry] of Object.entries(loadedPokemon)) {
+      if (selected.has(name)) {
+        nextPokemonData[name] = entry
+      }
+    }
+    for (const name of Object.keys(nextPokemonData)) {
+      if (!selected.has(name)) {
+        delete nextPokemonData[name]
+      }
+    }
+    pokemonData.value = nextPokemonData
+  } finally {
+    for (const name of missingNames) {
+      pendingPokemonLoads.delete(name)
+    }
+    hydratingPokemonData.value = pendingPokemonLoads.size > 0
+  }
+}
 
 function encodeState(): string {
   const state: SharedState = {
@@ -162,6 +224,7 @@ async function restoreState(query: SharedState) {
   medium.value = query.medium
   large.value = query.large
   selectedPokemon.value = [...query.pokemon]
+  await hydratePokemonSelection(query.pokemon)
 
   // Restore house registry if available (version 2+)
   if (query.houseRegistry) {
@@ -194,8 +257,8 @@ watch(selectedTimestamp, async (ts) => {
 })
 
 onMounted(async () => {
-  const [data, adjacency] = await Promise.all([loadPokemonData(), loadAdjacencyMap()])
-  pokemonData.value = data
+  const [names, adjacency] = await Promise.all([loadPokemonNames(), loadAdjacencyMap()])
+  pokemonNames.value = names
   adjacencyData.value = adjacency
 
   const shared = decodeStateFromUrl()
@@ -212,6 +275,14 @@ onMounted(async () => {
     restoringFromUrl = false
   }
 })
+
+watch(
+  selectedPokemon,
+  async (names) => {
+    await hydratePokemonSelection(names)
+  },
+  { deep: true },
+)
 
 watch(
   [
@@ -241,6 +312,7 @@ function clearAll() {
   medium.value = 0
   large.value = 0
   selectedPokemon.value = []
+  pokemonData.value = {}
 }
 
 function loadSample() {
@@ -251,8 +323,7 @@ function loadSample() {
   medium.value = 3
   large.value = 2
   houseStore.reconcileHouses({ small: 1, medium: 3, large: 2 }, new Set())
-  const names = pokemonNames.value
-  const shuffled = [...names].sort(() => Math.random() - 0.5)
+  const shuffled = [...pokemonNames.value].sort(() => Math.random() - 0.5)
   selectedPokemon.value = shuffled.slice(0, 13)
 }
 
@@ -262,13 +333,13 @@ watch(
     small,
     medium,
     large,
-    pokemonData,
+    hydratedPokemonReady,
     adjacencyData,
     () => pinStore.pinnedPokemon,
     () => pinStore.pinnedHouses,
   ],
   async () => {
-    if (!pokemonData.value || !adjacencyData.value || totalHouses.value === 0) {
+    if (!adjacencyData.value || totalHouses.value === 0 || !hydratedPokemonReady.value) {
       result.value = null
       return
     }
@@ -284,7 +355,7 @@ watch(
       pinStore.effectivelyPinnedHouseIds,
     )
 
-    loading.value = true
+    solving.value = true
     error.value = ''
     try {
       result.value = await solve(
@@ -297,7 +368,7 @@ watch(
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Solver failed'
     } finally {
-      loading.value = false
+      solving.value = false
     }
   },
   { deep: true },
@@ -352,7 +423,7 @@ defineExpose({
       <BButton
         variant="outline-secondary"
         class="beach-button"
-        :disabled="!pokemonData"
+        :disabled="pokemonNames.length === 0"
         @click="loadSample"
       >
         Show a sample island
@@ -360,7 +431,7 @@ defineExpose({
       <BButton
         variant="outline-primary"
         class="beach-button"
-        :disabled="!pokemonData"
+        :disabled="pokemonNames.length === 0"
         @click="openSaveModal"
       >
         Save query

@@ -270,16 +270,32 @@ export async function idealItems(favorites: string[]): Promise<ItemScore[]> {
   return Array.from(counts, ([item, score]) => ({ item, score }))
 }
 
-export async function loadPokemonData(): Promise<PokemonData> {
+export async function loadPokemonNames(): Promise<string[]> {
+  const db = await getDb()
+  const rows = db.exec(
+    `SELECT p.name
+     FROM pokemon p
+     ORDER BY p.name ASC`,
+  )[0]
+  if (!rows) return []
+  return rows.values.map((row) => row[0] as string)
+}
+
+export async function loadPokemonData(names?: string[]): Promise<PokemonData> {
   const db = await getDb()
   const pokemonData: PokemonData = {}
+  if (names && names.length === 0) return pokemonData
+
+  const whereClause = names ? `WHERE p.name IN (${names.map(() => '?').join(', ')})` : ''
   const rows = db.exec(
     `SELECT p.name, p.image_path, p.habitat,
             GROUP_CONCAT(pf.favorite_name, '|') as favorites_str
      FROM pokemon p
      LEFT JOIN pokemon_favorites pf ON p.id = pf.pokemon_id
+     ${whereClause}
      GROUP BY p.id, p.name, p.image_path, p.habitat
      ORDER BY p.name ASC`,
+    names ?? [],
   )[0]
   if (rows) {
     for (const row of rows.values) {

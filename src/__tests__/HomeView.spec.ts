@@ -9,7 +9,7 @@ vi.mock('@/db', async () => {
   return { getDb: async () => db }
 })
 
-import { loadAdjacencyMap, loadPokemonData } from '@/queries'
+import { loadAdjacencyMap, loadPokemonData, loadPokemonNames } from '@/queries'
 import type { SolverResult } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
@@ -33,6 +33,7 @@ vi.mock('@/queries', async (importOriginal) => {
   const actual = await importOriginal()
   return {
     ...(actual as object),
+    loadPokemonNames: vi.fn(),
     loadPokemonData: vi.fn(),
     loadAdjacencyMap: vi.fn(),
   }
@@ -63,7 +64,17 @@ describe('HomeView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setActivePinia(createPinia())
-    vi.mocked(loadPokemonData).mockResolvedValue(testPokemonData)
+    vi.mocked(loadPokemonNames).mockResolvedValue(Object.keys(testPokemonData).sort())
+    vi.mocked(loadPokemonData).mockImplementation(async (names?: string[]) => {
+      if (!names) {
+        return testPokemonData
+      }
+      return Object.fromEntries(
+        names
+          .map((name) => [name, testPokemonData[name as keyof typeof testPokemonData]])
+          .filter(([, value]) => !!value),
+      )
+    })
     vi.mocked(loadAdjacencyMap).mockResolvedValue(new Map())
     window.location.hash = ''
   })
@@ -77,11 +88,34 @@ describe('HomeView', () => {
     expect(wrapper.find('[data-testid="results"]').exists()).toBe(false)
   })
 
-  it('loads pokemon and adjacency data on mount', async () => {
+  it('loads pokemon names and adjacency data on mount without hydrating attributes', async () => {
     await mountHome()
 
-    expect(loadPokemonData).toHaveBeenCalledOnce()
+    expect(loadPokemonNames).toHaveBeenCalledOnce()
+    expect(loadPokemonData).not.toHaveBeenCalled()
     expect(loadAdjacencyMap).toHaveBeenCalledOnce()
+  })
+
+  it('hydrates pokemon data when names are selected', async () => {
+    const wrapper = await mountHome()
+
+    wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo']
+    await flushPromises()
+
+    expect(loadPokemonData).toHaveBeenCalledExactlyOnceWith(['AlphaOne', 'AlphaTwo'])
+  })
+
+  it('removes pokemon from in-memory data without a new query', async () => {
+    const wrapper = await mountHome()
+
+    wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo']
+    await flushPromises()
+    expect(loadPokemonData).toHaveBeenCalledTimes(1)
+
+    wrapper.vm.selectedPokemon = ['AlphaOne']
+    await flushPromises()
+
+    expect(loadPokemonData).toHaveBeenCalledTimes(1)
   })
 
   it('displays results with all pokemon housed', async () => {
