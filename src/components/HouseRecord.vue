@@ -339,12 +339,8 @@ watchEffect(() => {
         </template>
       </BTable>
 
-      <div
-        v-if="redundantTableItems.length"
-        class="mt-3 text-body-secondary opacity-50"
-        data-testid="redundant-items-section"
-      >
-        <h6 class="mb-2">Already covered</h6>
+      <details v-if="redundantTableItems.length" class="mt-3" data-testid="redundant-items-section">
+        <summary><h6 class="mb-2">Already covered</h6></summary>
         <p class="mb-2 small">
           These items would not add any new favorite coverage or tag coverage for this house.
         </p>
@@ -353,6 +349,7 @@ watchEffect(() => {
           :fields="tableFields"
           :items="redundantTableItems"
           data-testid="redundant-items-list"
+          class="text-body-secondary opacity-50"
         >
           <template #cell(col_image)="{ item }">
             <img
@@ -397,7 +394,7 @@ watchEffect(() => {
             >
           </template>
         </BTable>
-      </div>
+      </details>
     </details>
   </BListGroupItem>
 </template>
