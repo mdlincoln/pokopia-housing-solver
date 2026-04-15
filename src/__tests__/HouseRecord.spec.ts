@@ -229,7 +229,10 @@ describe('HouseRecord', () => {
   })
 
   it('shows only relaxation, decoration, and toy tagged recommended items', async () => {
-    // Tag-filtered results: all displayed recommendations must have relevant tags
+    // Tag-filtered results: every displayed recommendation row must have exactly one tag
+    // column ✓. Tag ✓ marks render as <span class="text-success">✓</span>; fav coverage
+    // cells use table-success on the <td> directly (no inner span), so counting text-success
+    // spans isolates tag column hits.
     const pokemonData: PokemonData = {
       PlannerOne: {
         image: '',
@@ -251,13 +254,18 @@ describe('HouseRecord', () => {
       props: { house, pokemonData },
     })
     await flushPromises()
+    await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
+    await flushPromises()
 
-    // All displayed items must carry a relevant tag
-    const tagBadges = wrapper.findAll('[data-testid="item-tag-badge"]')
-    expect(tagBadges.length).toBeGreaterThan(0)
-    const validTags = new Set(['Relaxation', 'Decoration', 'Toy'])
-    for (const badge of tagBadges) {
-      expect(validTags.has(badge.text())).toBe(true)
+    const table = wrapper.find('[data-testid="recommended-items-list"]')
+    const rows = table.findAll('tbody tr')
+    expect(rows.length).toBeGreaterThan(0)
+
+    // Each item carries exactly one tag, so each row has exactly one non-empty text-success
+    // span (the tag ✓). The item-in-cart-check span also has text-success but is empty here.
+    for (const row of rows) {
+      const tagChecks = row.findAll('td span.text-success').filter((s) => s.text().trim() === '✓')
+      expect(tagChecks.length).toBe(1)
     }
   })
 
@@ -327,7 +335,7 @@ describe('HouseRecord', () => {
     expect(craftCell.text()).toContain('Outdoor')
   })
 
-  it('tag fulfillment row always shows Relaxation, Toy, and Decoration badges', () => {
+  it('cart coverage table is hidden when cart is empty', async () => {
     const house: HouseAssignment = {
       houseId: 'S1',
       size: 'small',
@@ -338,35 +346,12 @@ describe('HouseRecord', () => {
     const wrapper = mount(HouseRecord, {
       props: { house, pokemonData: testPokemonData },
     })
+    await flushPromises()
 
-    const row = wrapper.find('[data-testid="tag-fulfillment-status"]')
-    expect(row.exists()).toBe(true)
-    expect(wrapper.find('[data-testid="tag-status-relaxation"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="tag-status-toy"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="tag-status-decoration"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="cart-items-coverage"]').exists()).toBe(false)
   })
 
-  it('tag badges are danger before any cart items are added', () => {
-    const house: HouseAssignment = {
-      houseId: 'S1',
-      size: 'small',
-      capacity: 1,
-      pokemon: ['AlphaOne'],
-    }
-
-    const wrapper = mount(HouseRecord, {
-      props: { house, pokemonData: testPokemonData },
-    })
-
-    for (const tag of ['relaxation', 'toy', 'decoration']) {
-      const badge = wrapper.find(`[data-testid="tag-status-${tag}"]`)
-      expect(badge.classes()).toContain('text-bg-danger')
-      expect(badge.classes()).not.toContain('text-bg-success')
-    }
-  })
-
-  it('tag badge turns success after adding a cart item with that tag', async () => {
-    // Punching Bag (Exercise) has the Toy tag and appears in tagged recommendations
+  it('cart coverage table appears with correct rows after adding cart items', async () => {
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['Exercise'] },
     }
@@ -380,23 +365,119 @@ describe('HouseRecord', () => {
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
 
-    // Find the first recommended item's tag badge to know which tag it carries
-    const tagBadge = wrapper.find('[data-testid="item-tag-badge"]')
-    expect(tagBadge.exists()).toBe(true)
-    const tagText = tagBadge.text().toLowerCase()
-
-    // Confirm that tag status badge starts as danger
-    const statusBadge = wrapper.find(`[data-testid="tag-status-${tagText}"]`)
-    expect(statusBadge.classes()).toContain('text-bg-danger')
-
-    // Add the item to cart — get its name from the recommended list
     const itemName = wrapper.find('[data-testid="item-name"]').text()
     const cartStore = useCartStore()
     await cartStore.addItem('S1', itemName)
     await flushPromises()
 
-    expect(statusBadge.classes()).toContain('text-bg-success')
-    expect(statusBadge.classes()).not.toContain('text-bg-danger')
+    const coverage = wrapper.find('[data-testid="cart-items-coverage"]')
+    expect(coverage.exists()).toBe(true)
+    const nameCell = coverage.find('[data-testid="item-name"]')
+    expect(nameCell.exists()).toBe(true)
+    expect(nameCell.text()).toBe(itemName)
+  })
+
+  it('cart coverage remove button deletes item from cart and hides table', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+
+    const itemName = wrapper.find('[data-testid="item-name"]').text()
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', itemName)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="cart-items-coverage"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="cart-coverage-remove"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="cart-items-coverage"]').exists()).toBe(false)
+    expect(cartStore.itemsByHouse.get('S1') ?? []).toHaveLength(0)
+  })
+
+  it('cart coverage table shows tag ✓ in the correct column for the item tag', async () => {
+    // Punching Bag (Exercise) has the Toy tag
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+
+    const itemName = wrapper.find('[data-testid="item-name"]').text()
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', itemName)
+    await flushPromises()
+
+    // Toy column should show ✓; Relaxation and Decoration should be empty
+    expect(wrapper.find('[data-testid="cart-tag-toy"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="cart-tag-relaxation"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="cart-tag-decoration"]').exists()).toBe(false)
+  })
+
+  it('cart coverage fav column header turns success when favorite is fulfilled', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+
+    const itemName = wrapper.find('[data-testid="item-name"]').text()
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', itemName)
+    await flushPromises()
+
+    // The fav column header for 'exercise' should have text-success once the item is in cart
+    const favHeader = wrapper.find('[data-testid="fav-header-fav_exercise"]')
+    expect(favHeader.exists()).toBe(true)
+    expect(favHeader.classes()).toContain('text-success')
+  })
+
+  it('cart coverage fav cell shows success background for covered favorite', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+
+    const itemName = wrapper.find('[data-testid="item-name"]').text()
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', itemName)
+    await flushPromises()
+
+    const table = wrapper.find('[data-testid="cart-coverage-table"]')
+    const successCells = table.findAll('tbody td.table-success')
+    expect(successCells.length).toBeGreaterThan(0)
   })
 
   it('fulfilled favorite badges turn success after adding a covering cart item', async () => {
@@ -516,8 +597,9 @@ describe('HouseRecord', () => {
 
     const redundantSection = wrapper.find('[data-testid="redundant-items-section"]')
     expect(redundantSection.exists()).toBe(true)
-    expect(redundantSection.classes()).toContain('opacity-50')
-    expect(redundantSection.find('[data-testid="redundant-items-list"]').exists()).toBe(true)
+    const redundantList = redundantSection.find('[data-testid="redundant-items-list"]')
+    expect(redundantList.exists()).toBe(true)
+    expect(redundantList.classes()).toContain('opacity-50')
 
     const redundantNames = redundantSection
       .findAll('[data-testid="item-name"]')

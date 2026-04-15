@@ -128,15 +128,15 @@ Each modal item row also shows pill badges for other favorites that same item fu
 
 ## House
 
-Reusable house display component in `src/components/HouseRecord.vue`. Renders as a `BListGroupItem` with size/capacity, assigned `PokemonCard` entries, a "Shared habitats" badge section, and a "Shared interests" badge section.
+Reusable house display component in `src/components/HouseRecord.vue`. Renders as a `BListGroupItem` with size/capacity, assigned `PokemonCard` entries, a "Shared habitats" badge section, a cart fulfillment table, and collapsible recommendations.
 
-Shared favorites are computed internally via [[src/solver.ts#rankHouseFavorites]]. Shared habitats are computed inline: if 2+ occupants share the same habitat value the habitat name and count appear as a colored `BBadge` pill (`data-testid="shared-habitat-badge"`) inside a `data-testid="shared-habitats"` wrapper.
+Shared habitats are computed inline: if 2+ occupants share the same habitat value the habitat name and count appear as a colored `BBadge` pill (`data-testid="shared-habitat-badge"`) inside a `data-testid="shared-habitats"` wrapper.
 
 Each `PokemonCard` receives the pokemon's `habitat` prop, which it renders as a colored `BBadge` pill (`data-testid="habitat-badge"`). The card uses a horizontal layout (`BCard` with `no-body`, `BRow`/`BCol`, `BCardImg`, `BCardBody`) with the image on the left and name + badges on the right.
 
 Habitat-to-badge-variant mappings for both `HouseRecord` and `PokemonCard` come from the shared constant `HABITAT_VARIANT` in `src/habitats.ts`.
 
-Shared favorite pills, cluster-favorites pills, and pokemon-card favorite pills are all rendered via the shared `FavoriteBadge` component (`src/components/FavoriteBadge.vue`). They are interactive and emit a favorite-selection event to HomeView, which opens the item lookup modal.
+Cluster-favorites pills and pokemon-card favorite pills are rendered via the shared `FavoriteBadge` component (`src/components/FavoriteBadge.vue`). They are interactive and emit a favorite-selection event to HomeView, which opens the item lookup modal.
 
 ### FavoriteBadge
 
@@ -146,23 +146,23 @@ Props: `favorite: string` (display name), `fulfilled?: boolean` (drives variant 
 
 When `fulfilled` is `true` renders `variant="success"` with a `✓` prefix; when `false` renders `variant="danger"` with a `✗` prefix; when `informational` is set renders `variant="secondary"` with no prefix. Note: Vue's boolean prop casting converts absent `fulfilled` to `false`, so pass `informational` explicitly when no fulfillment state applies.
 
-Used at three sites: `PokemonCard` per-pokemon favorites (`data-testid="fave-badge"`), `HouseRecord` shared favorites (`data-testid="shared-favorite-badge"`, passes `count`), and `HomeView` "Also fulfills" column in the items modal (`data-testid="favorite-item-related-favorite-pill"`, uses `informational`). Clicking an "Also fulfills" badge calls `openFavoriteItemsModal` to navigate the modal to that favorite.
+Used at two sites: `PokemonCard` per-pokemon favorites (`data-testid="fave-badge"`) and `HomeView` "Also fulfills" column in the items modal (`data-testid="favorite-item-related-favorite-pill"`, uses `informational`). Clicking an "Also fulfills" badge calls `openFavoriteItemsModal` to navigate the modal to that favorite.
 
 House recommendations use all favorites from pokemon assigned to that house (not only shared favorites). The recommendation list shows all tagged item rows returned by [[items#recommendedItemsForHouseWithStatus]], filtered to items tagged Relaxation, Decoration, or Toy and ranked by weighted score (sum of pokemon-favorite matches).
 
 Each recommended item has a small `+` button (`data-testid="add-to-cart"`) that calls `cartStore.addItem(houseId, itemName)` to add it to the shopping cart for that house. A checkmark cell (`data-testid="item-in-cart-check"`) in each row displays `✓` in success color when that item is already in the house's cart, and is empty otherwise; it updates reactively as items are added or removed. The same `+` button appears on each item row in the favorite items modal in HomeView, passing the originating house ID.
 
-`HouseRecord` passes a `fulfilledFavorites` prop (a `Set<string>` of lowercased favorite names) to each `PokemonCard`. This set is computed by watching `houseCartItems` and calling `favoritesForItem` for each cart item. `PokemonCard` renders each favorite badge with `variant="success"` and a `✓` prefix when fulfilled, and `variant="danger"` with a `✗` prefix when unfulfilled. The shared favorite badges at the top of the house card use the same fulfilled/unfulfilled treatment (checking against `fulfilledFavorites`), replacing the previous static `variant="info"`.
+`HouseRecord` passes a `fulfilledFavorites` prop (a `Set<string>` of lowercased favorite names) to each `PokemonCard`. This set is derived from `houseCartItems` by calling `favoritesForItem` for each cart item in a single batched `Promise.all`. `PokemonCard` renders each favorite badge with `variant="success"` and a `✓` prefix when fulfilled, and `variant="danger"` with a `✗` prefix when unfulfilled.
 
-A tag fulfillment row (`data-testid="tag-fulfillment-status"`) is rendered below the pokemon cards, above the recommended items. It always shows three `BBadge` pills for "Relaxation", "Toy", and "Decoration". Each uses `variant="success"` with a `✓` prefix once at least one cart item with that tag has been added to the house, and `variant="danger"` with a `✗` prefix otherwise. The fulfilled tags set is computed inline from `houseCartItems` using the `tag` field already present on `CartItem`.
+A **cart fulfillment table** (`data-testid="cart-items-coverage"`) is rendered below the pokemon cards when at least one item is in the house's cart. It shows one row per cart item with: image, name, a `×` remove button (`data-testid="cart-coverage-remove"`) that calls `cartStore.removeItem`, three boolean tag columns (Toy, Relaxation, Decoration — `✓` when the item carries that tag), and one boolean column per distinct pokemon favorite (cell gets `table-success` background when covered). Column headers for tag columns display `✓`/`✗` with `text-success`/`text-danger` styling based on whether that tag is fulfilled by any cart item. Column headers for favorite columns display `✓`/`✗ label ×count` — the count reflects how many pokemon in the house share that favorite — and turn `text-success` once the favorite is fulfilled. A generic `#head()` fallback slot handles all column header rendering. The table uses `sticky-header` so headers remain visible when the table scrolls.
 
-House cards still derive fulfillment state from house-scoped cart items, but they no longer render a duplicate per-house shopping list. Item quantities, progress checkboxes, and checked-off styling live only in the sidebar cart while the house card keeps the add-to-cart affordance and fulfillment summaries.
+House cards derive fulfillment state from house-scoped cart items. Item quantities, progress checkboxes, and checked-off styling live only in the sidebar cart while the house card keeps the add-to-cart affordance and fulfillment summaries.
 
 ### Item Metadata Display
 
 Every place an item is shown — recommended items list, favorite items modal, and shopping cart — renders metadata columns from the DB using Bootstrap Vue Next table components with `borderless` and `small` props for minimal visual weight.
 
-The recommended items inside each house card use a `BTable` with one row per item (no rowspan grouping). Columns are: item name with flavor text tooltip (`data-testid="item-name"`), picture thumbnail (`item-thumbnail` CSS, 32×32), add-to-cart button (`data-testid="add-to-cart"`) and in-cart checkmark (`data-testid="item-in-cart-check"`), craftability text (`data-testid="item-craftability"` — "Craftable - {category}" for craftable items, "Buy" otherwise), tag badge (`data-testid="item-tag-badge"`, `variant="info"`, only shown when non-null), and one column per distinct favorite of pokemon assigned to the house. Favorite columns are ordered by frequency (most-shared first, ties sorted alphabetically); each covered cell renders with Bootstrap's success table background while uncovered cells stay plain, with no checkmark text in either case. The table is sorted by BTable's built-in sort; the default sort is the first favorite column descending so items covering the most-common favorite appear at the top.
+The recommended items inside each house card use a `BTable` with one row per item (no rowspan grouping). Columns are: item name with flavor text tooltip (`data-testid="item-name"`), picture thumbnail (`item-thumbnail` CSS, 32×32), add-to-cart button (`data-testid="add-to-cart"`) and in-cart checkmark (`data-testid="item-in-cart-check"`), craftability text (`data-testid="item-craftability"` — "Craftable - {category}" for craftable items, "Buy" otherwise), three boolean tag columns (`col_toy`, `col_relaxation`, `col_decoration` — show `✓` when the item carries that tag), and one column per distinct favorite of pokemon assigned to the house. Favorite columns are ordered by frequency (most-shared first, ties sorted alphabetically); each covered cell renders with Bootstrap's success table background while uncovered cells stay plain, with no checkmark text in either case. The table uses `sticky-header` and is sorted by BTable's built-in sort; the default sort is the first favorite column descending so items covering the most-common favorite appear at the top. A generic `#head()` fallback slot renders fulfillment-styled headers for both tag and favorite columns.
 
 When a recommended item would no longer improve house happiness because every favorite it covers is already fulfilled AND its tag is already represented in the house, that row is removed from the main recommendations table and shown in a separate muted bottom section (`data-testid="redundant-items-section"`, table `data-testid="redundant-items-list"`). This keeps the high-value recommendations visible first while still letting users inspect or add already-covered items.
 
@@ -182,17 +182,29 @@ Verifies that the `item-craftability` cell for a craftable item includes the ite
 
 Verifies that clicking a shared-favorite badge and opening the modal shows `item-craftable-badge` elements on items in the list.
 
-#### Tag fulfillment row always present
+#### Cart coverage table hidden when empty
 
-The tag row (`tag-fulfillment-status`) and all three tag status badges (`tag-status-relaxation`, `tag-status-toy`, `tag-status-decoration`) are always rendered regardless of cart state.
+The cart coverage table (`cart-items-coverage`) is not rendered when no cart items exist for the house.
 
-#### Tag badges start secondary
+#### Cart coverage table appears with correct rows
 
-Before any cart items are added, all three tag status badges carry `variant="secondary"`.
+After adding an item to the house cart, the `cart-coverage-table` appears with a row showing that item's name.
 
-#### Tag badge turns success after item added
+#### Cart coverage remove button deletes item
 
-After calling `cartStore.addItem` for an item with a given tag, the corresponding tag status badge switches to `variant="success"`.
+Clicking `cart-coverage-remove` calls `cartStore.removeItem` for that house and item; the table disappears when the cart is empty.
+
+#### Cart coverage table tag column shows correct ✓
+
+After adding a tagged item, the appropriate tag cell (`cart-tag-toy`, `cart-tag-relaxation`, or `cart-tag-decoration`) shows `✓` and the other two are absent.
+
+#### Cart coverage fav header turns success when fulfilled
+
+Once an item covering a given favorite is in the cart, the corresponding fav column header (`fav-header-fav_<favorite>`) carries `text-success`.
+
+#### Cart coverage fav cell shows success background
+
+After adding a cart item that covers a favorite, the fav cell in the cart coverage table carries `table-success` background.
 
 #### Fulfilled favorite badge turns success
 
@@ -206,7 +218,7 @@ Adding a cart item to one house's slot does not cause another house's favorite b
 
 Test selectors use `data-testid` attributes so tests do not depend on Bootstrap CSS classes.
 
-Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `shared-favorite-badge`, `fave-badge`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-in-cart-check`, `item-name`, `item-craftability`, `item-craftable-badge`, `item-category-badge`, `item-tag-badge`, `recommended-items-list`, `redundant-items-section`, `redundant-items-list`, `progress-checkbox-house`, `progress-checkbox-pokemon`, `progress-checkbox-cart-item`, `cart-house-group`, `tag-fulfillment-status`, `tag-status-relaxation`, `tag-status-toy`, and `tag-status-decoration`.
+Current IDs include `house-card`, `error`, `unhoused`, `empty`, `results`, `habitat-badge`, `shared-habitats`, `shared-habitat-badge`, `fave-badge`, `shopping-cart`, `cart-empty`, `cart-items`, `cart-item`, `cart-quantity`, `cart-increment`, `cart-decrement`, `cart-remove`, `cart-aggregated`, `cart-aggregated-item`, `add-to-cart`, `item-in-cart-check`, `item-name`, `item-craftability`, `item-craftable-badge`, `item-category-badge`, `recommended-items-list`, `redundant-items-section`, `redundant-items-list`, `progress-checkbox-house`, `progress-checkbox-pokemon`, `progress-checkbox-cart-item`, `cart-house-group`, `cart-items-coverage`, `cart-coverage-table`, `cart-coverage-remove`, `cart-tag-toy`, `cart-tag-relaxation`, `cart-tag-decoration`, and `fav-header-fav_<favorite>` (dynamic, one per house favorite column in the cart coverage table).
 
 ## ShoppingCart
 

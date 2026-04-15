@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { assetPath } from '@/assetPath'
-import FavoriteBadge from '@/components/FavoriteBadge.vue'
 import PokemonCard from '@/components/PokemonCard.vue'
 import { HABITAT_VARIANT } from '@/habitats'
 import {
@@ -10,8 +9,8 @@ import {
   type ItemDetails,
   type RecommendedHouseItemWithStatus,
 } from '@/items'
-import { rankHouseFavorites, type HouseAssignment, type PokemonData } from '@/solver'
-import { useCartStore } from '@/stores/cart'
+import { type HouseAssignment, type PokemonData } from '@/solver'
+import { useCartStore, type CartItem } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
 import type { BTableSortBy } from 'bootstrap-vue-next'
 import { BBadge, BButton, BCardGroup, BListGroupItem, BTable } from 'bootstrap-vue-next'
@@ -28,12 +27,6 @@ const pinStore = usePinStore()
 function toggleHousePin() {
   pinStore.toggleHousePin(props.house.houseId, props.house.pokemon)
 }
-
-const sharedFavorites = computed(() => {
-  if (props.house.pokemon.length < 1) return []
-  const sets = props.house.pokemon.map((name) => new Set(props.pokemonData[name]?.favorites ?? []))
-  return rankHouseFavorites(sets)
-})
 
 const sharedHabitats = computed(() => {
   if (props.house.pokemon.length < 1) return []
@@ -57,8 +50,6 @@ const houseCartItems = computed(() => cartStore.itemsByHouse.get(props.house.hou
 
 const houseCartItemNames = computed(() => new Set(houseCartItems.value.map((item) => item.name)))
 
-const ITEM_TAGS = ['Relaxation', 'Toy', 'Decoration'] as const
-
 const fulfilledTags = computed(
   () =>
     new Set(
@@ -75,7 +66,18 @@ interface TableItemRow extends Record<string, unknown> {
   itemData: ItemDetails
   name: string
   craftability: string
-  tag: string
+  col_toy: boolean
+  col_relaxation: boolean
+  col_decoration: boolean
+  _cellVariants?: Record<string, 'success'>
+}
+
+interface CartTableItemRow extends Record<string, unknown> {
+  itemData: CartItem
+  name: string
+  col_toy: boolean
+  col_relaxation: boolean
+  col_decoration: boolean
   _cellVariants?: Record<string, 'success'>
 }
 
@@ -101,39 +103,74 @@ const tableFields = computed(() => [
   { key: 'col_image', label: '', sortable: false },
   { key: 'col_actions', label: '', sortable: false },
   { key: 'craftability', label: 'Craftability', sortable: true },
-  { key: 'tag', label: 'Tag', sortable: true },
+  { key: 'col_toy', label: 'Toy', sortable: true },
+  { key: 'col_relaxation', label: 'Relaxation', sortable: true },
+  { key: 'col_decoration', label: 'Decoration', sortable: true },
   ...houseFavoriteColumns.value.map((col) => ({
     key: favoriteCoverageColumnKey(col.favorite),
     label: col.favorite,
     sortable: true,
     formatter: () => '',
+    count: col.count,
+  })),
+])
+
+const cartTableFields = computed(() => [
+  { key: 'col_image', label: '' },
+  { key: 'name', label: 'Item' },
+  { key: 'col_actions', label: '' },
+  { key: 'col_toy', label: 'Toy' },
+  { key: 'col_relaxation', label: 'Relaxation' },
+  { key: 'col_decoration', label: 'Decoration' },
+  ...houseFavoriteColumns.value.map((col) => ({
+    key: favoriteCoverageColumnKey(col.favorite),
+    label: col.favorite,
+    formatter: () => '',
+    count: col.count,
   })),
 ])
 
 const activeTableItems = ref<TableItemRow[]>([])
-
 const redundantTableItems = ref<TableItemRow[]>([])
-
-async function loadFulfilledFavoriteSet(items: { name: string }[]): Promise<Set<string>> {
-  if (items.length === 0) {
-    return new Set()
-  }
-
-  const allFavs = await Promise.all(items.map((item) => favoritesForItem(item.name)))
-  return new Set(allFavs.flat().map((favorite) => favorite.toLowerCase()))
-}
+const cartTableItems = ref<CartTableItemRow[]>([])
 
 function buildTableRow(item: RecommendedHouseItemWithStatus): TableItemRow {
   const row: TableItemRow = {
     itemData: item,
     name: item.name,
     craftability: craftabilityText(item),
-    tag: item.tag ?? '',
+    col_toy: item.tag?.toLowerCase() === 'toy',
+    col_relaxation: item.tag?.toLowerCase() === 'relaxation',
+    col_decoration: item.tag?.toLowerCase() === 'decoration',
   }
   const cellVariants: Record<string, 'success'> = {}
   for (const col of houseFavoriteColumns.value) {
     const cellKey = favoriteCoverageColumnKey(col.favorite)
     const isCovered = item[cellKey] === true
+    row[cellKey] = isCovered
+    if (isCovered) {
+      cellVariants[cellKey] = 'success'
+    }
+  }
+  if (Object.keys(cellVariants).length > 0) {
+    row._cellVariants = cellVariants
+  }
+  return row
+}
+
+function buildCartRow(item: CartItem, itemFavs: string[]): CartTableItemRow {
+  const favSet = new Set(itemFavs.map((f) => f.toLowerCase()))
+  const row: CartTableItemRow = {
+    itemData: item,
+    name: item.name,
+    col_toy: item.tag?.toLowerCase() === 'toy',
+    col_relaxation: item.tag?.toLowerCase() === 'relaxation',
+    col_decoration: item.tag?.toLowerCase() === 'decoration',
+  }
+  const cellVariants: Record<string, 'success'> = {}
+  for (const col of houseFavoriteColumns.value) {
+    const cellKey = favoriteCoverageColumnKey(col.favorite)
+    const isCovered = favSet.has(col.favorite.toLowerCase())
     row[cellKey] = isCovered
     if (isCovered) {
       cellVariants[cellKey] = 'success'
@@ -151,13 +188,19 @@ watch(
   [() => props.house.pokemon, houseCartItems],
   async ([pokemon, items]) => {
     const run = ++recommendationRun
-    const fulfilledFavoriteSet = await loadFulfilledFavoriteSet(items)
 
-    if (run !== recommendationRun) {
-      return
-    }
+    // Fetch favorites for all cart items in one pass — used for both the
+    // aggregate fulfilled set and the per-row cart coverage table.
+    const allFavsPerItem =
+      items.length > 0 ? await Promise.all(items.map((item) => favoritesForItem(item.name))) : []
 
+    if (run !== recommendationRun) return
+
+    const fulfilledFavoriteSet = new Set(
+      allFavsPerItem.flat().map((favorite) => favorite.toLowerCase()),
+    )
     fulfilledFavorites.value = fulfilledFavoriteSet
+    cartTableItems.value = items.map((item, i) => buildCartRow(item, allFavsPerItem[i]!))
 
     const allFavorites = pokemon.flatMap((name) => props.pokemonData[name]?.favorites ?? [])
     if (allFavorites.length === 0) {
@@ -177,9 +220,7 @@ watch(
       representedTags,
     )
 
-    if (run !== recommendationRun) {
-      return
-    }
+    if (run !== recommendationRun) return
 
     const activeRows: TableItemRow[] = []
     const redundantRows: TableItemRow[] = []
@@ -239,29 +280,7 @@ watchEffect(() => {
           {{ item.habitat }} &times;{{ item.count }}
         </BBadge>
       </span>
-      <span v-if="sharedFavorites.length" class="mt-2">
-        <FavoriteBadge
-          v-for="item in sharedFavorites"
-          :key="item.favorite"
-          :favorite="item.favorite"
-          :fulfilled="fulfilledFavorites.has(item.favorite.toLowerCase())"
-          :count="item.count"
-          data-testid="shared-favorite-badge"
-        />
-      </span>
     </p>
-
-    <div class="my-2 d-flex gap-2" data-testid="tag-fulfillment-status">
-      <BBadge
-        v-for="tag in ITEM_TAGS"
-        :key="tag"
-        :variant="fulfilledTags.has(tag.toLowerCase()) ? 'success' : 'danger'"
-        pill
-        :data-testid="`tag-status-${tag.toLowerCase()}`"
-      >
-        {{ fulfilledTags.has(tag.toLowerCase()) ? '✓' : '✗' }} {{ tag }}
-      </BBadge>
-    </div>
 
     <BCardGroup v-if="house.pokemon.length > 0">
       <PokemonCard
@@ -278,6 +297,84 @@ watchEffect(() => {
     </BCardGroup>
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
 
+    <div v-if="cartTableItems.length" class="mt-3" data-testid="cart-items-coverage">
+      <h6>Items in cart</h6>
+      <BTable
+        sticky-header="250px"
+        no-border-collapse
+        small
+        responsive
+        :fields="cartTableFields"
+        :items="cartTableItems"
+        data-testid="cart-coverage-table"
+      >
+        <template #head()="{ column, label, field }">
+          <template v-if="column.startsWith('fav_')">
+            <span
+              :class="
+                fulfilledFavorites.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
+              "
+              :data-testid="`fav-header-${column}`"
+            >
+              {{ fulfilledFavorites.has(label.toLowerCase()) ? '✓' : '✗' }}
+              {{ label }} &times;{{ (field as any).count }}
+            </span>
+          </template>
+          <template
+            v-else-if="
+              column === 'col_toy' || column === 'col_relaxation' || column === 'col_decoration'
+            "
+          >
+            <span
+              :class="
+                fulfilledTags.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
+              "
+            >
+              {{ fulfilledTags.has(label.toLowerCase()) ? '✓' : '✗' }} {{ label }}
+            </span>
+          </template>
+          <template v-else>{{ label }}</template>
+        </template>
+
+        <template #cell(col_image)="{ item }">
+          <img
+            v-if="(item as any).itemData.picturePath"
+            :src="assetPath((item as any).itemData.picturePath)"
+            :alt="(item as any).itemData.name"
+            class="item-thumbnail"
+          />
+        </template>
+
+        <template #cell(name)="{ item }">
+          <span :title="(item as any).itemData.flavorText ?? undefined" data-testid="item-name">{{
+            (item as any).itemData.name
+          }}</span>
+        </template>
+
+        <template #cell(col_actions)="{ item }">
+          <BButton
+            size="sm"
+            variant="outline-danger"
+            data-testid="cart-coverage-remove"
+            @click="cartStore.removeItem(house.houseId, (item as any).itemData.name)"
+            >&times;</BButton
+          >
+        </template>
+
+        <template #cell(col_toy)="{ value }">
+          <span v-if="value" class="text-success" data-testid="cart-tag-toy">✓</span>
+        </template>
+
+        <template #cell(col_relaxation)="{ value }">
+          <span v-if="value" class="text-success" data-testid="cart-tag-relaxation">✓</span>
+        </template>
+
+        <template #cell(col_decoration)="{ value }">
+          <span v-if="value" class="text-success" data-testid="cart-tag-decoration">✓</span>
+        </template>
+      </BTable>
+    </div>
+
     <details
       v-if="activeTableItems.length || redundantTableItems.length"
       data-testid="recommended-items"
@@ -289,6 +386,8 @@ watchEffect(() => {
       </p>
       <BTable
         v-if="activeTableItems.length"
+        sticky-header="400px"
+        no-border-collapse
         small
         responsive
         :fields="tableFields"
@@ -296,6 +395,33 @@ watchEffect(() => {
         v-model:sort-by="sortBy"
         data-testid="recommended-items-list"
       >
+        <template #head()="{ column, label, field }">
+          <template v-if="column.startsWith('fav_')">
+            <span
+              :class="
+                fulfilledFavorites.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
+              "
+            >
+              {{ fulfilledFavorites.has(label.toLowerCase()) ? '✓' : '✗' }}
+              {{ label }} &times;{{ (field as any).count }}
+            </span>
+          </template>
+          <template
+            v-else-if="
+              column === 'col_toy' || column === 'col_relaxation' || column === 'col_decoration'
+            "
+          >
+            <span
+              :class="
+                fulfilledTags.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
+              "
+            >
+              {{ fulfilledTags.has(label.toLowerCase()) ? '✓' : '✗' }} {{ label }}
+            </span>
+          </template>
+          <template v-else>{{ label }}</template>
+        </template>
+
         <template #cell(col_image)="{ item }">
           <img
             v-if="(item as any).itemData.picturePath"
@@ -329,14 +455,16 @@ watchEffect(() => {
           <span data-testid="item-craftability">{{ (item as any).craftability }}</span>
         </template>
 
-        <template #cell(tag)="{ item }">
-          <BBadge
-            v-if="(item as any).itemData.tag"
-            variant="info"
-            pill
-            data-testid="item-tag-badge"
-            >{{ (item as any).itemData.tag }}</BBadge
-          >
+        <template #cell(col_toy)="{ value }">
+          <span v-if="value" class="text-success">✓</span>
+        </template>
+
+        <template #cell(col_relaxation)="{ value }">
+          <span v-if="value" class="text-success">✓</span>
+        </template>
+
+        <template #cell(col_decoration)="{ value }">
+          <span v-if="value" class="text-success">✓</span>
         </template>
       </BTable>
 
@@ -348,11 +476,42 @@ watchEffect(() => {
         <BTable
           small
           responsive
+          sticky-header="400px"
+          no-border-collapse
           :fields="tableFields"
           :items="redundantTableItems"
           data-testid="redundant-items-list"
           class="text-body-secondary opacity-50"
         >
+          <template #head()="{ column, label, field }">
+            <template v-if="column.startsWith('fav_')">
+              <span
+                :class="
+                  fulfilledFavorites.has(label.toLowerCase())
+                    ? 'text-success fw-bold'
+                    : 'text-danger'
+                "
+              >
+                {{ fulfilledFavorites.has(label.toLowerCase()) ? '✓' : '✗' }}
+                {{ label }} &times;{{ (field as any).count }}
+              </span>
+            </template>
+            <template
+              v-else-if="
+                column === 'col_toy' || column === 'col_relaxation' || column === 'col_decoration'
+              "
+            >
+              <span
+                :class="
+                  fulfilledTags.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
+                "
+              >
+                {{ fulfilledTags.has(label.toLowerCase()) ? '✓' : '✗' }} {{ label }}
+              </span>
+            </template>
+            <template v-else>{{ label }}</template>
+          </template>
+
           <template #cell(col_image)="{ item }">
             <img
               v-if="(item as any).itemData.picturePath"
@@ -386,14 +545,16 @@ watchEffect(() => {
             <span data-testid="item-craftability">{{ (item as any).craftability }}</span>
           </template>
 
-          <template #cell(tag)="{ item }">
-            <BBadge
-              v-if="(item as any).itemData.tag"
-              variant="info"
-              pill
-              data-testid="item-tag-badge"
-              >{{ (item as any).itemData.tag }}</BBadge
-            >
+          <template #cell(col_toy)="{ value }">
+            <span v-if="value" class="text-success">✓</span>
+          </template>
+
+          <template #cell(col_relaxation)="{ value }">
+            <span v-if="value" class="text-success">✓</span>
+          </template>
+
+          <template #cell(col_decoration)="{ value }">
+            <span v-if="value" class="text-success">✓</span>
           </template>
         </BTable>
       </details>
