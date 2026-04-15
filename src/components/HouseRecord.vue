@@ -290,6 +290,7 @@ watchEffect(() => {
       <BTable
         v-if="activeTableItems.length"
         small
+        responsive
         :fields="tableFields"
         :items="activeTableItems"
         v-model:sort-by="sortBy"
@@ -346,6 +347,7 @@ watchEffect(() => {
         </p>
         <BTable
           small
+          responsive
           :fields="tableFields"
           :items="redundantTableItems"
           data-testid="redundant-items-list"
