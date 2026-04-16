@@ -63,9 +63,12 @@ export async function getItemMetadata(itemName: string): Promise<{
 }
 
 // @lat: [[items#favoritesForItem]]
+const _itemFavsCache = new Map<string, string[]>()
 export async function favoritesForItem(item: string): Promise<string[]> {
-  const db = await getDb()
   const normalized = item.toLowerCase()
+  const cached = _itemFavsCache.get(normalized)
+  if (cached) return cached
+  const db = await getDb()
   const rows = db.exec(
     `SELECT IF.favorite_name FROM item_favorites IF
        JOIN items i ON i.id = IF.item_id
@@ -73,8 +76,9 @@ export async function favoritesForItem(item: string): Promise<string[]> {
        ORDER BY IF.favorite_name ASC`,
     [normalized],
   )[0]
-  if (!rows) return []
-  return rows.values.map((row) => row[0] as string)
+  const result = rows ? rows.values.map((row) => row[0] as string) : []
+  _itemFavsCache.set(normalized, result)
+  return result
 }
 
 export interface ItemScore {

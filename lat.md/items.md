@@ -30,7 +30,7 @@ Returns `ItemDetails[]` (name, isCraftable, category, flavorText) in database or
 
 Returns all favorites fulfilled by one item using a precomputed reverse index. See [[src/queries.ts#favoritesForItem]].
 
-Queries the SQLite database for the favorites associated with a given item. Input is case-insensitive (lowercased before querying); output favorites are in alphabetically sorted order as returned by the DB.
+Queries the SQLite database for the favorites associated with a given item. Input is case-insensitive (lowercased before querying); output favorites are in alphabetically sorted order as returned by the DB. Results are cached in a module-level `Map` keyed on the lowercased item name — the item-favorites catalog is static (read-only DB), so no invalidation is needed. After the first call per item, subsequent calls are synchronous map lookups.
 
 ## clusterItemsByFavorites
 

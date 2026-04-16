@@ -264,7 +264,7 @@ State: `items` (`Map<string, CartEntry>` with `houseId`, `quantity`, `picturePat
 
 Actions: `addItem(houseId, name)` — increments quantity or inserts at 1 for the given house, loads picture, metadata, and recipe on first add via [[queries#getItemPicturePath]], [[queries#getItemMetadata]], and [[queries#getRecipeForItem]], then recomputes aggregated. `removeItem(houseId, name)`, `incrementItem(houseId, name)`, `decrementItem(houseId, name)` adjust quantities (removing at 0) and recompute aggregated. `restoreItems(entries)` — clears the cart and re-hydrates from a `{ houseId?, houseIndex?, name, quantity }[]` array (legacy entries with `houseIndex` are accepted for backward compat); fetches metadata and recipes for all items in parallel, then calls `recomputeAggregated` once. Used by [[ui#HomeView#Saved Queries]] restore.
 
-Getters: `totalItems` (sum of all quantities), `itemList` (array of `CartItem` including `houseId` for template iteration), `itemsByHouse` (`Map<string, CartItem[]>` grouping `itemList` by house — used by `ShoppingCart.vue` for grouped rendering).
+Getters: `totalItems` (sum of all quantities), `itemList` (array of `CartItem` including `houseId` for template iteration), `itemsByHouse` (`Map<string, CartItem[]>` grouping `itemList` by house — used by `ShoppingCart.vue` for grouped rendering and by each `HouseRecord` to watch its own house's cart items). `itemsByHouse` maintains stable per-house array references: a `name:qty,...` fingerprint detects whether a house's items actually changed; if not, the same `CartItem[]` reference is reused so unaffected house card watchers skip their deep comparisons entirely.
 
 ### Progress Store
 
