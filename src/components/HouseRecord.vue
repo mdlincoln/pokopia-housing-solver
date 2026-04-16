@@ -104,9 +104,13 @@ const recommendationTableFields = computed(() => [
   { key: 'col_image', label: '', sortable: false },
   { key: 'col_actions', label: '', sortable: false },
   { key: 'craftability', label: 'Craftability', sortable: true },
-  { key: 'col_toy', label: 'Toy', sortable: true },
-  { key: 'col_relaxation', label: 'Relaxation', sortable: true },
-  { key: 'col_decoration', label: 'Decoration', sortable: true },
+  ...(!fulfilledTags.value.has('toy') ? [{ key: 'col_toy', label: 'Toy', sortable: true }] : []),
+  ...(!fulfilledTags.value.has('relaxation')
+    ? [{ key: 'col_relaxation', label: 'Relaxation', sortable: true }]
+    : []),
+  ...(!fulfilledTags.value.has('decoration')
+    ? [{ key: 'col_decoration', label: 'Decoration', sortable: true }]
+    : []),
   ...unfulfilledFavoriteColumns.value.map((col) => ({
     key: favoriteCoverageColumnKey(col.favorite),
     label: col.favorite,
@@ -148,6 +152,9 @@ function buildTableRow(item: RecommendedHouseItem): TableItemRow {
     col_decoration: item.tag?.toLowerCase() === 'decoration',
   }
   const cellVariants: Record<string, 'success'> = {}
+  if (row.col_toy) cellVariants['col_toy'] = 'success'
+  if (row.col_relaxation) cellVariants['col_relaxation'] = 'success'
+  if (row.col_decoration) cellVariants['col_decoration'] = 'success'
   for (const col of unfulfilledFavoriteColumns.value) {
     const cellKey = favoriteCoverageColumnKey(col.favorite)
     const isCovered = item[cellKey] === true
@@ -461,17 +468,9 @@ watchEffect(() => {
           <span data-testid="item-craftability">{{ (item as any).craftability }}</span>
         </template>
 
-        <template #cell(col_toy)="{ value }">
-          <span v-if="value" class="text-success">✓</span>
-        </template>
-
-        <template #cell(col_relaxation)="{ value }">
-          <span v-if="value" class="text-success">✓</span>
-        </template>
-
-        <template #cell(col_decoration)="{ value }">
-          <span v-if="value" class="text-success">✓</span>
-        </template>
+        <template #cell(col_toy)=""></template>
+        <template #cell(col_relaxation)=""></template>
+        <template #cell(col_decoration)=""></template>
       </BTable>
     </details>
   </BListGroupItem>
