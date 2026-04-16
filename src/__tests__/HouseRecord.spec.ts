@@ -261,11 +261,11 @@ describe('HouseRecord', () => {
     const rows = table.findAll('tbody tr')
     expect(rows.length).toBeGreaterThan(0)
 
-    // Each item carries exactly one tag, so each row has exactly one non-empty text-success
-    // span (the tag ✓). The item-in-cart-check span also has text-success but is empty here.
+    // Each item carries at least one tag, so each row should have at least one bool-check span.
+    // Both tag and fav coverage cells now render <span class="bool-check">✓</span>.
     for (const row of rows) {
-      const tagChecks = row.findAll('td span.text-success').filter((s) => s.text().trim() === '✓')
-      expect(tagChecks.length).toBe(1)
+      const boolChecks = row.findAll('td span.bool-check')
+      expect(boolChecks.length).toBeGreaterThan(0)
     }
   })
 
@@ -547,7 +547,7 @@ describe('HouseRecord', () => {
     expect(checkmarkForItem()).toBe('')
   })
 
-  it('favorite coverage cells use success background and no checkmark text', async () => {
+  it('favorite coverage cells use success background and show a checkmark', async () => {
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['Exercise'] },
     }
@@ -566,7 +566,8 @@ describe('HouseRecord', () => {
     const successCells = wrapper.findAll('tbody td.table-success')
     expect(successCells.length).toBeGreaterThan(0)
     for (const cell of successCells) {
-      expect(cell.text().trim()).toBe('')
+      expect(cell.find('span.bool-check').exists()).toBe(true)
+      expect(cell.find('span.bool-check').text().trim()).toBe('✓')
     }
   })
 

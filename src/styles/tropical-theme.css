@@ -572,22 +572,47 @@ body {
 }
 
 .recommended-items-table thead tr {
-  height: 80px;
+  height: 150px;
 }
 
 .recommended-items-table thead th {
   vertical-align: bottom;
   padding: 0 !important;
-  text-align: left;
-  position: relative;
+  text-align: center;
+  overflow: hidden;
 }
 
 .recommended-items-table thead th span {
-  display: block;
+  display: inline-block;
   white-space: nowrap;
-  transform: rotate(-50deg);
-  transform-origin: 0% 100%;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
   padding: 3px 4px;
+}
+
+.recommended-items-table thead th.text-col {
+  vertical-align: bottom;
+}
+
+.recommended-items-table thead th.text-col span {
+  writing-mode: horizontal-tb;
+  transform: none;
+  display: inline;
+}
+
+.recommended-items-table th.bool-col,
+.recommended-items-table td.bool-col {
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  text-align: center;
+  border-left: 1px solid var(--bs-border-color);
+}
+
+.bool-check {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--bs-success);
 }
 
 .cart-thumbnail-sm {

@@ -100,22 +100,24 @@ const unfulfilledFavoriteColumns = computed(() => {
 })
 
 const recommendationTableFields = computed(() => [
-  { key: 'name', label: 'Item', sortable: true },
+  { key: 'name', label: 'Item', sortable: true, class: 'text-col' },
   { key: 'col_image', label: '', sortable: false },
   { key: 'col_actions', label: '', sortable: false },
-  { key: 'craftability', label: 'Craftability', sortable: true },
-  ...(!fulfilledTags.value.has('toy') ? [{ key: 'col_toy', label: 'Toy', sortable: true }] : []),
+  { key: 'craftability', label: 'Craftability', sortable: true, class: 'text-col' },
+  ...(!fulfilledTags.value.has('toy')
+    ? [{ key: 'col_toy', label: 'Toy', sortable: true, class: 'bool-col' }]
+    : []),
   ...(!fulfilledTags.value.has('relaxation')
-    ? [{ key: 'col_relaxation', label: 'Relaxation', sortable: true }]
+    ? [{ key: 'col_relaxation', label: 'Relaxation', sortable: true, class: 'bool-col' }]
     : []),
   ...(!fulfilledTags.value.has('decoration')
-    ? [{ key: 'col_decoration', label: 'Decoration', sortable: true }]
+    ? [{ key: 'col_decoration', label: 'Decoration', sortable: true, class: 'bool-col' }]
     : []),
   ...unfulfilledFavoriteColumns.value.map((col) => ({
     key: favoriteCoverageColumnKey(col.favorite),
     label: col.favorite,
     sortable: true,
-    formatter: () => '',
+    class: 'bool-col',
     count: col.count,
   })),
 ])
@@ -419,7 +421,6 @@ watchEffect(() => {
                   : 'text-danger'
               "
             >
-              {{ fulfilledFavorites.has((label as string).toLowerCase()) ? '✓' : '✗' }}
               {{ label }} &times;{{ (field as any).count }}
             </span>
           </template>
@@ -435,7 +436,7 @@ watchEffect(() => {
                   : 'text-danger'
               "
             >
-              {{ fulfilledTags.has((label as string).toLowerCase()) ? '✓' : '✗' }} {{ label }}
+              {{ label }}
             </span>
           </template>
           <template v-else
@@ -476,9 +477,9 @@ watchEffect(() => {
           <span data-testid="item-craftability">{{ (item as any).craftability }}</span>
         </template>
 
-        <template #cell(col_toy)=""></template>
-        <template #cell(col_relaxation)=""></template>
-        <template #cell(col_decoration)=""></template>
+        <template #cell()="{ field, value }">
+          <span v-if="(field as any).class === 'bool-col' && value" class="bool-check">✓</span>
+        </template>
       </BTable>
     </details>
   </BListGroupItem>
