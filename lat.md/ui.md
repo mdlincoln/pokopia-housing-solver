@@ -116,11 +116,9 @@ Verifies that selecting a saved query with `pinnedHouses` and `pinnedPokemon` re
 
 #### Sample island clears progress
 
-Verifies that clicking "Show a sample island" after pinning a house clears all pins and progress checkboxes, so the new sample starts with a clean slate.
+Verifies that clicking "Show a sample island" after pinning a house clears all pins so the new sample starts with a clean slate.
 
-Clicking a favorite pill from either shared house favorites or a pokemon card opens a modal showing catalog items for that exact favorite, sourced from [[items#itemsForFavorite]].
-
-Each modal item row also shows pill badges for other favorites that same item fulfills, sourced from [[items#favoritesForItem]]. Both `selectedFavoriteItems` and `selectedFavoriteItemRows` are `ref`s populated by an async `watch` on `selectedFavorite`, since the query functions are async.
+The test pins a house (which also auto-pins all its pokemon occupants) then loads a new sample and asserts all `aria-checked` attributes are false.
 
 ## House
 

@@ -253,11 +253,13 @@ test.describe('Progress Tracking', () => {
     await page.getByRole('button', { name: 'Show a sample island' }).click()
     await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
 
-    // Check the first house and first pokemon checkboxes
-    await page.getByTestId('progress-checkbox-house').first().check()
-    await page.getByTestId('progress-checkbox-pokemon').first().check()
-    await expect(page.getByTestId('progress-checkbox-house').first()).toBeChecked()
-    await expect(page.getByTestId('progress-checkbox-pokemon').first()).toBeChecked()
+    // Pin the first house — after pinning, the house card animates to the bottom,
+    // so .first() would resolve to a different card. Use .click() and then verify
+    // by attribute selector rather than position.
+    // Note: pinning a house also auto-pins all its pokemon occupants.
+    await page.getByTestId('progress-checkbox-house').first().click()
+    await expect(page.locator('[data-testid="progress-checkbox-house"][aria-checked="true"]')).not.toHaveCount(0)
+    await expect(page.locator('[data-testid="progress-checkbox-pokemon"][aria-checked="true"]')).not.toHaveCount(0)
 
     // Load a new sample — progress should be cleared
     await page.getByRole('button', { name: 'Show a sample island' }).click()
