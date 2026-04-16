@@ -340,15 +340,13 @@ body {
 .house-card {
   padding: var(--space-3);
   margin-bottom: var(--space-2);
-  order: 0;
   transition:
-    order 750ms ease,
     opacity 0.2s,
     filter 0.2s;
 }
 
-.house-card.checked-off {
-  order: 1;
+.house-move {
+  transition: transform 750ms ease;
 }
 
 .house-title {

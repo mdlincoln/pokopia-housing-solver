@@ -56,6 +56,10 @@ Verifies that cart entries encoded in the hash are restored into the shopping ca
 
 Verifies that `pinnedHouses` and `pinnedPokemon` encoded in a version 2 hash are restored so the correct pin checkboxes appear checked.
 
+##### Saves imported state as unlabeled scenario
+
+Verifies that when a user visits a URL with a hash fragment, the decoded state is automatically added to the saved-queries dropdown as an unlabeled entry (empty title), so the user can restore it later without manually saving.
+
 #### Loads legacy entry without checkbox fields
 
 Verifies that a saved entry from before checkbox tracking was added (missing `checkedHouses`, `checkedPokemon`, `checkedCartItems`) restores successfully with all progress checkboxes unchecked.
@@ -94,13 +98,13 @@ Verifies that when a saved query has a non-empty title, the restore dropdown opt
 
 ### Results Display
 
-After solving, a full-width `BListGroup` renders one [[ui#House]] item per assigned house. Unhoused pokemon appear in a `BAlert` warning. Error and loading states are handled inline with `BAlert` and `BSpinner`.
+After solving, a `TransitionGroup` renders one [[ui#House]] per assigned house; pinned houses sort to the bottom with a 750ms FLIP transition. Unhoused pokemon and errors appear in `BAlert` banners.
 
 ### Pinning
 
 Lets users lock pokemon into specific houses and lock entire houses so they persist across re-solves. State is owned by `src/stores/pins.ts` (see [[ui#ShoppingCart#Pin Store]]).
 
-Each house card has a `data-testid="progress-checkbox-house"` lock icon button (`role="checkbox"`) in the title row. Each pokemon card has a `data-testid="progress-checkbox-pokemon"` lock icon button inside the card body. The icons use Bootstrap Icons: `bi-lock-fill` when pinned, `bi-unlock` when unpinned. Pinning a house pins all its current occupants AND prevents the house from being removed when reducing house counts. Pinning applies a `.checked-off` CSS class (defined in `tropical-theme.css`) which reduces opacity and desaturates it. Pinned pokemon cannot be removed from PokemonSelect (their close button is disabled).
+Each house card has a `data-testid="progress-checkbox-house"` lock icon button (`role="checkbox"`) in the title row. Each pokemon card has a `data-testid="progress-checkbox-pokemon"` lock icon button inside the card body. The icons use Bootstrap Icons: `bi-lock-fill` when pinned, `bi-unlock` when unpinned. Pinning a house pins all its current occupants AND prevents the house from being removed when reducing house counts. Pinning applies a `.checked-off` CSS class (defined in `tropical-theme.css`) which reduces opacity and desaturates it. Pinning a house also moves it to the bottom of the sorted list via a 750ms FLIP transition (see [[ui#HomeView#Results Display]]). Pinned pokemon cannot be removed from PokemonSelect (their close button is disabled).
 
 House count inputs have computed `:min` values based on how many houses of each size are effectively pinned (either explicitly or by having pinned pokemon). Reducing a count below the pinned minimum is clamped.
 

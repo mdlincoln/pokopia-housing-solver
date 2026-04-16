@@ -17,7 +17,6 @@ import {
   BFormInput,
   BFormSelect,
   BFormSpinbutton,
-  BListGroup,
   BModal,
   BRow,
   BSpinner,
@@ -61,6 +60,14 @@ const solving = ref(false)
 const loading = computed(() => hydratingPokemonData.value || solving.value)
 const error = ref('')
 const result = ref<SolverResult | null>(null)
+const sortedHouses = computed(() => {
+  if (!result.value) return []
+  return [...result.value.houses].sort((a, b) => {
+    const aPinned = pinStore.isHousePinned(a.houseId) ? 1 : 0
+    const bPinned = pinStore.isHousePinned(b.houseId) ? 1 : 0
+    return aPinned - bPinned
+  })
+})
 
 interface SavedQuery {
   title: string
@@ -503,13 +510,17 @@ defineExpose({
       </ul>
     </BAlert>
 
-    <BListGroup class="w-100 results-list" flush>
+    <TransitionGroup
+      tag="div"
+      class="list-group list-group-flush w-100 results-list"
+      move-class="house-move"
+    >
       <HouseRecord
-        v-for="house in result.houses"
+        v-for="house in sortedHouses"
         :key="house.houseId"
         :house="house"
         :pokemon-data="pokemonData!"
       />
-    </BListGroup>
+    </TransitionGroup>
   </section>
 </template>
