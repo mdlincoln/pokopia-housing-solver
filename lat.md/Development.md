@@ -68,9 +68,14 @@ npm run lint
 
 ## Pre-commit Hook
 
-Formatting and linting run automatically on every commit via husky.
+Code quality checks run automatically on every commit via husky and lint-staged.
 
-The hook runs `npm run format` (oxfmt) and aborts if formatting modified any files so the user must stage those edits before retrying. After that it runs `npm run lint` (oxlint + ESLint).
+The hook uses [lint-staged](https://github.com/okonet/lint-staged) to run linting and formatting only on staged files:
+- ESLint (`eslint --fix`) on `.js`, `.ts`, and `.vue` files
+- oxlint (`oxlint --fix`) on `.js`, `.ts`, and `.vue` files
+- oxfmt on files in `src/` directory
+
+This ensures that only the code you're committing is validated, not the entire codebase.
 
 ## Continuous Integration
 

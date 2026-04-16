@@ -1,9 +1,1 @@
-npm run format
-
-if ! git diff --quiet --exit-code; then
-	echo "Formatting changed files. Stage the updates and commit again."
-	git --no-pager diff --name-only
-	exit 1
-fi
-
-npm run lint
+npx lint-staged

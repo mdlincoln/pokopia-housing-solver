@@ -1,0 +1,4 @@
+{
+  "*.{js,ts,vue}": ["eslint --fix --cache", "oxlint --fix"],
+  "src/**": ["oxfmt"]
+}
