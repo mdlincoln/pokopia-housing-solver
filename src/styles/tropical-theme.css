@@ -336,7 +336,7 @@ body {
   margin-bottom: var(--space-2);
   order: 0;
   transition:
-    order 300ms ease,
+    order 750ms ease,
     opacity 0.2s,
     filter 0.2s;
 }
