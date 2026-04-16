@@ -38,7 +38,7 @@ When saved queries exist, a `BFormSelect` dropdown appears. The timestamp is alw
 
 Scenario state is reactively encoded into the URL hash as base64 JSON so users can share links.
 
-A `watch` on all state sources (house counts, selected pokemon, cart items, progress checkboxes, and pin state) updates the hash via `history.replaceState` whenever any value changes. Version 2 hashes include `pinnedHouses`, `pinnedPokemon`, `houseRegistry`, and `houseCounters`. When a new user visits a URL with a hash fragment, `onMounted` decodes the state, saves it as an unlabeled `SavedQuery` in localStorage, restores all fields (including house registry and pins if present), and clears the hash. A `restoringFromUrl` flag suppresses the hash watcher during import.
+A `watch` on all state sources (house counts, selected pokemon, cart items, progress checkboxes, and pin state) updates the hash via `history.replaceState` whenever any value changes. Version 2 hashes include `pinnedHouses`, `pinnedPokemon`, `houseRegistry`, and `houseCounters`. When a new user visits a URL with a hash fragment, `onMounted` decodes the state and restores all fields (including house registry and pins if present) without saving to localStorage. A `restoringFromUrl` flag suppresses the hash watcher during import. Users can explicitly save the loaded scenario using the "Save query" button.
 
 ##### Hash updates reactively
 
@@ -47,10 +47,6 @@ Verifies that after configuring houses and pokemon, the URL gains a non-empty ha
 ##### Restores houses and pokemon from hash
 
 Verifies that navigating to a URL with an encoded hash automatically restores house counts and selected pokemon so the solver displays the correct results.
-
-##### Saves imported state as unlabeled scenario
-
-Verifies that importing from a URL hash creates an unlabeled (timestamp-only) entry in the saved queries dropdown in localStorage.
 
 ##### Restores cart items from hash
 

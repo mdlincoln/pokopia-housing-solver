@@ -264,13 +264,6 @@ onMounted(async () => {
   const shared = decodeStateFromUrl()
   if (shared) {
     restoringFromUrl = true
-    const entry: SavedQuery = {
-      title: '',
-      timestamp: Date.now(),
-      ...shared,
-    }
-    savedQueries.value = [entry, ...savedQueries.value]
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedQueries.value))
     await restoreState(shared)
     restoringFromUrl = false
   }
