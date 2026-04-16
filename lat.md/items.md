@@ -30,7 +30,7 @@ Returns `ItemDetails[]` (name, isCraftable, category, flavorText) in database or
 
 Returns all favorites fulfilled by one item using a precomputed reverse index. See [[src/queries.ts#favoritesForItem]].
 
-Queries the SQLite database for the favorites associated with a given item. Input is case-insensitive (lowercased before querying); output favorites are in alphabetically sorted order as returned by the DB.
+Queries the SQLite database for the favorites associated with a given item. Input is case-insensitive (lowercased before querying); output favorites are in alphabetically sorted order as returned by the DB. Results are cached in a module-level `Map` keyed on the lowercased item name — the item-favorites catalog is static (read-only DB), so no invalidation is needed. After the first call per item, subsequent calls are synchronous map lookups.
 
 ## clusterItemsByFavorites
 
@@ -45,12 +45,6 @@ Returns flat tagged recommendation rows for a house's favorites. See [[src/queri
 `allFavorites` is the flat list with duplicates, so if two pokemon share a favorite it appears twice and matching items receive a proportionally higher score. SQLite returns one row per item filtered to tags in {Relaxation, Decoration, Toy}, ordered by weighted score descending, covered-favorite count descending, and name ascending.
 
 Each row is `ItemDetails` plus one boolean field per distinct normalized favorite, keyed as `fav_<favorite>`. [[ui#House]] uses those dynamic fields directly to render the per-favorite table columns and success-highlighted covered cells without any regrouping step in TypeScript.
-
-## recommendedItemsForHouseWithStatus
-
-Returns the same flat tagged recommendation rows plus an `isRedundant` flag. See [[src/queries.ts#recommendedItemsForHouseWithStatus]].
-
-The query accepts the house's currently fulfilled favorites and represented tags, computes redundancy in SQLite, and lets [[ui#House]] partition active rows from the muted "Already covered" section without recalculating per-item coverage in Vue.
 
 ## Scraping item tags
 

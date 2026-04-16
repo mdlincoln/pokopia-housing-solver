@@ -59,6 +59,13 @@ export const useCartStore = defineStore('cart', () => {
     })),
   )
 
+  // Stable per-house array cache: keyed by houseId → { fingerprint, items }.
+  // The fingerprint is "name:qty,..." — cheap to compute and sufficient to detect
+  // any change that would alter CartItem field values. When the fingerprint matches,
+  // the same CartItem[] reference is returned so watchers in unaffected house cards
+  // skip their deep comparison entirely.
+  const _stableHouseArrays = new Map<string, { fingerprint: string; items: CartItem[] }>()
+
   const itemsByHouse = computed(() => {
     const grouped = new Map<string, CartItem[]>()
     for (const item of itemList.value) {
@@ -69,7 +76,22 @@ export const useCartStore = defineStore('cart', () => {
       }
       list.push(item)
     }
-    return grouped
+
+    const result = new Map<string, CartItem[]>()
+    for (const [houseId, newItems] of grouped) {
+      const fingerprint = newItems.map((i) => `${i.name}:${i.quantity}`).join(',')
+      const stable = _stableHouseArrays.get(houseId)
+      if (stable?.fingerprint === fingerprint) {
+        result.set(houseId, stable.items)
+      } else {
+        _stableHouseArrays.set(houseId, { fingerprint, items: newItems })
+        result.set(houseId, newItems)
+      }
+    }
+    for (const houseId of _stableHouseArrays.keys()) {
+      if (!grouped.has(houseId)) _stableHouseArrays.delete(houseId)
+    }
+    return result
   })
 
   async function recomputeAggregated() {

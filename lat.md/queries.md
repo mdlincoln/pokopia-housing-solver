@@ -52,12 +52,6 @@ Accepts `allFavorites: string[]` with duplicates preserved for score weighting. 
 
 The SELECT list is assembled dynamically: for each distinct normalized favorite it adds a `MAX(CASE WHEN ...) AS "fav_<favorite>"` column. Each returned row therefore contains `ItemDetails` plus one boolean field per required favorite, which [[ui#House]] can render directly as table cells.
 
-## recommendedItemsForHouseWithStatus
-
-Queries the same flat tagged recommendation rows plus a redundancy flag. See [[src/queries.ts#recommendedItemsForHouseWithStatus]].
-
-Accepts `allFavorites`, `fulfilledFavorites`, and `fulfilledTags`. SQLite computes `isRedundant` as true only when every favorite covered by the item is already fulfilled for the house and the item's tag is already represented, so Vue can split rows into active and already-covered sections without recomputing coverage sets.
-
 ## getItemPicturePath
 
 Returns the `picture_path` for a single item by name. See [[src/queries.ts#getItemPicturePath]].

@@ -63,9 +63,12 @@ export async function getItemMetadata(itemName: string): Promise<{
 }
 
 // @lat: [[items#favoritesForItem]]
+const _itemFavsCache = new Map<string, string[]>()
 export async function favoritesForItem(item: string): Promise<string[]> {
-  const db = await getDb()
   const normalized = item.toLowerCase()
+  const cached = _itemFavsCache.get(normalized)
+  if (cached) return cached
+  const db = await getDb()
   const rows = db.exec(
     `SELECT IF.favorite_name FROM item_favorites IF
        JOIN items i ON i.id = IF.item_id
@@ -73,8 +76,9 @@ export async function favoritesForItem(item: string): Promise<string[]> {
        ORDER BY IF.favorite_name ASC`,
     [normalized],
   )[0]
-  if (!rows) return []
-  return rows.values.map((row) => row[0] as string)
+  const result = rows ? rows.values.map((row) => row[0] as string) : []
+  _itemFavsCache.set(normalized, result)
+  return result
 }
 
 export interface ItemScore {
@@ -84,10 +88,6 @@ export interface ItemScore {
 
 export interface RecommendedHouseItem extends ItemDetails {
   [key: string]: string | boolean | null
-}
-
-export interface RecommendedHouseItemWithStatus extends RecommendedHouseItem {
-  isRedundant: boolean
 }
 
 export function favoriteCoverageColumnKey(favorite: string): string {
@@ -169,82 +169,6 @@ export async function recommendedItemsForHouse(
   if (!rows) return []
 
   return rows.values.map((row) => mapRecommendedHouseItemRow(row, favorites))
-}
-
-// @lat: [[items#recommendedItemsForHouseWithStatus]]
-export async function recommendedItemsForHouseWithStatus(
-  allFavorites: string[],
-  fulfilledFavorites: string[],
-  fulfilledTags: string[],
-): Promise<RecommendedHouseItemWithStatus[]> {
-  const db = await getDb()
-  const favoriteCounts = buildFavoriteCounts(allFavorites)
-  if (favoriteCounts.size === 0) return []
-
-  const favorites = Array.from(favoriteCounts.keys())
-  const fulfilledFavoriteList = [
-    ...new Set(fulfilledFavorites.map((favorite) => favorite.toLowerCase())),
-  ]
-  const fulfilledTagList = [...new Set(fulfilledTags.map((tag) => tag.toLowerCase()))]
-
-  const favoriteValuesSql = favorites.map(() => '(?, ?)').join(', ')
-  const favoriteSelectSql = favorites
-    .map(
-      (favorite) =>
-        `MAX(CASE WHEN IF.favorite_name = ? THEN 1 ELSE 0 END) AS ${favoriteCoverageColumnAlias(favorite)}`,
-    )
-    .join(',\n            ')
-
-  const tagRepresentedCondition = fulfilledTagList.length
-    ? `LOWER(COALESCE(i.tag, '')) IN (${fulfilledTagList.map(() => '?').join(', ')})`
-    : '0'
-
-  const fulfilledFavoriteCondition = fulfilledFavoriteList.length
-    ? `IF.favorite_name IN (${fulfilledFavoriteList.map(() => '?').join(', ')})`
-    : '0'
-
-  const params: Array<string | number> = []
-  for (const [favorite, count] of favoriteCounts) {
-    params.push(favorite, count)
-  }
-  params.push(...favorites)
-  params.push(...fulfilledTagList)
-  params.push(...fulfilledFavoriteList)
-
-  const rows = db.exec(
-    `WITH house_favorites(favorite_name, favorite_count) AS (VALUES ${favoriteValuesSql})
-     SELECT i.name,
-            i.category,
-            i.flavor_text,
-            i.picture_path,
-            i.tag,
-            CASE WHEN EXISTS(SELECT 1 FROM item_recipe r WHERE r.item_id = i.id) THEN 1 ELSE 0 END AS is_craftable,
-            ${favoriteSelectSql},
-            SUM(hf.favorite_count) AS score,
-            COUNT(DISTINCT IF.favorite_name) AS covered_count,
-            CASE
-              WHEN ${tagRepresentedCondition}
-               AND COUNT(DISTINCT IF.favorite_name) = COUNT(DISTINCT CASE WHEN ${fulfilledFavoriteCondition} THEN IF.favorite_name END)
-              THEN 1 ELSE 0
-            END AS is_redundant
-     FROM items i
-     JOIN item_favorites IF ON i.id = IF.item_id
-     JOIN house_favorites hf ON hf.favorite_name = IF.favorite_name
-     WHERE LOWER(i.tag) IN ('relaxation', 'decoration', 'toy')
-     GROUP BY i.id, i.name, i.category, i.flavor_text, i.picture_path, i.tag
-     ORDER BY score DESC, covered_count DESC, LOWER(i.name) ASC, i.name ASC`,
-    params,
-  )[0]
-
-  if (!rows) return []
-
-  return rows.values.map((row) => {
-    const item = mapRecommendedHouseItemRow(row, favorites)
-    return {
-      ...item,
-      isRedundant: (row[6 + favorites.length + 2] as number) === 1,
-    }
-  })
 }
 
 // @lat: [[items#idealItems]]

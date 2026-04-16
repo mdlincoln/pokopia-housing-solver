@@ -5,9 +5,9 @@ import { HABITAT_VARIANT } from '@/habitats'
 import {
   favoriteCoverageColumnKey,
   favoritesForItem,
-  recommendedItemsForHouseWithStatus,
+  recommendedItemsForHouse,
   type ItemDetails,
-  type RecommendedHouseItemWithStatus,
+  type RecommendedHouseItem,
 } from '@/items'
 import { type HouseAssignment, type PokemonData } from '@/solver'
 import { useCartStore, type CartItem } from '@/stores/cart'
@@ -94,19 +94,24 @@ const houseFavoriteColumns = computed(() => {
     .sort((a, b) => b.count - a.count || a.favorite.localeCompare(b.favorite))
 })
 
-function craftabilityText(item: ItemDetails): string {
-  return item.isCraftable ? `Craftable - ${item.category ?? ''}`.trimEnd() : 'Buy'
-}
+const unfulfilledFavoriteColumns = computed(() => {
+  const fulfilled = fulfilledFavorites.value
+  return houseFavoriteColumns.value.filter((col) => !fulfilled.has(col.favorite.toLowerCase()))
+})
 
-const tableFields = computed(() => [
+const recommendationTableFields = computed(() => [
   { key: 'name', label: 'Item', sortable: true },
   { key: 'col_image', label: '', sortable: false },
   { key: 'col_actions', label: '', sortable: false },
   { key: 'craftability', label: 'Craftability', sortable: true },
-  { key: 'col_toy', label: 'Toy', sortable: true },
-  { key: 'col_relaxation', label: 'Relaxation', sortable: true },
-  { key: 'col_decoration', label: 'Decoration', sortable: true },
-  ...houseFavoriteColumns.value.map((col) => ({
+  ...(!fulfilledTags.value.has('toy') ? [{ key: 'col_toy', label: 'Toy', sortable: true }] : []),
+  ...(!fulfilledTags.value.has('relaxation')
+    ? [{ key: 'col_relaxation', label: 'Relaxation', sortable: true }]
+    : []),
+  ...(!fulfilledTags.value.has('decoration')
+    ? [{ key: 'col_decoration', label: 'Decoration', sortable: true }]
+    : []),
+  ...unfulfilledFavoriteColumns.value.map((col) => ({
     key: favoriteCoverageColumnKey(col.favorite),
     label: col.favorite,
     sortable: true,
@@ -114,6 +119,10 @@ const tableFields = computed(() => [
     count: col.count,
   })),
 ])
+
+function craftabilityText(item: ItemDetails): string {
+  return item.isCraftable ? `Craftable - ${item.category ?? ''}`.trimEnd() : 'Buy'
+}
 
 const cartTableFields = computed(() => [
   { key: 'col_image', label: '' },
@@ -131,10 +140,9 @@ const cartTableFields = computed(() => [
 ])
 
 const activeTableItems = ref<TableItemRow[]>([])
-const redundantTableItems = ref<TableItemRow[]>([])
 const cartTableItems = ref<CartTableItemRow[]>([])
 
-function buildTableRow(item: RecommendedHouseItemWithStatus): TableItemRow {
+function buildTableRow(item: RecommendedHouseItem): TableItemRow {
   const row: TableItemRow = {
     itemData: item,
     name: item.name,
@@ -144,7 +152,10 @@ function buildTableRow(item: RecommendedHouseItemWithStatus): TableItemRow {
     col_decoration: item.tag?.toLowerCase() === 'decoration',
   }
   const cellVariants: Record<string, 'success'> = {}
-  for (const col of houseFavoriteColumns.value) {
+  if (row.col_toy) cellVariants['col_toy'] = 'success'
+  if (row.col_relaxation) cellVariants['col_relaxation'] = 'success'
+  if (row.col_decoration) cellVariants['col_decoration'] = 'success'
+  for (const col of unfulfilledFavoriteColumns.value) {
     const cellKey = favoriteCoverageColumnKey(col.favorite)
     const isCovered = item[cellKey] === true
     row[cellKey] = isCovered
@@ -203,38 +214,21 @@ watch(
     cartTableItems.value = items.map((item, i) => buildCartRow(item, allFavsPerItem[i]!))
 
     const allFavorites = pokemon.flatMap((name) => props.pokemonData[name]?.favorites ?? [])
-    if (allFavorites.length === 0) {
+    const unfulfilledFavorites = allFavorites.filter(
+      (favorite) => !fulfilledFavoriteSet.has(favorite.toLowerCase()),
+    )
+    const queryFavorites = unfulfilledFavorites.length > 0 ? unfulfilledFavorites : allFavorites
+
+    if (queryFavorites.length === 0) {
       activeTableItems.value = []
-      redundantTableItems.value = []
       return
     }
 
-    const representedTags = items
-      .map((item) => item.tag)
-      .filter((tag): tag is string => !!tag)
-      .map((tag) => tag.toLowerCase())
-
-    const recommendations = await recommendedItemsForHouseWithStatus(
-      allFavorites,
-      Array.from(fulfilledFavoriteSet),
-      representedTags,
-    )
+    const recommendations = await recommendedItemsForHouse(queryFavorites)
 
     if (run !== recommendationRun) return
 
-    const activeRows: TableItemRow[] = []
-    const redundantRows: TableItemRow[] = []
-    for (const recommendation of recommendations) {
-      const row = buildTableRow(recommendation)
-      if (recommendation.isRedundant) {
-        redundantRows.push(row)
-      } else {
-        activeRows.push(row)
-      }
-    }
-
-    activeTableItems.value = activeRows
-    redundantTableItems.value = redundantRows
+    activeTableItems.value = recommendations.map((r) => buildTableRow(r))
   },
   { deep: true, immediate: true },
 )
@@ -242,9 +236,20 @@ watch(
 const sortBy = ref<BTableSortBy[]>([])
 
 watchEffect(() => {
-  const cols = houseFavoriteColumns.value
-  if (sortBy.value.length === 0 && cols.length > 0) {
-    sortBy.value = [{ key: favoriteCoverageColumnKey(cols[0]!.favorite), order: 'desc' }]
+  const cols = unfulfilledFavoriteColumns.value
+  const firstKey = cols.length > 0 ? favoriteCoverageColumnKey(cols[0]!.favorite) : undefined
+
+  if (sortBy.value.length === 0 && firstKey) {
+    sortBy.value = [{ key: firstKey, order: 'desc' }]
+    return
+  }
+
+  if (sortBy.value.length > 0 && firstKey && sortBy.value[0]!.key !== firstKey) {
+    sortBy.value = [{ key: firstKey, order: 'desc' }]
+  }
+
+  if (sortBy.value.length > 0 && !firstKey) {
+    sortBy.value = []
   }
 })
 </script>
@@ -312,15 +317,17 @@ watchEffect(() => {
         data-testid="cart-coverage-table"
       >
         <template #head()="{ column, label, field }">
-          <template v-if="typeof column === 'string' && column.startsWith('fav_')">
+          <template v-if="(column as string).startsWith('fav_')">
             <span
               v-if="label"
               :class="
-                fulfilledFavorites.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
+                fulfilledFavorites.has((label as string).toLowerCase())
+                  ? 'text-success fw-bold'
+                  : 'text-danger'
               "
               :data-testid="`fav-header-${column}`"
             >
-              {{ fulfilledFavorites.has(label.toLowerCase()) ? '✓' : '✗' }}
+              {{ fulfilledFavorites.has((label as string).toLowerCase()) ? '✓' : '✗' }}
               {{ label }} &times;{{ (field as any).count }}
             </span>
           </template>
@@ -332,10 +339,12 @@ watchEffect(() => {
             <span
               v-if="label"
               :class="
-                fulfilledTags.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
+                fulfilledTags.has((label as string).toLowerCase())
+                  ? 'text-success fw-bold'
+                  : 'text-danger'
               "
             >
-              {{ fulfilledTags.has(label.toLowerCase()) ? '✓' : '✗' }} {{ label }}
+              {{ fulfilledTags.has((label as string).toLowerCase()) ? '✓' : '✗' }} {{ label }}
             </span>
           </template>
           <template v-else>{{ label }}</template>
@@ -381,7 +390,7 @@ watchEffect(() => {
     </div>
 
     <details
-      v-if="activeTableItems.length || redundantTableItems.length"
+      v-if="activeTableItems.length"
       data-testid="recommended-items"
       class="mt-3 house-recommendations"
     >
@@ -395,19 +404,21 @@ watchEffect(() => {
         no-border-collapse
         small
         responsive
-        :fields="tableFields"
+        :fields="recommendationTableFields"
         :items="activeTableItems"
         v-model:sort-by="sortBy"
         data-testid="recommended-items-list"
       >
         <template #head()="{ column, label, field }">
-          <template v-if="column.startsWith('fav_')">
+          <template v-if="(column as string).startsWith('fav_')">
             <span
               :class="
-                fulfilledFavorites.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
+                fulfilledFavorites.has((label as string).toLowerCase())
+                  ? 'text-success fw-bold'
+                  : 'text-danger'
               "
             >
-              {{ fulfilledFavorites.has(label.toLowerCase()) ? '✓' : '✗' }}
+              {{ fulfilledFavorites.has((label as string).toLowerCase()) ? '✓' : '✗' }}
               {{ label }} &times;{{ (field as any).count }}
             </span>
           </template>
@@ -418,10 +429,12 @@ watchEffect(() => {
           >
             <span
               :class="
-                fulfilledTags.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
+                fulfilledTags.has((label as string).toLowerCase())
+                  ? 'text-success fw-bold'
+                  : 'text-danger'
               "
             >
-              {{ fulfilledTags.has(label.toLowerCase()) ? '✓' : '✗' }} {{ label }}
+              {{ fulfilledTags.has((label as string).toLowerCase()) ? '✓' : '✗' }} {{ label }}
             </span>
           </template>
           <template v-else>{{ label }}</template>
@@ -460,109 +473,10 @@ watchEffect(() => {
           <span data-testid="item-craftability">{{ (item as any).craftability }}</span>
         </template>
 
-        <template #cell(col_toy)="{ value }">
-          <span v-if="value" class="text-success">✓</span>
-        </template>
-
-        <template #cell(col_relaxation)="{ value }">
-          <span v-if="value" class="text-success">✓</span>
-        </template>
-
-        <template #cell(col_decoration)="{ value }">
-          <span v-if="value" class="text-success">✓</span>
-        </template>
+        <template #cell(col_toy)=""></template>
+        <template #cell(col_relaxation)=""></template>
+        <template #cell(col_decoration)=""></template>
       </BTable>
-
-      <details v-if="redundantTableItems.length" class="mt-3" data-testid="redundant-items-section">
-        <summary><h6 class="mb-2">Already covered</h6></summary>
-        <p class="mb-2 small">
-          These items would not add any new favorite coverage or tag coverage for this house.
-        </p>
-        <BTable
-          small
-          responsive
-          sticky-header="400px"
-          no-border-collapse
-          :fields="tableFields"
-          :items="redundantTableItems"
-          data-testid="redundant-items-list"
-          class="text-body-secondary opacity-50"
-        >
-          <template #head()="{ column, label, field }">
-            <template v-if="column.startsWith('fav_')">
-              <span
-                :class="
-                  fulfilledFavorites.has(label.toLowerCase())
-                    ? 'text-success fw-bold'
-                    : 'text-danger'
-                "
-              >
-                {{ fulfilledFavorites.has(label.toLowerCase()) ? '✓' : '✗' }}
-                {{ label }} &times;{{ (field as any).count }}
-              </span>
-            </template>
-            <template
-              v-else-if="
-                column === 'col_toy' || column === 'col_relaxation' || column === 'col_decoration'
-              "
-            >
-              <span
-                :class="
-                  fulfilledTags.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
-                "
-              >
-                {{ fulfilledTags.has(label.toLowerCase()) ? '✓' : '✗' }} {{ label }}
-              </span>
-            </template>
-            <template v-else>{{ label }}</template>
-          </template>
-
-          <template #cell(col_image)="{ item }">
-            <img
-              v-if="(item as any).itemData.picturePath"
-              :src="assetPath((item as any).itemData.picturePath)"
-              :alt="(item as any).itemData.name"
-              class="item-thumbnail"
-            />
-          </template>
-
-          <template #cell(col_actions)="{ item }">
-            <BButton
-              size="sm"
-              variant="outline-success"
-              class="cart-add-btn"
-              data-testid="add-to-cart"
-              @click="cartStore.addItem(house.houseId, (item as any).itemData.name)"
-              >+</BButton
-            >
-            <span class="text-success fw-bold ms-1" data-testid="item-in-cart-check">
-              {{ houseCartItemNames.has((item as any).itemData.name) ? '✓' : '' }}
-            </span>
-          </template>
-
-          <template #cell(name)="{ item }">
-            <span :title="(item as any).itemData.flavorText ?? undefined" data-testid="item-name">{{
-              (item as any).itemData.name
-            }}</span>
-          </template>
-
-          <template #cell(craftability)="{ item }">
-            <span data-testid="item-craftability">{{ (item as any).craftability }}</span>
-          </template>
-
-          <template #cell(col_toy)="{ value }">
-            <span v-if="value" class="text-success">✓</span>
-          </template>
-
-          <template #cell(col_relaxation)="{ value }">
-            <span v-if="value" class="text-success">✓</span>
-          </template>
-
-          <template #cell(col_decoration)="{ value }">
-            <span v-if="value" class="text-success">✓</span>
-          </template>
-        </BTable>
-      </details>
     </details>
   </BListGroupItem>
 </template>
