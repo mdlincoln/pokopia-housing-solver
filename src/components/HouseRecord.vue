@@ -128,15 +128,15 @@ function craftabilityText(item: ItemDetails): string {
 
 const cartTableFields = computed(() => [
   { key: 'col_image', label: '' },
-  { key: 'name', label: 'Item' },
+  { key: 'name', label: 'Item', class: 'text-col' },
   { key: 'col_actions', label: '' },
-  { key: 'col_toy', label: 'Toy' },
-  { key: 'col_relaxation', label: 'Relaxation' },
-  { key: 'col_decoration', label: 'Decoration' },
+  { key: 'col_toy', label: 'Toy', class: 'bool-col' },
+  { key: 'col_relaxation', label: 'Relaxation', class: 'bool-col' },
+  { key: 'col_decoration', label: 'Decoration', class: 'bool-col' },
   ...houseFavoriteColumns.value.map((col) => ({
     key: favoriteCoverageColumnKey(col.favorite),
     label: col.favorite,
-    formatter: () => '',
+    class: 'bool-col',
     count: col.count,
   })),
 ])
@@ -314,6 +314,7 @@ watchEffect(() => {
         no-border-collapse
         small
         responsive
+        class="recommended-items-table"
         :fields="cartTableFields"
         :items="cartTableItems"
         data-testid="cart-coverage-table"
@@ -329,7 +330,6 @@ watchEffect(() => {
               "
               :data-testid="`fav-header-${column}`"
             >
-              {{ fulfilledFavorites.has((label as string).toLowerCase()) ? '✓' : '✗' }}
               {{ label }} &times;{{ (field as any).count }}
             </span>
           </template>
@@ -346,10 +346,12 @@ watchEffect(() => {
                   : 'text-danger'
               "
             >
-              {{ fulfilledTags.has((label as string).toLowerCase()) ? '✓' : '✗' }} {{ label }}
+              {{ label }}
             </span>
           </template>
-          <template v-else>{{ label }}</template>
+          <template v-else
+            ><span>{{ label }}</span></template
+          >
         </template>
 
         <template #cell(col_image)="{ item }">
@@ -378,15 +380,19 @@ watchEffect(() => {
         </template>
 
         <template #cell(col_toy)="{ value }">
-          <span v-if="value" class="text-success" data-testid="cart-tag-toy">✓</span>
+          <span v-if="value" class="bool-check" data-testid="cart-tag-toy">✓</span>
         </template>
 
         <template #cell(col_relaxation)="{ value }">
-          <span v-if="value" class="text-success" data-testid="cart-tag-relaxation">✓</span>
+          <span v-if="value" class="bool-check" data-testid="cart-tag-relaxation">✓</span>
         </template>
 
         <template #cell(col_decoration)="{ value }">
-          <span v-if="value" class="text-success" data-testid="cart-tag-decoration">✓</span>
+          <span v-if="value" class="bool-check" data-testid="cart-tag-decoration">✓</span>
+        </template>
+
+        <template #cell()="{ field, value }">
+          <span v-if="(field as any).class === 'bool-col' && value" class="bool-check">✓</span>
         </template>
       </BTable>
     </div>
