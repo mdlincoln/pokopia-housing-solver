@@ -220,17 +220,22 @@ const flatRows = computed<FlatRow[]>(() => {
       class="mt-3 house-recommendations"
     >
       <summary>Recommended items</summary>
-      <BTableSimple small borderless data-testid="recommended-items-list">
+      <BTableSimple
+        small
+        borderless
+        class="recommended-items-table"
+        data-testid="recommended-items-list"
+      >
         <BThead>
           <BTr>
-            <BTh>Favorites</BTh>
+            <BTh><span>Favorites</span></BTh>
             <BTh></BTh>
             <BTh></BTh>
             <BTh></BTh>
-            <BTh>Item</BTh>
-            <BTh>Craft</BTh>
-            <BTh>Category</BTh>
-            <BTh>Tag</BTh>
+            <BTh><span>Item</span></BTh>
+            <BTh><span>Craft</span></BTh>
+            <BTh><span>Category</span></BTh>
+            <BTh><span>Tag</span></BTh>
           </BTr>
         </BThead>
         <BTbody>
