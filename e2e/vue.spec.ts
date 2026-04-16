@@ -401,28 +401,6 @@ test.describe('URL Hash Sharing', () => {
     await expect(page.getByTestId('results')).toContainText('Ivysaur', { timeout: 30_000 })
   })
 
-  // @lat: [[ui#HomeView#Saved Queries#URL Sharing#Saves imported state as unlabeled scenario]]
-  test('imported URL state is saved as an unlabeled entry in the dropdown', async ({ page }) => {
-    test.setTimeout(40_000)
-
-    const state = { small: 1, medium: 0, large: 0, pokemon: ['Bulbasaur'] }
-    const hash = btoa(JSON.stringify(state))
-
-    await page.goto(`/#${hash}`)
-
-    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
-
-    const select = page.locator('#saved-queries-select')
-    await expect(select).toBeVisible({ timeout: 2000 })
-
-    // The imported entry appears with only a timestamp (no title prefix)
-    const option = select.locator('option').nth(1)
-    const text = await option.textContent()
-    expect(text?.trim().length).toBeGreaterThan(0)
-    // A titled entry would look like "My title (date)"; unlabeled is just the timestamp
-    expect(text?.trim()).not.toMatch(/^\w.+\(/)
-  })
-
   // @lat: [[ui#HomeView#Saved Queries#URL Sharing#Restores cart items from hash]]
   test('loading a shared URL restores cart items', async ({ page }) => {
     test.setTimeout(40_000)

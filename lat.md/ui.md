@@ -56,10 +56,6 @@ Verifies that cart entries encoded in the hash are restored into the shopping ca
 
 Verifies that `pinnedHouses` and `pinnedPokemon` encoded in a version 2 hash are restored so the correct pin checkboxes appear checked.
 
-##### Saves imported state as unlabeled scenario
-
-Verifies that when a user visits a URL with a hash fragment, the decoded state is automatically added to the saved-queries dropdown as an unlabeled entry (empty title), so the user can restore it later without manually saving.
-
 #### Loads legacy entry without checkbox fields
 
 Verifies that a saved entry from before checkbox tracking was added (missing `checkedHouses`, `checkedPokemon`, `checkedCartItems`) restores successfully with all progress checkboxes unchecked.
