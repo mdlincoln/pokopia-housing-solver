@@ -6,7 +6,6 @@ import {
   favoritesToItems,
   idealItems,
   recommendedItemsForHouse,
-  recommendedItemsForHouseWithStatus,
   type ItemDetails,
   type ItemScore,
 } from '../items'
@@ -278,32 +277,5 @@ describe('recommendedItemsForHouse', () => {
   it('returns an empty array when no favorites match tagged items', async () => {
     const result = await recommendedItemsForHouse(['not a real favorite'])
     expect(result).toHaveLength(0)
-  })
-})
-
-describe('recommendedItemsForHouseWithStatus', () => {
-  it('marks rows redundant when both favorite coverage and tag coverage are already satisfied', async () => {
-    const result = await recommendedItemsForHouseWithStatus(
-      ['soft stuff'],
-      ['soft stuff'],
-      ['relaxation'],
-    )
-
-    expect(result.length).toBeGreaterThan(0)
-    expect(result.some((item) => item.isRedundant)).toBe(true)
-    expect(result.some((item) => !item.isRedundant)).toBe(true)
-  })
-
-  it('does not mark rows redundant when the represented tag is missing', async () => {
-    const result = await recommendedItemsForHouseWithStatus(['soft stuff'], ['soft stuff'], [])
-
-    expect(result.length).toBeGreaterThan(0)
-    expect(result.every((item) => item.isRedundant === false)).toBe(true)
-  })
-
-  it('returns dynamic favorite coverage columns alongside redundancy status', async () => {
-    const result = await recommendedItemsForHouseWithStatus(['soft stuff'], [], [])
-    expect(result.length).toBeGreaterThan(0)
-    expect(result[0]?.[favoriteCoverageColumnKey('soft stuff')]).toBeTypeOf('boolean')
   })
 })

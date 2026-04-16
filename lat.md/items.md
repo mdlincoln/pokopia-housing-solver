@@ -46,12 +46,6 @@ Returns flat tagged recommendation rows for a house's favorites. See [[src/queri
 
 Each row is `ItemDetails` plus one boolean field per distinct normalized favorite, keyed as `fav_<favorite>`. [[ui#House]] uses those dynamic fields directly to render the per-favorite table columns and success-highlighted covered cells without any regrouping step in TypeScript.
 
-## recommendedItemsForHouseWithStatus
-
-Returns the same flat tagged recommendation rows plus an `isRedundant` flag. See [[src/queries.ts#recommendedItemsForHouseWithStatus]].
-
-The query accepts the house's currently fulfilled favorites and represented tags, computes redundancy in SQLite, and lets [[ui#House]] partition active rows from the muted "Already covered" section without recalculating per-item coverage in Vue.
-
 ## Scraping item tags
 
 [[scripts/scrape-item-tags.js]] populates the `tag` column by scraping all item pages from serebii.net. The script is resumable and rate-limited at 1500ms intervals.

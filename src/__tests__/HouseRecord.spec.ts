@@ -570,15 +570,15 @@ describe('HouseRecord', () => {
     }
   })
 
-  it('moves fully covered same-tag items into a grayed-out bottom section', async () => {
+  it('hides a fulfilled pokemon favorite column from active recommendations', async () => {
     const pokemonData: PokemonData = {
-      Softie: { image: '', favorites: ['Soft stuff'] },
+      FitOne: { image: '', favorites: ['Exercise', 'Cleanliness'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
       size: 'small',
       capacity: 1,
-      pokemon: ['Softie'],
+      pokemon: ['FitOne'],
     }
 
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
@@ -586,31 +586,26 @@ describe('HouseRecord', () => {
     await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="redundant-items-section"]').exists()).toBe(false)
+    const recommendationTable = wrapper.find('[data-testid="recommended-items-list"]')
+    expect(recommendationTable.exists()).toBe(true)
 
-    const activeTable = wrapper.find('[data-testid="recommended-items-list"]')
-    const firstRecommendedName = activeTable.find('[data-testid="item-name"]').text()
+    const headerTextsBefore = recommendationTable
+      .findAll('thead th')
+      .map((node) => node.text().toLowerCase().trim())
+      .filter(Boolean)
+    expect(headerTextsBefore.some((text) => text.includes('exercise'))).toBe(true)
+    expect(headerTextsBefore.some((text) => text.includes('cleanliness'))).toBe(true)
 
     const cartStore = useCartStore()
-    await cartStore.addItem('S1', firstRecommendedName)
+    await cartStore.addItem('S1', 'Punching bag')
     await flushPromises()
 
-    const redundantSection = wrapper.find('[data-testid="redundant-items-section"]')
-    expect(redundantSection.exists()).toBe(true)
-    const redundantList = redundantSection.find('[data-testid="redundant-items-list"]')
-    expect(redundantList.exists()).toBe(true)
-    expect(redundantList.classes()).toContain('opacity-50')
-
-    const redundantNames = redundantSection
-      .findAll('[data-testid="item-name"]')
-      .map((node) => node.text())
-    expect(redundantNames).toContain(firstRecommendedName)
-
-    const activeNames = wrapper
-      .find('[data-testid="recommended-items-list"]')
-      .findAll('[data-testid="item-name"]')
-      .map((node) => node.text())
-    expect(activeNames).not.toContain(firstRecommendedName)
+    const headerTextsAfter = recommendationTable
+      .findAll('thead th')
+      .map((node) => node.text().toLowerCase().trim())
+      .filter(Boolean)
+    expect(headerTextsAfter.some((text) => text.includes('exercise'))).toBe(false)
+    expect(headerTextsAfter.some((text) => text.includes('cleanliness'))).toBe(true)
   })
 
   it('fulfilled favorites do not bleed across houses', async () => {

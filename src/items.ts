@@ -3,7 +3,6 @@ import {
   idealItems,
   itemsForFavorite,
   recommendedItemsForHouse,
-  recommendedItemsForHouseWithStatus,
   type ItemDetails,
 } from '@/queries'
 
@@ -13,14 +12,8 @@ export {
   idealItems,
   itemsForFavorite,
   recommendedItemsForHouse,
-  recommendedItemsForHouseWithStatus,
 } from '@/queries'
-export type {
-  ItemDetails,
-  ItemScore,
-  RecommendedHouseItem,
-  RecommendedHouseItemWithStatus,
-} from '@/queries'
+export type { ItemDetails, ItemScore, RecommendedHouseItem } from '@/queries'
 
 export interface FavoriteCount {
   favorite: string
