@@ -571,6 +571,25 @@ body {
   border-top: 1px solid var(--bs-border-color-translucent) !important;
 }
 
+.recommended-items-table thead tr {
+  height: 80px;
+}
+
+.recommended-items-table thead th {
+  vertical-align: bottom;
+  padding: 0 !important;
+  text-align: left;
+  position: relative;
+}
+
+.recommended-items-table thead th span {
+  display: block;
+  white-space: nowrap;
+  transform: rotate(-50deg);
+  transform-origin: 0% 100%;
+  padding: 3px 4px;
+}
+
 .cart-thumbnail-sm {
   width: 20px;
   height: 20px;

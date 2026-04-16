@@ -404,6 +404,7 @@ watchEffect(() => {
         no-border-collapse
         small
         responsive
+        class="recommended-items-table"
         :fields="recommendationTableFields"
         :items="activeTableItems"
         v-model:sort-by="sortBy"
@@ -437,7 +438,9 @@ watchEffect(() => {
               {{ fulfilledTags.has((label as string).toLowerCase()) ? '✓' : '✗' }} {{ label }}
             </span>
           </template>
-          <template v-else>{{ label }}</template>
+          <template v-else
+            ><span>{{ label }}</span></template
+          >
         </template>
 
         <template #cell(col_image)="{ item }">
