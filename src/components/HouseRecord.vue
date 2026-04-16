@@ -310,7 +310,6 @@ watchEffect(() => {
     <div v-if="cartTableItems.length" class="mt-3" data-testid="cart-items-coverage">
       <h6>Items in cart</h6>
       <BTable
-        sticky-header="250px"
         no-border-collapse
         small
         responsive
@@ -408,7 +407,6 @@ watchEffect(() => {
       </p>
       <BTable
         v-if="activeTableItems.length"
-        sticky-header="400px"
         no-border-collapse
         small
         responsive
