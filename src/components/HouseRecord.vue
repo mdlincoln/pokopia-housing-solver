@@ -312,8 +312,9 @@ watchEffect(() => {
         data-testid="cart-coverage-table"
       >
         <template #head()="{ column, label, field }">
-          <template v-if="column.startsWith('fav_')">
+          <template v-if="typeof column === 'string' && column.startsWith('fav_')">
             <span
+              v-if="label"
               :class="
                 fulfilledFavorites.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
               "
@@ -329,6 +330,7 @@ watchEffect(() => {
             "
           >
             <span
+              v-if="label"
               :class="
                 fulfilledTags.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
               "
@@ -399,8 +401,9 @@ watchEffect(() => {
         data-testid="recommended-items-list"
       >
         <template #head()="{ column, label, field }">
-          <template v-if="column.startsWith('fav_')">
+          <template v-if="typeof column === 'string' && column.startsWith('fav_')">
             <span
+              v-if="label"
               :class="
                 fulfilledFavorites.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
               "
@@ -415,6 +418,7 @@ watchEffect(() => {
             "
           >
             <span
+              v-if="label"
               :class="
                 fulfilledTags.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
               "
@@ -487,8 +491,9 @@ watchEffect(() => {
           class="text-body-secondary opacity-50"
         >
           <template #head()="{ column, label, field }">
-            <template v-if="column.startsWith('fav_')">
+            <template v-if="typeof column === 'string' && column.startsWith('fav_')">
               <span
+                v-if="label"
                 :class="
                   fulfilledFavorites.has(label.toLowerCase())
                     ? 'text-success fw-bold'
@@ -505,6 +510,7 @@ watchEffect(() => {
               "
             >
               <span
+                v-if="label"
                 :class="
                   fulfilledTags.has(label.toLowerCase()) ? 'text-success fw-bold' : 'text-danger'
                 "
