@@ -256,14 +256,17 @@ watchEffect(() => {
     :class="{ 'checked-off': pinStore.isHousePinned(house.houseId) }"
   >
     <h5 class="mb-1 house-title">
-      <input
-        type="checkbox"
-        :checked="pinStore.isHousePinned(house.houseId)"
-        class="form-check-input me-2"
+      <button
+        type="button"
+        role="checkbox"
+        :aria-checked="pinStore.isHousePinned(house.houseId)"
+        class="btn btn-link p-0 me-2 pin-icon"
         data-testid="progress-checkbox-house"
-        @change="toggleHousePin"
+        @click="toggleHousePin"
         title="Pin this house and all its pokemon so they stay when re-solving"
-      />
+      >
+        <i :class="pinStore.isHousePinned(house.houseId) ? 'bi bi-lock-fill' : 'bi bi-unlock'"></i>
+      </button>
       {{ house.size }} house {{ house.houseId }}
     </h5>
     <h6>House-wide needs</h6>

@@ -100,7 +100,7 @@ After solving, a full-width `BListGroup` renders one [[ui#House]] item per assig
 
 Lets users lock pokemon into specific houses and lock entire houses so they persist across re-solves. State is owned by `src/stores/pins.ts` (see [[ui#ShoppingCart#Pin Store]]).
 
-Each house card has a `data-testid="progress-checkbox-house"` checkbox in the title row. Each pokemon card has a `data-testid="progress-checkbox-pokemon"` checkbox inside the card body. Pinning a house pins all its current occupants AND prevents the house from being removed when reducing house counts. Pinning applies a `.checked-off` CSS class (defined in `tropical-theme.css`) which reduces opacity and desaturates it. Pinned pokemon cannot be removed from PokemonSelect (their close button is disabled).
+Each house card has a `data-testid="progress-checkbox-house"` lock icon button (`role="checkbox"`) in the title row. Each pokemon card has a `data-testid="progress-checkbox-pokemon"` lock icon button inside the card body. The icons use Bootstrap Icons: `bi-lock-fill` when pinned, `bi-unlock` when unpinned. Pinning a house pins all its current occupants AND prevents the house from being removed when reducing house counts. Pinning applies a `.checked-off` CSS class (defined in `tropical-theme.css`) which reduces opacity and desaturates it. Pinned pokemon cannot be removed from PokemonSelect (their close button is disabled).
 
 House count inputs have computed `:min` values based on how many houses of each size are effectively pinned (either explicitly or by having pinned pokemon). Reducing a count below the pinned minimum is clamped.
 

@@ -40,14 +40,17 @@ const habitatVariant = computed(() =>
       <BCol>
         <BCardBody :title="name" class="pokemon-card-body">
           <div class="mb-1">
-            <input
-              type="checkbox"
-              :checked="checked"
-              class="form-check-input me-1"
+            <button
+              type="button"
+              role="checkbox"
+              :aria-checked="checked"
+              class="btn btn-link p-0 me-1 pin-icon"
               data-testid="progress-checkbox-pokemon"
-              @change="emit('toggle')"
+              @click="emit('toggle')"
               title="Pin this pokemon to this house so it stays when re-solving"
-            />
+            >
+              <i :class="checked ? 'bi bi-lock-fill' : 'bi bi-unlock'"></i>
+            </button>
           </div>
           <div v-if="habitat && habitatVariant">
             <BBadge :variant="habitatVariant" pill class="me-1 mb-1" data-testid="habitat-badge">

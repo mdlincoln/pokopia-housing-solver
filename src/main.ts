@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 import posthog from 'posthog-js'
 import { createApp } from 'vue'
 
+import 'bootstrap-icons/font/bootstrap-icons.css'
 import 'bootstrap-vue-next/dist/bootstrap-vue-next.css'
 import 'bootstrap/dist/css/bootstrap.css'
 import './styles/tropical-theme.css'
