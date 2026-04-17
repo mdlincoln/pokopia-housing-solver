@@ -32,6 +32,29 @@ const progressStore = useProgressStore()
         </BButton>
       </div>
 
+      <h6>
+        Total materials
+        <BBadge variant="secondary" pill>{{ cart.aggregated.length }}</BBadge>
+      </h6>
+      <BListGroup flush data-testid="cart-aggregated">
+        <BListGroupItem
+          v-for="mat in cart.aggregated"
+          :key="mat.name"
+          class="d-flex align-items-center gap-2 py-1"
+          data-testid="cart-aggregated-item"
+        >
+          <img
+            v-if="mat.picturePath"
+            :src="assetPath(mat.picturePath)"
+            :alt="mat.name"
+            class="cart-thumbnail"
+          />
+          <span>{{ mat.total }}&times; {{ mat.name }}</span>
+        </BListGroupItem>
+      </BListGroup>
+
+      <hr />
+
       <div data-testid="cart-items">
         <div
           v-for="[houseId, houseItems] in cart.itemsByHouse"
@@ -145,29 +168,6 @@ const progressStore = useProgressStore()
           </BListGroup>
         </div>
       </div>
-
-      <hr />
-
-      <h6>
-        Total materials
-        <BBadge variant="secondary" pill>{{ cart.aggregated.length }}</BBadge>
-      </h6>
-      <BListGroup flush data-testid="cart-aggregated">
-        <BListGroupItem
-          v-for="mat in cart.aggregated"
-          :key="mat.name"
-          class="d-flex align-items-center gap-2 py-1"
-          data-testid="cart-aggregated-item"
-        >
-          <img
-            v-if="mat.picturePath"
-            :src="assetPath(mat.picturePath)"
-            :alt="mat.name"
-            class="cart-thumbnail"
-          />
-          <span>{{ mat.total }}&times; {{ mat.name }}</span>
-        </BListGroupItem>
-      </BListGroup>
     </template>
   </BOffcanvas>
 </template>
