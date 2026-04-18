@@ -78,10 +78,11 @@ interface SavedQuery {
   medium: number
   large: number
   pokemon: string[]
-  cart?: Array<{ houseId?: string; houseIndex?: number; name: string; quantity: number }>
+  cart?: Array<{ houseId?: string; houseIndex?: number; name: string; quantity?: number }>
   checkedHouses?: number[]
   checkedPokemon?: string[]
   checkedCartItems?: string[]
+  placedItems?: string[]
   pinnedHouses?: string[]
   pinnedPokemon?: string[]
   houseRegistry?: Array<{ id: string; size: string }>
@@ -161,11 +162,7 @@ function encodeState(): string {
     medium: medium.value,
     large: large.value,
     pokemon: [...selectedPokemon.value],
-    cart: cartStore.itemList.map(({ houseId, name, quantity }) => ({
-      houseId,
-      name,
-      quantity,
-    })),
+    cart: cartStore.itemList.map(({ houseId, name }) => ({ houseId, name })),
     ...progressStore.toSerializable(),
     ...pinStore.toSerializable(),
     ...houseStore.toSerializable(),
@@ -211,11 +208,7 @@ function confirmSave() {
     medium: medium.value,
     large: large.value,
     pokemon: [...selectedPokemon.value],
-    cart: cartStore.itemList.map(({ houseId, name, quantity }) => ({
-      houseId,
-      name,
-      quantity,
-    })),
+    cart: cartStore.itemList.map(({ houseId, name }) => ({ houseId, name })),
     ...progressStore.toSerializable(),
     ...pinStore.toSerializable(),
     ...houseStore.toSerializable(),
@@ -294,6 +287,7 @@ watch(
     selectedPokemon,
     () => cartStore.itemList,
     () => progressStore.checkedCartItems,
+    () => progressStore.placedItems,
     () => pinStore.pinnedHouses,
     () => pinStore.pinnedPokemon,
   ],

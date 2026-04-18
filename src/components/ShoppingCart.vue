@@ -79,8 +79,16 @@ const progressStore = useProgressStore()
                   :checked="progressStore.isCartItemChecked(item.houseId, item.name)"
                   class="form-check-input"
                   data-testid="progress-checkbox-cart-item"
-                  title="Check off this item once acquired"
+                  title="Check off this item once crafted"
                   @change="progressStore.toggleCartItem(item.houseId, item.name)"
+                />
+                <input
+                  type="checkbox"
+                  :checked="progressStore.isItemPlaced(item.houseId, item.name)"
+                  class="form-check-input"
+                  data-testid="progress-checkbox-placed-item"
+                  title="Check off this item once placed in the house"
+                  @change="progressStore.togglePlacedItem(item.houseId, item.name)"
                 />
                 <img
                   v-if="item.picturePath"
@@ -122,23 +130,6 @@ const progressStore = useProgressStore()
                 <div class="d-flex align-items-center gap-1 cart-controls">
                   <BButton
                     size="sm"
-                    variant="outline-secondary"
-                    data-testid="cart-decrement"
-                    @click="cart.decrementItem(item.houseId, item.name)"
-                  >
-                    &minus;
-                  </BButton>
-                  <span class="cart-quantity" data-testid="cart-quantity">{{ item.quantity }}</span>
-                  <BButton
-                    size="sm"
-                    variant="outline-secondary"
-                    data-testid="cart-increment"
-                    @click="cart.incrementItem(item.houseId, item.name)"
-                  >
-                    +
-                  </BButton>
-                  <BButton
-                    size="sm"
                     variant="outline-danger"
                     data-testid="cart-remove"
                     @click="cart.removeItem(item.houseId, item.name)"
@@ -160,7 +151,7 @@ const progressStore = useProgressStore()
                     :alt="ing.ingredientName"
                     class="cart-thumbnail-sm"
                   />
-                  <span>{{ ing.count * item.quantity }}&times; {{ ing.ingredientName }}</span>
+                  <span>{{ ing.count }}&times; {{ ing.ingredientName }}</span>
                 </li>
               </ul>
               <span v-else class="text-muted small ps-3">(no recipe)</span>

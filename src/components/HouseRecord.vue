@@ -12,6 +12,7 @@ import {
 import { type HouseAssignment, type PokemonData } from '@/solver'
 import { useCartStore, type CartItem } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
+import { useProgressStore } from '@/stores/progress'
 import type { BTableSortBy } from 'bootstrap-vue-next'
 import { BBadge, BButton, BCardGroup, BListGroupItem, BTable } from 'bootstrap-vue-next'
 import { computed, ref, watch, watchEffect } from 'vue'
@@ -23,6 +24,7 @@ const props = defineProps<{
 
 const cartStore = useCartStore()
 const pinStore = usePinStore()
+const progressStore = useProgressStore()
 
 function toggleHousePin() {
   pinStore.toggleHousePin(props.house.houseId, props.house.pokemon)
@@ -363,12 +365,28 @@ watchEffect(() => {
         </template>
 
         <template #cell(name)="{ item }">
-          <span :title="(item as any).itemData.flavorText ?? undefined" data-testid="item-name">{{
-            (item as any).itemData.name
-          }}</span>
+          <span
+            :title="(item as any).itemData.flavorText ?? undefined"
+            :class="{
+              'text-decoration-line-through': progressStore.isItemPlaced(
+                house.houseId,
+                (item as any).itemData.name,
+              ),
+            }"
+            data-testid="item-name"
+            >{{ (item as any).itemData.name }}</span
+          >
         </template>
 
         <template #cell(col_actions)="{ item }">
+          <input
+            type="checkbox"
+            :checked="progressStore.isItemPlaced(house.houseId, (item as any).itemData.name)"
+            class="form-check-input me-1"
+            data-testid="progress-checkbox-placed-coverage"
+            title="Mark as placed in this house"
+            @change="progressStore.togglePlacedItem(house.houseId, (item as any).itemData.name)"
+          />
           <BButton
             size="sm"
             variant="outline-danger"

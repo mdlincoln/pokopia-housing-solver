@@ -13,6 +13,7 @@ import { loadAdjacencyMap, loadPokemonData, loadPokemonNames } from '@/queries'
 import type { SolverResult } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
+import { useProgressStore } from '@/stores/progress'
 import HomeView from '@/views/HomeView.vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -222,7 +223,6 @@ describe('HomeView', () => {
     const cartStore = useCartStore()
     cartStore.items.set('S1:Punching Bag', {
       houseId: 'S1',
-      quantity: 2,
       picturePath: null,
       isCraftable: true,
       category: 'Outdoor',
@@ -238,7 +238,7 @@ describe('HomeView', () => {
     const call = setItem.mock.calls.find(([key]) => key === 'pokehousing_saved_queries')
     expect(call).toBeDefined()
     const saved = JSON.parse(call![1] as string)
-    expect(saved[0].cart).toEqual([{ houseId: 'S1', name: 'Punching Bag', quantity: 2 }])
+    expect(saved[0].cart).toEqual([{ houseId: 'S1', name: 'Punching Bag' }])
   })
 
   // @lat: [[ui#HomeView#Saved Queries#Restores cart from saved query]]
@@ -332,5 +332,30 @@ describe('HomeView', () => {
     const select = wrapper.find('#saved-queries-select')
     expect(select.html()).toContain('Jungle paradise')
     expect(select.html()).toContain(new Date(entry.timestamp).toLocaleString())
+  })
+
+  // @lat: [[ui#ShoppingCart#Cart Store#addItem is idempotent per house]]
+  it('addItem is idempotent per house', async () => {
+    await mountHome()
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', 'Punching Bag')
+    await cartStore.addItem('S1', 'Punching Bag')
+    expect(cartStore.items.size).toBe(1)
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#Saves placedItems with saved query]]
+  it('saves placedItems with saved query', async () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem')
+
+    const wrapper = await mountHome()
+    const progressStore = useProgressStore()
+    progressStore.togglePlacedItem('S1', 'Apple')
+
+    wrapper.vm.confirmSave()
+
+    const call = setItem.mock.calls.find(([key]) => key === 'pokehousing_saved_queries')
+    expect(call).toBeDefined()
+    const saved = JSON.parse(call![1] as string)
+    expect(saved[0].placedItems).toEqual(['S1:Apple'])
   })
 })
