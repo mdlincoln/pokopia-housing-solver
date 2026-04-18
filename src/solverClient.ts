@@ -7,6 +7,7 @@ import {
 } from '@/solver'
 import SolverWorker from '@/solver.worker.ts?worker'
 import type { SolverRequest, SolverResponse } from '@/solver.worker'
+import { toRaw } from 'vue'
 
 export class SupersededError extends Error {
   constructor() {
@@ -79,12 +80,26 @@ export function solveInWorker(args: SolveArgs): Promise<SolverResult> {
   const id = nextId++
   return new Promise<SolverResult>((resolve, reject) => {
     pending.set(id, { resolve, reject })
+    // Vue reactive Proxies are not structured-clonable. toRaw() strips one
+    // proxy layer, but pokemonData sub-objects become reactive when spread via
+    // `{ ...pokemonData.value }` in HomeView, so a single toRaw isn't enough.
+    // Build fully-plain copies of every reactive argument before postMessage.
+    const rawPokemonData: PokemonData = {}
+    for (const [name, entry] of Object.entries(toRaw(args.pokemonData))) {
+      const e = toRaw(entry as { image: string; favorites: string[]; habitat?: string })
+      rawPokemonData[name] = {
+        image: e.image,
+        favorites: [...toRaw(e.favorites)],
+        habitat: e.habitat,
+      }
+    }
+
     const request: SolverRequest = {
       id,
-      pokemonNames: args.pokemonNames,
-      houses: args.houses,
-      pokemonData: args.pokemonData,
-      adjacencyMap: args.adjacencyMap,
+      pokemonNames: [...toRaw(args.pokemonNames)],
+      houses: args.houses.map((h) => ({ ...toRaw(h) })),
+      pokemonData: rawPokemonData,
+      adjacencyMap: args.adjacencyMap ? toRaw(args.adjacencyMap) : undefined,
       pinnedAssignments: args.pinnedAssignments,
     }
     w.postMessage(request)

@@ -29,7 +29,7 @@ The solver runs in a dedicated Web Worker so the three synchronous clustering ph
 
 HomeView invokes the solver through [[src/solverClient.ts#solveInWorker]] rather than calling `solve` directly. The client lazily spawns a single worker from [[src/solver.worker.ts]] and tracks pending requests by monotonically-increasing id. When a new request arrives while one is already in flight (e.g., rapid pin toggles), the older promise is rejected with `SupersededError` and the worker response for it is dropped on arrival — only the latest input ever updates `result`. When `Worker` is unavailable (jsdom unit tests), `solveInWorker` falls back to calling `solve` directly on the same thread so tests and headless environments keep working.
 
-`AdjacencyMap` (`Map<string, Map<string, number | null>>`), `PokemonData`, `HouseWithId[]`, and `Map<string, string[]>` are all structured-clonable, so `postMessage` handles inputs and the `SolverResult` output natively with no manual serialization.
+All inputs are converted to fully-plain, non-reactive values inside [[src/solverClient.ts#solveInWorker]] before `postMessage`. Vue reactive Proxies are not structured-clonable, and the spread pattern `{ ...pokemonData.value }` in HomeView causes sub-objects to become reactive even when the outer object is not. The client therefore rebuilds each argument explicitly (`toRaw` + spread for nested objects, `[...toRaw(array)]` for arrays) so the worker receives only plain JS values that pass the structured-clone algorithm. The `SolverResult` posted back by the worker contains only plain objects and arrays, so no conversion is needed on the response path.
 
 ## House Sizes
 
