@@ -18,6 +18,8 @@ The main page at `/` in `src/views/HomeView.vue`, built with Bootstrap Vue Next 
 
 Users set house counts via `BFormSpinbutton` (`role="spinbutton"`) in a `BRow` grid and select pokemon with an autocomplete multi-select. Results update automatically via Vue `watch` whenever inputs change — there is no submit button.
 
+The solver watch flips `solving` to `true` immediately on any change so the spinner appears without delay, then calls a 150ms trailing-edge debounced body (via [[src/utils/debounce.ts#debounce]]) that invokes [[src/solverClient.ts#solveInWorker]]. The debounce collapses bursts of rapid interactions — rapid pin toggles, type-through house count edits, or add-pokemon sprees — into a single worker run, and the worker itself runs on a background thread so the main thread stays responsive during solve (see [[solver#API#Web Worker Execution]]).
+
 Asset URLs are constructed by the shared helper `src/assetPath.ts` (`assetPath(fileName)` returns `BASE_URL + fileName`). Both `HomeView` and `PokemonCard` import from this module.
 
 A "Clear all" button resets the form to a blank state: all house counts to 0, selected pokemon to none, and clears pins, progress, and the house registry. A "Show a sample island" button prefills the form with 1 small, 3 medium, 2 large houses and 13 randomly chosen pokemon. It is disabled until the pokemon names catalog has loaded. It also clears pins, progress, and the house registry before loading the new sample.
@@ -95,6 +97,8 @@ Verifies that when a saved query has a non-empty title, the restore dropdown opt
 ### Results Display
 
 After solving, a `TransitionGroup` renders one [[ui#House]] per assigned house; pinned houses sort to the bottom with a 750ms FLIP transition. Unhoused pokemon and errors appear in `BAlert` banners.
+
+While the solver watch is pending or the worker is solving, the results list carries a `results-pending` class that fades it to 60% opacity and disables pointer events via `tropical-theme.css`. The previous `result` is kept visible during the transition (never nulled between successful solves) so houses stay in place and only fade rather than flashing out and back.
 
 ### Pinning
 

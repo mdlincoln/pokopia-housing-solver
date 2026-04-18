@@ -2,7 +2,9 @@
 import HouseRecord from '@/components/HouseRecord.vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
 import { loadAdjacencyMap, loadPokemonData, loadPokemonNames } from '@/queries'
-import { solve, type AdjacencyMap, type PokemonData, type SolverResult } from '@/solver'
+import { type AdjacencyMap, type PokemonData, type SolverResult } from '@/solver'
+import { solveInWorker, SupersededError } from '@/solverClient'
+import { debounce } from '@/utils/debounce'
 import { useCartStore } from '@/stores/cart'
 import { useHouseStore } from '@/stores/houses'
 import { usePinStore } from '@/stores/pins'
@@ -327,6 +329,31 @@ function loadSample() {
   selectedPokemon.value = shuffled.slice(0, 13)
 }
 
+async function runSolve() {
+  error.value = ''
+  try {
+    result.value = await solveInWorker({
+      pokemonNames: selectedPokemon.value,
+      houses: houseStore.orderedHouses,
+      pokemonData: pokemonData.value,
+      adjacencyMap: adjacencyData.value ?? undefined,
+      pinnedAssignments: pinStore.getPinnedAssignments(),
+    })
+    solving.value = false
+  } catch (e) {
+    // Superseded means a newer solve is already in flight; keep the spinner
+    // on and let that newer run settle solving.value.
+    if (e instanceof SupersededError) return
+    error.value = e instanceof Error ? e.message : 'Solver failed'
+    solving.value = false
+  }
+}
+
+// 0ms in tests so flushPromises() settles the pending body; 150ms in dev/prod
+// collapses rapid interaction bursts into a single worker run.
+const SOLVE_DEBOUNCE_MS = import.meta.env.MODE === 'test' ? 0 : 150
+const debouncedSolve = debounce(runSolve, SOLVE_DEBOUNCE_MS)
+
 watch(
   [
     selectedPokemon,
@@ -338,9 +365,11 @@ watch(
     () => pinStore.pinnedPokemon,
     () => pinStore.pinnedHouses,
   ],
-  async () => {
+  () => {
     if (!adjacencyData.value || totalHouses.value === 0 || !hydratedPokemonReady.value) {
+      debouncedSolve.cancel()
       result.value = null
+      solving.value = false
       return
     }
 
@@ -355,21 +384,10 @@ watch(
       pinStore.effectivelyPinnedHouseIds,
     )
 
+    // Flip the spinner on immediately so the UI feels responsive while the
+    // debounce window collapses bursts of rapid interactions.
     solving.value = true
-    error.value = ''
-    try {
-      result.value = await solve(
-        selectedPokemon.value,
-        houseStore.orderedHouses,
-        pokemonData.value,
-        adjacencyData.value,
-        pinStore.getPinnedAssignments(),
-      )
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Solver failed'
-    } finally {
-      solving.value = false
-    }
+    debouncedSolve()
   },
   { deep: true },
 )
@@ -513,6 +531,7 @@ defineExpose({
     <TransitionGroup
       tag="div"
       class="list-group list-group-flush w-100 results-list"
+      :class="{ 'results-pending': solving }"
       move-class="house-move"
     >
       <HouseRecord
