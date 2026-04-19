@@ -310,7 +310,14 @@ watchEffect(() => {
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
 
     <div v-if="cartTableItems.length" class="mt-3" data-testid="cart-items-coverage">
-      <h6>Items in cart</h6>
+      <h6 class="cart-section-heading">
+        Items in cart
+        <span
+          class="cart-sync-badge"
+          title="These items appear in the sidebar cart. The 🏠 Placed stamp syncs between here and the cart."
+          >🛒 syncs with sidebar</span
+        >
+      </h6>
       <BTable
         no-border-collapse
         small
@@ -379,14 +386,18 @@ watchEffect(() => {
         </template>
 
         <template #cell(col_actions)="{ item }">
-          <input
-            type="checkbox"
-            :checked="progressStore.isItemPlaced(house.houseId, (item as any).itemData.name)"
-            class="form-check-input me-1"
-            data-testid="progress-checkbox-placed-coverage"
-            title="Mark as placed in this house"
-            @change="progressStore.togglePlacedItem(house.houseId, (item as any).itemData.name)"
-          />
+          <label
+            class="progress-action progress-action--placed progress-action--compact me-1"
+            title="Mark as placed in this house — also syncs with sidebar cart"
+          >
+            <input
+              type="checkbox"
+              :checked="progressStore.isItemPlaced(house.houseId, (item as any).itemData.name)"
+              data-testid="progress-checkbox-placed-coverage"
+              @change="progressStore.togglePlacedItem(house.houseId, (item as any).itemData.name)"
+            />
+            <span>Placed</span>
+          </label>
           <BButton
             size="sm"
             variant="outline-danger"

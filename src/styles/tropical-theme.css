@@ -725,3 +725,132 @@ body {
   color: inherit;
   opacity: 0.75;
 }
+
+/* ── Progress Action Checkboxes ──────────────────────── */
+/*
+ * Intentionally NOT pill-shaped — visually distinct from the
+ * informational BBadge pills (Craft/Buy, category, tag).
+ * Rendered as labeled checkbox rows below a dashed divider.
+ */
+
+.progress-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.1rem 0.8rem;
+  padding-top: 0.42rem;
+  margin-top: 0.42rem;
+  border-top: 1px dashed rgb(94 167 185 / 35%);
+}
+
+.progress-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  cursor: pointer;
+  font-size: 0.77rem;
+  font-weight: 600;
+  font-family: var(--trop-body-font);
+  line-height: 1.25;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: opacity 120ms ease;
+}
+
+.progress-action:hover {
+  opacity: 0.75;
+}
+
+.progress-action input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+/* Crafted — amber */
+.progress-action--craft {
+  color: #6b4700;
+}
+
+.progress-action--craft input[type='checkbox'] {
+  accent-color: #b87a00;
+}
+
+/* Placed — mint */
+.progress-action--placed {
+  color: #1a5e3d;
+}
+
+.progress-action--placed input[type='checkbox'] {
+  accent-color: #2f8f6f;
+}
+
+/* Compact variant for table cells in HouseRecord */
+.progress-action--compact {
+  font-size: 0.72rem;
+}
+
+.progress-action--compact input[type='checkbox'] {
+  width: 13px;
+  height: 13px;
+}
+
+/* Placed state in cart sidebar */
+.cart-item--placed {
+  border-left: 3px solid rgb(47 143 111 / 48%) !important;
+}
+
+/* One-line legend explaining the two checkboxes */
+.cart-steps-legend {
+  font-size: 0.74rem;
+  color: #4a798a;
+  margin: 0 0 0.65rem;
+  line-height: 1.5;
+}
+
+.step-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.16rem;
+  padding: 0.05rem 0.42rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+.step-hint--craft {
+  background: rgb(255 217 122 / 38%);
+  border: 1px solid rgb(228 168 30 / 40%);
+  color: #6b4700;
+}
+
+.step-hint--placed {
+  background: rgb(158 232 201 / 38%);
+  border: 1px solid rgb(47 143 111 / 38%);
+  color: #1a5e3d;
+}
+
+/* "Synced with sidebar" badge in HouseRecord cart section heading */
+.cart-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.cart-sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #3288a0;
+  background: rgb(124 216 232 / 22%);
+  border: 1px solid rgb(124 216 232 / 48%);
+  border-radius: 999px;
+  padding: 0.06rem 0.52rem;
+  cursor: help;
+  letter-spacing: 0.01em;
+}

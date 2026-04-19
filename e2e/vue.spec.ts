@@ -321,7 +321,6 @@ test.describe('Shopping Cart', () => {
     await expect(page.getByTestId('cart-quantity')).toHaveText('1')
   })
 
-  // @lat: [[ui#ShoppingCart#Incrementing quantity updates badge]]
   test('incrementing quantity updates the displayed count', async ({ page }) => {
     test.setTimeout(40_000)
     await setupWithRecommendedItems(page)
