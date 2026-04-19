@@ -334,6 +334,80 @@ describe('HomeView', () => {
     expect(select.html()).toContain(new Date(entry.timestamp).toLocaleString())
   })
 
+  // @lat: [[ui#HomeView#Saved Queries#Loads legacy entry without checkbox fields]]
+  it('restores legacy entry without pin fields with all pins cleared', async () => {
+    const legacyEntry = {
+      title: 'Legacy save',
+      timestamp: 1700000000010,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['AlphaOne'],
+      // no pinnedHouses, pinnedPokemon, checkedHouses, checkedPokemon
+    }
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([legacyEntry]))
+
+    const wrapper = await mountHome()
+    const pinStore = usePinStore()
+    const cartStore = useCartStore()
+    vi.spyOn(cartStore, 'restoreItems').mockResolvedValue(undefined)
+
+    pinStore.pinHouse('S1', ['AlphaOne'])
+    expect(pinStore.isHousePinned('S1')).toBe(true)
+
+    wrapper.vm.selectedTimestamp = 1700000000010
+    await flushPromises()
+
+    expect(pinStore.isHousePinned('S1')).toBe(false)
+    expect(pinStore.pinnedPokemon.size).toBe(0)
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#Loads legacy cart entry without houseIndex]]
+  it('restores legacy cart entry without houseId by passing raw cart array to restoreItems', async () => {
+    const legacyEntry = {
+      title: 'Legacy cart',
+      timestamp: 1700000000011,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['AlphaOne'],
+      cart: [{ name: 'Berry Pots', quantity: 3 }], // no houseId
+    }
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([legacyEntry]))
+
+    const wrapper = await mountHome()
+    const cartStore = useCartStore()
+    const restoreItemsSpy = vi.spyOn(cartStore, 'restoreItems').mockResolvedValue(undefined)
+
+    wrapper.vm.selectedTimestamp = 1700000000011
+    await flushPromises()
+
+    expect(restoreItemsSpy).toHaveBeenCalledWith([{ name: 'Berry Pots', quantity: 3 }])
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#Loads legacy entry with no cart field]]
+  it('restores legacy entry with no cart field by passing empty array to restoreItems', async () => {
+    const legacyEntry = {
+      title: '',
+      timestamp: 1700000000012,
+      small: 1,
+      medium: 1,
+      large: 0,
+      pokemon: ['AlphaOne', 'AlphaTwo'],
+      // no cart field
+    }
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([legacyEntry]))
+
+    const wrapper = await mountHome()
+    const cartStore = useCartStore()
+    const restoreItemsSpy = vi.spyOn(cartStore, 'restoreItems').mockResolvedValue(undefined)
+
+    wrapper.vm.selectedTimestamp = 1700000000012
+    await flushPromises()
+
+    expect(restoreItemsSpy).toHaveBeenCalledWith([])
+  })
+
   // @lat: [[ui#ShoppingCart#Cart Store#addItem is idempotent per house]]
   it('addItem is idempotent per house', async () => {
     await mountHome()
