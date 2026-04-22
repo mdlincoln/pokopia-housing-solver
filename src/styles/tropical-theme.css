@@ -796,11 +796,6 @@ body {
   height: 13px;
 }
 
-/* Placed state in cart sidebar */
-.cart-item--placed {
-  border-left: 3px solid rgb(47 143 111 / 48%) !important;
-}
-
 /* One-line legend explaining the two checkboxes */
 .cart-steps-legend {
   font-size: 0.74rem;
@@ -823,12 +818,6 @@ body {
   background: rgb(255 217 122 / 38%);
   border: 1px solid rgb(228 168 30 / 40%);
   color: #6b4700;
-}
-
-.step-hint--placed {
-  background: rgb(158 232 201 / 38%);
-  border: 1px solid rgb(47 143 111 / 38%);
-  color: #1a5e3d;
 }
 
 /* "Synced with sidebar" badge in HouseRecord cart section heading */

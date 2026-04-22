@@ -57,8 +57,7 @@ const progressStore = useProgressStore()
 
       <div data-testid="cart-items">
         <p class="cart-steps-legend">
-          <span class="step-hint step-hint--craft">🔨 Crafted</span> removes from totals &middot;
-          <span class="step-hint step-hint--placed">🏠 Placed</span> syncs with house cards
+          <span class="step-hint step-hint--craft">🔨 Crafted</span> removes from totals
         </p>
 
         <div
@@ -75,7 +74,6 @@ const progressStore = useProgressStore()
               class="cart-item"
               :class="{
                 'checked-off': progressStore.isCartItemChecked(item.houseId, item.name),
-                'cart-item--placed': progressStore.isItemPlaced(item.houseId, item.name),
               }"
               data-testid="cart-item"
             >
@@ -160,18 +158,6 @@ const progressStore = useProgressStore()
                     @change="progressStore.toggleCartItem(item.houseId, item.name)"
                   />
                   <span>Crafted — removes from totals</span>
-                </label>
-                <label
-                  class="progress-action progress-action--placed"
-                  title="Mark as placed in the house — syncs with the house card"
-                >
-                  <input
-                    type="checkbox"
-                    :checked="progressStore.isItemPlaced(item.houseId, item.name)"
-                    data-testid="progress-checkbox-placed-item"
-                    @change="progressStore.togglePlacedItem(item.houseId, item.name)"
-                  />
-                  <span>Placed in house</span>
                 </label>
               </div>
             </BListGroupItem>
