@@ -31,6 +31,12 @@ export const useProgressStore = defineStore('progress', () => {
     return placedItems.value.has(`${houseId}:${name}`)
   }
 
+  function clearItemProgress(houseId: string, name: string) {
+    const key = `${houseId}:${name}`
+    checkedCartItems.value.delete(key)
+    placedItems.value.delete(key)
+  }
+
   function restoreProgress(data: { checkedCartItems?: string[]; placedItems?: string[] }) {
     checkedCartItems.value = new Set(data.checkedCartItems ?? [])
     placedItems.value = new Set(data.placedItems ?? [])
@@ -50,6 +56,7 @@ export const useProgressStore = defineStore('progress', () => {
     isCartItemChecked,
     togglePlacedItem,
     isItemPlaced,
+    clearItemProgress,
     restoreProgress,
     toSerializable,
   }

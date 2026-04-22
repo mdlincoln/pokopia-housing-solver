@@ -290,6 +290,48 @@ test.describe('Shopping Cart', () => {
     await expect(page.getByTestId('cart-empty')).toBeVisible({ timeout: 2000 })
   })
 
+  // @lat: [[ui#ShoppingCart#Progress Store#Placed state clears on cart remove]]
+  test('placed state is cleared when item is removed and re-added to cart', async ({ page }) => {
+    test.setTimeout(40_000)
+    await page.goto('/')
+
+    await setSpinbutton(page, 'house-small', 1)
+    await selectPokemon(page, 'Abra')
+
+    await expect(page.getByTestId('results')).toContainText('Abra', { timeout: 30_000 })
+
+    const details = page.getByTestId('recommended-items')
+    await expect(details).toBeVisible()
+    await details.locator('summary').click()
+
+    const recommendedList = page.getByTestId('recommended-items-list')
+    const pinwheelsRow = recommendedList.locator('tr').filter({ hasText: 'Pinwheels' })
+    await expect(pinwheelsRow).toBeVisible({ timeout: 5_000 })
+
+    // 1. Add Pinwheels to the house
+    await pinwheelsRow.getByTestId('add-to-cart').click()
+
+    // 2. Mark it as placed
+    const coverageSection = page.getByTestId('cart-items-coverage')
+    const pinwheelsCoverageRow = coverageSection.locator('tr').filter({ hasText: 'Pinwheels' })
+    await expect(pinwheelsCoverageRow).toBeVisible({ timeout: 2_000 })
+    const placedCheckbox = pinwheelsCoverageRow.getByTestId('progress-checkbox-placed-coverage')
+    await placedCheckbox.check()
+    await expect(placedCheckbox).toBeChecked()
+
+    // 3. Remove it from the house
+    await pinwheelsCoverageRow.getByTestId('cart-coverage-remove').click()
+    await expect(pinwheelsCoverageRow).toBeHidden({ timeout: 2_000 })
+
+    // 4. Add Pinwheels again (it reappears in recommended items once removed)
+    await expect(pinwheelsRow).toBeVisible({ timeout: 5_000 })
+    await pinwheelsRow.getByTestId('add-to-cart').click()
+
+    // 5. Assert it is NOT placed
+    await expect(pinwheelsCoverageRow).toBeVisible({ timeout: 2_000 })
+    await expect(pinwheelsCoverageRow.getByTestId('progress-checkbox-placed-coverage')).not.toBeChecked()
+  })
+
   // @lat: [[ui#ShoppingCart#Clear all empties the cart]]
   test('clear all button removes all items and shows empty state', async ({ page }) => {
     test.setTimeout(40_000)

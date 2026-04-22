@@ -170,6 +170,7 @@ export const useCartStore = defineStore('cart', () => {
 
   function removeItem(houseId: string, name: string) {
     items.value.delete(cartKey(houseId, name))
+    progressStore.clearItemProgress(houseId, name)
     recomputeAggregated()
   }
 

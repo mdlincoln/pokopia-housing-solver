@@ -274,7 +274,11 @@ The Pinia store at `src/stores/progress.ts` tracks two item-tracking states. Hou
 
 State: `checkedCartItems` (`Set<string>`, keys `"houseId:itemName"`) — items marked as crafted; `placedItems` (`Set<string>`, keys `"houseId:itemName"`) — items marked as placed in their house.
 
-Actions: `toggleCartItem(houseId, name)` / `isCartItemChecked(houseId, name)` — toggle and query crafted state. Crafted items are excluded from the cart store's aggregated ingredient totals. `togglePlacedItem(houseId, name)` / `isItemPlaced(houseId, name)` — toggle and query placed-in-house state; surfaced only in the HouseRecord cart coverage table (`progress-checkbox-placed-coverage`). `restoreProgress({ checkedCartItems?, placedItems? })` replaces both sets (used by [[ui#HomeView#Saved Queries]] restore). `toSerializable()` returns both arrays for JSON storage.
+Actions: `toggleCartItem(houseId, name)` / `isCartItemChecked(houseId, name)` — toggle and query crafted state. Crafted items are excluded from the cart store's aggregated ingredient totals. `togglePlacedItem(houseId, name)` / `isItemPlaced(houseId, name)` — toggle and query placed-in-house state; surfaced only in the HouseRecord cart coverage table (`progress-checkbox-placed-coverage`). `clearItemProgress(houseId, name)` — removes both the crafted and placed entries for a given cart key; called by `cartStore.removeItem` to ensure re-adding an item starts fresh. `restoreProgress({ checkedCartItems?, placedItems? })` replaces both sets (used by [[ui#HomeView#Saved Queries]] restore). `toSerializable()` returns both arrays for JSON storage.
+
+#### Placed state clears on cart remove
+
+Removing an item from the cart (via `cartStore.removeItem`) clears both its placed and crafted states in the progress store, so re-adding the same item to the same house starts fresh with no prior progress recorded.
 
 ### Pin Store
 
