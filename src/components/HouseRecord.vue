@@ -50,8 +50,6 @@ const sharedHabitats = computed(() => {
 
 const houseCartItems = computed(() => cartStore.itemsByHouse.get(props.house.houseId) ?? [])
 
-const houseCartItemNames = computed(() => new Set(houseCartItems.value.map((item) => item.name)))
-
 const fulfilledTags = computed(
   () =>
     new Set(
@@ -102,10 +100,10 @@ const unfulfilledFavoriteColumns = computed(() => {
 })
 
 const recommendationTableFields = computed(() => [
-  { key: 'name', label: 'Item', sortable: true, class: 'text-col' },
+  { key: 'name', label: 'Item', sortable: true },
   { key: 'col_image', label: '', sortable: false },
   { key: 'col_actions', label: '', sortable: false },
-  { key: 'craftability', label: 'Craftability', sortable: true, class: 'text-col' },
+  { key: 'craftability', label: 'Craftability', sortable: true },
   ...(!fulfilledTags.value.has('toy')
     ? [{ key: 'col_toy', label: 'Toy', sortable: true, class: 'bool-col' }]
     : []),
@@ -221,14 +219,13 @@ watch(
     const unfulfilledFavorites = allFavorites.filter(
       (favorite) => !fulfilledFavoriteSet.has(favorite.toLowerCase()),
     )
-    const queryFavorites = unfulfilledFavorites.length > 0 ? unfulfilledFavorites : allFavorites
 
-    if (queryFavorites.length === 0) {
+    if (unfulfilledFavorites.length === 0) {
       activeTableItems.value = []
       return
     }
 
-    const recommendations = await recommendedItemsForHouse(queryFavorites)
+    const recommendations = await recommendedItemsForHouse(unfulfilledFavorites)
 
     if (run !== recommendationRun) return
 
@@ -242,18 +239,17 @@ const sortBy = ref<BTableSortBy[]>([])
 watchEffect(() => {
   const cols = unfulfilledFavoriteColumns.value
   const firstKey = cols.length > 0 ? favoriteCoverageColumnKey(cols[0]!.favorite) : undefined
+  const validKeys = new Set(
+    recommendationTableFields.value.filter((f) => f.sortable).map((f) => f.key),
+  )
 
   if (sortBy.value.length === 0 && firstKey) {
     sortBy.value = [{ key: firstKey, order: 'desc' }]
     return
   }
 
-  if (sortBy.value.length > 0 && firstKey && sortBy.value[0]!.key !== firstKey) {
-    sortBy.value = [{ key: firstKey, order: 'desc' }]
-  }
-
-  if (sortBy.value.length > 0 && !firstKey) {
-    sortBy.value = []
+  if (sortBy.value.length > 0 && !validKeys.has(sortBy.value[0]!.key)) {
+    sortBy.value = firstKey ? [{ key: firstKey, order: 'desc' }] : []
   }
 })
 </script>
@@ -495,9 +491,6 @@ watchEffect(() => {
             @click="cartStore.addItem(house.houseId, (item as any).itemData.name)"
             >+</BButton
           >
-          <span class="text-success fw-bold ms-1" data-testid="item-in-cart-check">
-            {{ houseCartItemNames.has((item as any).itemData.name) ? '✓' : '' }}
-          </span>
         </template>
 
         <template #cell(name)="{ item }">

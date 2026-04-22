@@ -605,14 +605,11 @@ body {
   padding: 3px 4px;
 }
 
-.recommended-items-table thead th.text-col {
-  vertical-align: bottom;
-}
-
-.recommended-items-table thead th.text-col span {
-  writing-mode: horizontal-tb;
-  transform: none;
-  display: inline;
+.recommended-items-table thead th[aria-sort] {
+  background-position: center bottom 2px !important;
+  background-size: 1em 1em !important;
+  padding-right: 0 !important;
+  padding-bottom: 1.25em !important;
 }
 
 .recommended-items-table th.bool-col,

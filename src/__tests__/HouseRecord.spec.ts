@@ -509,44 +509,6 @@ describe('HouseRecord', () => {
     expect(favBadge.classes()).toContain('text-bg-success')
   })
 
-  it('recommended item row shows checkmark when item is in cart, clears when removed', async () => {
-    const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise'] },
-    }
-    const house: HouseAssignment = {
-      houseId: 'S1',
-      size: 'small',
-      capacity: 1,
-      pokemon: ['FitOne'],
-    }
-
-    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
-    await flushPromises()
-
-    const itemName = wrapper.find('[data-testid="item-name"]').text()
-    const cartStore = useCartStore()
-
-    const checkmarkForItem = () => {
-      const names = wrapper.findAll('[data-testid="item-name"]')
-      const checks = wrapper.findAll('[data-testid="item-in-cart-check"]')
-      const index = names.findIndex((node) => node.text() === itemName)
-      return index >= 0 ? checks[index]!.text().trim() : undefined
-    }
-
-    // Before adding: no checkmark
-    expect(checkmarkForItem()).toBe('')
-
-    // After adding: checkmark appears
-    await cartStore.addItem('S1', itemName)
-    await flushPromises()
-    expect(checkmarkForItem()).toBe('✓')
-
-    // After removing: checkmark clears
-    cartStore.removeItem('S1', itemName)
-    await flushPromises()
-    expect(checkmarkForItem()).toBe('')
-  })
-
   it('favorite coverage cells use success background and show a checkmark', async () => {
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['Exercise'] },
@@ -607,6 +569,30 @@ describe('HouseRecord', () => {
       .filter(Boolean)
     expect(headerTextsAfter.some((text) => text.includes('exercise'))).toBe(false)
     expect(headerTextsAfter.some((text) => text.includes('cleanliness'))).toBe(true)
+  })
+
+  // @lat: [[ui#House#Item Metadata Display#Hides recommendations when every favorite is fulfilled]]
+  it('hides recommendations entirely when every favorite is fulfilled', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['Exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
+
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', 'Punching bag')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(false)
   })
 
   it('fulfilled favorites do not bleed across houses', async () => {
