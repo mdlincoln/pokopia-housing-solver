@@ -14,7 +14,14 @@ import { useCartStore, type CartItem } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
 import { useProgressStore } from '@/stores/progress'
 import type { BTableSortBy } from 'bootstrap-vue-next'
-import { BBadge, BButton, BCardGroup, BListGroupItem, BTable } from 'bootstrap-vue-next'
+import {
+  BBadge,
+  BButton,
+  BCardGroup,
+  BFormCheckbox,
+  BListGroupItem,
+  BTable,
+} from 'bootstrap-vue-next'
 import { computed, ref, watch, watchEffect } from 'vue'
 
 const props = defineProps<{
@@ -235,6 +242,13 @@ watch(
 )
 
 const sortBy = ref<BTableSortBy[]>([])
+const showCraftableOnly = ref(false)
+
+const filteredTableItems = computed(() =>
+  showCraftableOnly.value
+    ? activeTableItems.value.filter((row) => row.itemData.isCraftable)
+    : activeTableItems.value,
+)
 
 watchEffect(() => {
   const cols = unfulfilledFavoriteColumns.value
@@ -426,7 +440,17 @@ watchEffect(() => {
       data-testid="recommended-items"
       class="mt-3 house-recommendations"
     >
-      <summary>Recommended items</summary>
+      <summary>
+        Recommended items
+        <BFormCheckbox
+          v-model="showCraftableOnly"
+          switch
+          size="sm"
+          class="d-inline-block ms-3 align-middle"
+          @click.stop
+          >Craftable only</BFormCheckbox
+        >
+      </summary>
       <p v-if="activeTableItems.length === 0" class="text-muted fst-italic mb-2">
         All recommended favorites and tags are already covered for this house.
       </p>
@@ -437,7 +461,7 @@ watchEffect(() => {
         responsive
         class="recommended-items-table"
         :fields="recommendationTableFields"
-        :items="activeTableItems"
+        :items="filteredTableItems"
         v-model:sort-by="sortBy"
         data-testid="recommended-items-list"
       >
