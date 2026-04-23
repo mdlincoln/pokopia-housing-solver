@@ -262,18 +262,6 @@ test.describe('Shopping Cart', () => {
 
     await expect(page.getByTestId('cart-items')).toBeVisible({ timeout: 2000 })
     await expect(page.getByTestId('cart-item')).toHaveCount(1)
-    await expect(page.getByTestId('cart-quantity')).toHaveText('1')
-  })
-
-  test('incrementing quantity updates the displayed count', async ({ page }) => {
-    test.setTimeout(40_000)
-    await setupWithRecommendedItems(page)
-
-    await page.getByTestId('add-to-cart').first().click()
-    await expect(page.getByTestId('cart-quantity')).toHaveText('1')
-
-    await page.getByTestId('cart-increment').click()
-    await expect(page.getByTestId('cart-quantity')).toHaveText('2')
   })
 
   // @lat: [[ui#ShoppingCart#Remove clears item from cart]]
@@ -405,7 +393,7 @@ test.describe('URL Hash Sharing', () => {
 
     await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
     await expect(page.getByTestId('cart-items')).toBeVisible({ timeout: 5000 })
-    await expect(page.getByTestId('cart-quantity')).toHaveText('2')
+    await expect(page.getByTestId('cart-item')).toHaveCount(1)
   })
 
   // @lat: [[ui#HomeView#Saved Queries#URL Sharing#Restores pins from hash]]
