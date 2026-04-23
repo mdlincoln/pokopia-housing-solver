@@ -9,6 +9,8 @@ CREATE TABLE
       , habitat TEXT REFERENCES habitats (habitat)
     );
 
+CREATE INDEX idx_pokemon_habitat ON pokemon (habitat);
+
 CREATE TABLE
     pokemon_favorites (
         pokemon_id INTEGER NOT NULL REFERENCES pokemon (id)
@@ -77,7 +79,7 @@ WHERE
     /* shared_habitat(pokemon_a,pokemon_b) */;
 
 CREATE VIEW
-    adjacency AS
+    dense_adjacency AS
 WITH
     combined_adjacency AS (
         SELECT
@@ -101,4 +103,33 @@ FROM
 GROUP BY
     pokemon_a
   , pokemon_b
+    /* dense_adjacency(pokemon_a,pokemon_b,score) */;
+
+CREATE VIEW
+    conflicting_habitats AS
+SELECT
+    pl.id AS pokemon_a
+  , pr.id AS pokemon_b
+  , NULL AS score
+FROM
+    pokemon pl
+    LEFT JOIN habitats h ON (pl.habitat = h.habitat)
+    LEFT JOIN pokemon pr ON (h.opposite = pr.habitat)
+    /* conflicting_habitats(pokemon_a,pokemon_b,score) */;
+
+CREATE VIEW
+    adjacency AS
+SELECT
+    pokemon_a
+  , pokemon_b
+  , score
+FROM
+    dense_adjacency
+UNION ALL
+SELECT
+    pokemon_a
+  , pokemon_b
+  , score
+FROM
+    conflicting_habitats
     /* adjacency(pokemon_a,pokemon_b,score) */;
