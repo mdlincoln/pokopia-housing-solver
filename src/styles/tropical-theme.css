@@ -360,6 +360,11 @@ body {
     filter 0.2s;
 }
 
+.house-card.fully-fulfilled {
+  background: rgb(47 143 111 / 12%) !important;
+  border-color: var(--trop-palm-600) !important;
+}
+
 .house-move {
   transition: transform 750ms ease;
 }
@@ -433,9 +438,25 @@ body {
   gap: var(--space-2);
 }
 
+.badge.bg-success,
+.badge.bg-warning,
+.badge.bg-info,
+.badge.bg-danger,
+.badge.text-bg-success,
+.badge.text-bg-warning,
+.badge.text-bg-info,
+.badge.text-bg-danger {
+  color: inherit;
+}
+
+.badge.bg-success,
+.badge.text-bg-success {
+  color: #1a4a35;
+}
+
 .badge.bg-warning,
 .badge.text-bg-warning {
-  color: #5f4b18;
+  color: #624e1f;
 }
 
 .badge.bg-info,
@@ -486,10 +507,6 @@ body {
 
 .alert-heading {
   font-family: var(--trop-heading-font);
-}
-
-.text-bg-warning {
-  color: #624e1f;
 }
 
 .modal-footer .btn {

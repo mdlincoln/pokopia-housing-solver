@@ -106,6 +106,10 @@ const unfulfilledFavoriteColumns = computed(() => {
   return houseFavoriteColumns.value.filter((col) => !fulfilled.has(col.favorite.toLowerCase()))
 })
 
+const allFulfilled = computed(
+  () => props.house.pokemon.length > 0 && unfulfilledFavoriteColumns.value.length === 0,
+)
+
 const recommendationTableFields = computed(() => [
   { key: 'name', label: 'Item', sortable: true },
   { key: 'col_image', label: '', sortable: false },
@@ -272,7 +276,9 @@ watchEffect(() => {
   <BListGroupItem
     class="house-card"
     data-testid="house-card"
-    :class="{ 'checked-off': pinStore.isHousePinned(house.houseId) }"
+    :class="[
+      { 'checked-off': pinStore.isHousePinned(house.houseId), 'fully-fulfilled': allFulfilled },
+    ]"
   >
     <h5 class="mb-1 house-title">
       <button
