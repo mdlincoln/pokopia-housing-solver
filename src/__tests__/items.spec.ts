@@ -42,12 +42,6 @@ describe('favoritesForItem', () => {
     expect(result).toContain('shiny stuff')
   })
 
-  it('is case-insensitive', async () => {
-    const r1 = await favoritesForItem('gaming bed')
-    const r2 = await favoritesForItem('Gaming Bed')
-    expect(r1).toEqual(r2)
-  })
-
   it('returns empty list for unknown item', async () => {
     const result = await favoritesForItem('Not A Real Item')
     expect(result).toEqual([])
@@ -221,10 +215,15 @@ describe('clusterItemsByFavorites', () => {
     expect(singleFavoriteClusters[1]!.favorites).toEqual(['exercise'])
   })
 
-  it('deduplicates input favorites case-insensitively', async () => {
-    const result = await clusterItemsByFavorites(['Exercise', 'exercise', 'EXERCISE'])
+  it('deduplicates exact-match input favorites', async () => {
+    const result = await clusterItemsByFavorites(['exercise', 'exercise'])
     expect(result).toHaveLength(1)
     expect(itemNames(result[0]!.items)).toContain('Punching Bag')
+  })
+
+  it('returns empty for unknown favorites', async () => {
+    const result = await clusterItemsByFavorites(['Exercise'])
+    expect(result).toHaveLength(0)
   })
 
   it('every item in a cluster fulfills all of that cluster favorites', async () => {

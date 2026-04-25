@@ -53,14 +53,13 @@ function compareClusters(a: ItemCluster, b: ItemCluster): number {
 
 // @lat: [[items#clusterItemsByFavorites]]
 export async function clusterItemsByFavorites(favorites: string[]): Promise<ItemCluster[]> {
-  // Deduplicate input favorites (case-insensitive)
+  // Deduplicate input favorites
   const uniqueFavs: string[] = []
   const seen = new Set<string>()
   for (const fav of favorites) {
-    const lower = fav.toLowerCase()
-    if (!seen.has(lower)) {
-      seen.add(lower)
-      uniqueFavs.push(lower)
+    if (!seen.has(fav)) {
+      seen.add(fav)
+      uniqueFavs.push(fav)
     }
   }
 

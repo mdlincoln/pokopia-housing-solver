@@ -142,10 +142,10 @@ describe('HouseRecord', () => {
   })
 
   it('shows recommended items as one row per item', async () => {
-    // Both pokemon share 'Exercise' and 'Cleanliness' — real catalog favorites
+    // Both pokemon share 'exercise' and 'cleanliness' — real catalog favorites
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise', 'Cleanliness'], habitat: 'Dark' },
-      FitTwo: { image: '', favorites: ['Exercise', 'Cleanliness'], habitat: 'Dark' },
+      FitOne: { image: '', favorites: ['exercise', 'cleanliness'], habitat: 'Dark' },
+      FitTwo: { image: '', favorites: ['exercise', 'cleanliness'], habitat: 'Dark' },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -167,10 +167,10 @@ describe('HouseRecord', () => {
   })
 
   it('shows recommended items for multiple favorites', async () => {
-    // Both share 'Lots of Fire', 'Group Activities', and 'Stone Stuff'
+    // Both share 'lots of fire', 'group activities', and 'stone stuff'
     const pokemonData: PokemonData = {
-      FireOne: { image: '', favorites: ['Lots of Fire', 'Group Activities', 'Stone Stuff'] },
-      FireTwo: { image: '', favorites: ['Lots of Fire', 'Group Activities', 'Stone Stuff'] },
+      FireOne: { image: '', favorites: ['lots of fire', 'group activities', 'stone stuff'] },
+      FireTwo: { image: '', favorites: ['lots of fire', 'group activities', 'stone stuff'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -197,7 +197,7 @@ describe('HouseRecord', () => {
     }
 
     const pokemonData: PokemonData = {
-      Solo: { image: '', favorites: ['Exercise'] },
+      Solo: { image: '', favorites: ['exercise'] },
     }
 
     const wrapper = mount(HouseRecord, {
@@ -210,8 +210,8 @@ describe('HouseRecord', () => {
 
   it('shows recommended items even when occupants have no shared favorites', async () => {
     const pokemonData: PokemonData = {
-      UniqueOne: { image: '', favorites: ['Exercise'] },
-      UniqueTwo: { image: '', favorites: ['Cleanliness'] },
+      UniqueOne: { image: '', favorites: ['exercise'] },
+      UniqueTwo: { image: '', favorites: ['cleanliness'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -236,11 +236,11 @@ describe('HouseRecord', () => {
     const pokemonData: PokemonData = {
       PlannerOne: {
         image: '',
-        favorites: ['Lots of Fire', 'Group Activities', 'Stone Stuff', 'Exercise', 'Cleanliness'],
+        favorites: ['lots of fire', 'group activities', 'stone stuff', 'exercise', 'cleanliness'],
       },
       PlannerTwo: {
         image: '',
-        favorites: ['Lots of Fire', 'Group Activities', 'Stone Stuff', 'Exercise', 'Cleanliness'],
+        favorites: ['lots of fire', 'group activities', 'stone stuff', 'exercise', 'cleanliness'],
       },
     }
     const house: HouseAssignment = {
@@ -270,9 +270,9 @@ describe('HouseRecord', () => {
   })
 
   it('shows craftable badge for items that have recipes', async () => {
-    // Punching Bag (Exercise) is craftable
+    // Punching Bag (exercise) is craftable
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise'] },
+      FitOne: { image: '', favorites: ['exercise'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -294,7 +294,7 @@ describe('HouseRecord', () => {
   it('shows Buy badge for items without recipes', async () => {
     // Shiny Stuff includes non-craftable Meteor Lamps
     const pokemonData: PokemonData = {
-      ShinyOne: { image: '', favorites: ['Shiny Stuff'] },
+      ShinyOne: { image: '', favorites: ['shiny stuff'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -316,7 +316,7 @@ describe('HouseRecord', () => {
   it('shows category badge for items with a category', async () => {
     // Punching Bag has category 'Outdoor'
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise'] },
+      FitOne: { image: '', favorites: ['exercise'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -353,7 +353,7 @@ describe('HouseRecord', () => {
 
   it('cart coverage table appears with correct rows after adding cart items', async () => {
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise'] },
+      FitOne: { image: '', favorites: ['exercise'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -379,7 +379,7 @@ describe('HouseRecord', () => {
 
   it('cart coverage remove button deletes item from cart and hides table', async () => {
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise'] },
+      FitOne: { image: '', favorites: ['exercise'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -406,9 +406,9 @@ describe('HouseRecord', () => {
   })
 
   it('cart coverage table shows tag ✓ in the correct column for the item tag', async () => {
-    // Punching Bag (Exercise) has the Toy tag
+    // Punching Bag (exercise) has the Toy tag
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise'] },
+      FitOne: { image: '', favorites: ['exercise'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -433,7 +433,7 @@ describe('HouseRecord', () => {
 
   it('cart coverage fav column header turns success when favorite is fulfilled', async () => {
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise'] },
+      FitOne: { image: '', favorites: ['exercise'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -458,7 +458,7 @@ describe('HouseRecord', () => {
 
   it('cart coverage fav cell shows success background for covered favorite', async () => {
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise'] },
+      FitOne: { image: '', favorites: ['exercise'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -482,7 +482,7 @@ describe('HouseRecord', () => {
 
   it('fulfilled favorite badges turn success after adding a covering cart item', async () => {
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise'] },
+      FitOne: { image: '', favorites: ['exercise'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -494,9 +494,9 @@ describe('HouseRecord', () => {
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
 
-    // Before adding any cart items, the Exercise badge should be danger (unfulfilled)
+    // Before adding any cart items, the exercise badge should be danger (unfulfilled)
     const favBadge = wrapper.find('[data-testid="fave-badge"]')
-    expect(favBadge.text()).toContain('Exercise')
+    expect(favBadge.text()).toContain('exercise')
     expect(favBadge.classes()).toContain('text-bg-danger')
     expect(favBadge.classes()).not.toContain('text-bg-success')
 
@@ -511,7 +511,7 @@ describe('HouseRecord', () => {
 
   it('favorite coverage cells use success background and show a checkmark', async () => {
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise'] },
+      FitOne: { image: '', favorites: ['exercise'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -535,7 +535,7 @@ describe('HouseRecord', () => {
 
   it('hides a fulfilled pokemon favorite column from active recommendations', async () => {
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise', 'Cleanliness'] },
+      FitOne: { image: '', favorites: ['exercise', 'cleanliness'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -560,7 +560,7 @@ describe('HouseRecord', () => {
     expect(headerTextsBefore.some((text) => text.includes('cleanliness'))).toBe(true)
 
     const cartStore = useCartStore()
-    await cartStore.addItem('S1', 'Punching bag')
+    await cartStore.addItem('S1', 'Punching Bag')
     await flushPromises()
 
     const headerTextsAfter = recommendationTable
@@ -574,7 +574,7 @@ describe('HouseRecord', () => {
   // @lat: [[ui#House#Item Metadata Display#Hides recommendations when every favorite is fulfilled]]
   it('hides recommendations entirely when every favorite is fulfilled', async () => {
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise'] },
+      FitOne: { image: '', favorites: ['exercise'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -589,7 +589,7 @@ describe('HouseRecord', () => {
     expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
 
     const cartStore = useCartStore()
-    await cartStore.addItem('S1', 'Punching bag')
+    await cartStore.addItem('S1', 'Punching Bag')
     await flushPromises()
 
     expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(false)
@@ -597,8 +597,8 @@ describe('HouseRecord', () => {
 
   it('fulfilled favorites do not bleed across houses', async () => {
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise'] },
-      FitTwo: { image: '', favorites: ['Exercise'] },
+      FitOne: { image: '', favorites: ['exercise'] },
+      FitTwo: { image: '', favorites: ['exercise'] },
     }
     const houseA: HouseAssignment = {
       houseId: 'A1',
@@ -633,7 +633,7 @@ describe('HouseRecord', () => {
   it('shows flavor text as title attribute on item name', async () => {
     // Punching Bag has flavor text
     const pokemonData: PokemonData = {
-      FitOne: { image: '', favorites: ['Exercise'] },
+      FitOne: { image: '', favorites: ['exercise'] },
     }
     const house: HouseAssignment = {
       houseId: 'S1',

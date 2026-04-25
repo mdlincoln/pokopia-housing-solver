@@ -97,26 +97,26 @@ describe('PokemonCard', () => {
       props: {
         name: 'TestMon',
         image: 'test.png',
-        favorites: ['Exercise', 'Cleanliness'],
+        favorites: ['exercise', 'cleanliness'],
         fulfilledFavorites: new Set(['exercise']),
       },
     })
 
     const badges = wrapper.findAll('[data-testid="fave-badge"]')
     expect(badges).toHaveLength(2)
-    const exerciseBadge = badges.find((b) => b.text().includes('Exercise'))!
-    const cleanlinessBadge = badges.find((b) => b.text().includes('Cleanliness'))!
+    const exerciseBadge = badges.find((b) => b.text().includes('exercise'))!
+    const cleanlinessBadge = badges.find((b) => b.text().includes('cleanliness'))!
     expect(exerciseBadge.classes()).toContain('text-bg-success')
     expect(cleanlinessBadge.classes()).toContain('text-bg-danger')
     expect(cleanlinessBadge.classes()).not.toContain('text-bg-success')
   })
 
-  it('fulfilled favorites matching is case-insensitive', () => {
+  it('fulfilled favorites matching is case-sensitive', () => {
     const wrapper = mount(PokemonCard, {
       props: {
         name: 'TestMon',
         image: 'test.png',
-        favorites: ['Shiny Stuff'],
+        favorites: ['shiny stuff'],
         fulfilledFavorites: new Set(['shiny stuff']),
       },
     })
@@ -130,7 +130,7 @@ describe('PokemonCard', () => {
       props: {
         name: 'TestMon',
         image: 'test.png',
-        favorites: ['Exercise', 'Cleanliness', 'Shiny Stuff'],
+        favorites: ['exercise', 'cleanliness', 'shiny stuff'],
         fulfilledFavorites: new Set(['exercise', 'cleanliness', 'shiny stuff']),
       },
     })

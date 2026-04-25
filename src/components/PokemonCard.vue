@@ -62,7 +62,7 @@ const habitatVariant = computed(() =>
               v-for="fav in favorites"
               :key="fav"
               :favorite="fav"
-              :fulfilled="fulfilledFavorites?.has(fav.toLowerCase()) ?? false"
+              :fulfilled="fulfilledFavorites?.has(fav) ?? false"
               data-testid="fave-badge"
             />
           </div>

@@ -13,16 +13,15 @@ export interface ItemDetails {
 // @lat: [[items#itemsForFavorite]]
 export async function itemsForFavorite(favorite: string): Promise<ItemDetails[]> {
   const db = await getDb()
-  const normalized = favorite.toLowerCase()
   const rows = db.exec(
     `SELECT i.name, i.category, i.flavor_text, i.picture_path, i.tag,
-            CASE WHEN COUNT(r.ingredient_id) > 0 THEN 1 ELSE 0 END AS is_craftable
-     FROM items i
-     JOIN item_favorites IF ON i.id = IF.item_id
-     LEFT JOIN item_recipe r ON r.item_id = i.id
-     WHERE IF.favorite_name = ?
-     GROUP BY i.id, i.name, i.category, i.flavor_text, i.picture_path, i.tag`,
-    [normalized],
+             CASE WHEN COUNT(r.ingredient_id) > 0 THEN 1 ELSE 0 END AS is_craftable
+      FROM items i
+      JOIN item_favorites IF ON i.id = IF.item_id
+      LEFT JOIN item_recipe r ON r.item_id = i.id
+      WHERE IF.favorite_name = ?
+      GROUP BY i.id, i.name, i.category, i.flavor_text, i.picture_path, i.tag`,
+    [favorite],
   )[0]
   if (!rows) return []
   return rows.values.map((row) => ({
@@ -44,12 +43,12 @@ export async function getItemMetadata(itemName: string): Promise<{
   const db = await getDb()
   const rows = db.exec(
     `SELECT i.category, i.flavor_text, i.tag,
-            CASE WHEN COUNT(r.ingredient_id) > 0 THEN 1 ELSE 0 END AS is_craftable
-     FROM items i
-     LEFT JOIN item_recipe r ON r.item_id = i.id
-     WHERE LOWER(i.name) = ?
-     GROUP BY i.id`,
-    [itemName.toLowerCase()],
+             CASE WHEN COUNT(r.ingredient_id) > 0 THEN 1 ELSE 0 END AS is_craftable
+      FROM items i
+      LEFT JOIN item_recipe r ON r.item_id = i.id
+      WHERE i.name = ?
+      GROUP BY i.id`,
+    [itemName],
   )[0]
   if (!rows || rows.values.length === 0)
     return { isCraftable: false, category: null, flavorText: null, tag: null }
@@ -65,19 +64,18 @@ export async function getItemMetadata(itemName: string): Promise<{
 // @lat: [[items#favoritesForItem]]
 const _itemFavsCache = new Map<string, string[]>()
 export async function favoritesForItem(item: string): Promise<string[]> {
-  const normalized = item.toLowerCase()
-  const cached = _itemFavsCache.get(normalized)
+  const cached = _itemFavsCache.get(item)
   if (cached) return cached
   const db = await getDb()
   const rows = db.exec(
     `SELECT IF.favorite_name FROM item_favorites IF
        JOIN items i ON i.id = IF.item_id
-       WHERE LOWER(i.name) = ?
+       WHERE i.name = ?
        ORDER BY IF.favorite_name ASC`,
-    [normalized],
+    [item],
   )[0]
   const result = rows ? rows.values.map((row) => row[0] as string) : []
-  _itemFavsCache.set(normalized, result)
+  _itemFavsCache.set(item, result)
   return result
 }
 
@@ -91,14 +89,13 @@ export interface RecommendedHouseItem extends ItemDetails {
 }
 
 export function favoriteCoverageColumnKey(favorite: string): string {
-  return `fav_${favorite.toLowerCase()}`
+  return `fav_${favorite}`
 }
 
 function buildFavoriteCounts(allFavorites: string[]): Map<string, number> {
   const favoriteCounts = new Map<string, number>()
   for (const favorite of allFavorites) {
-    const normalized = favorite.toLowerCase()
-    favoriteCounts.set(normalized, (favoriteCounts.get(normalized) ?? 0) + 1)
+    favoriteCounts.set(favorite, (favoriteCounts.get(favorite) ?? 0) + 1)
   }
   return favoriteCounts
 }
@@ -160,9 +157,9 @@ export async function recommendedItemsForHouse(
      FROM items i
      JOIN item_favorites IF ON i.id = IF.item_id
      JOIN house_favorites hf ON hf.favorite_name = IF.favorite_name
-     WHERE LOWER(i.tag) IN ('relaxation', 'decoration', 'toy')
-     GROUP BY i.id, i.name, i.category, i.flavor_text, i.picture_path, i.tag
-     ORDER BY score DESC, covered_count DESC, LOWER(i.name) ASC, i.name ASC`,
+       WHERE i.tag IN ('Relaxation', 'Decoration', 'Toy')
+      GROUP BY i.id, i.name, i.category, i.flavor_text, i.picture_path, i.tag
+      ORDER BY score DESC, covered_count DESC, i.name ASC`,
     params,
   )[0]
 
@@ -174,10 +171,9 @@ export async function recommendedItemsForHouse(
 // @lat: [[items#idealItems]]
 export async function idealItems(favorites: string[]): Promise<ItemScore[]> {
   const db = await getDb()
-  const normalized = favorites.map((f) => f.toLowerCase())
   const counts = new Map<string, number>()
 
-  for (const fav of normalized) {
+  for (const fav of favorites) {
     const rows = db.exec(
       `SELECT i.name FROM items i
          JOIN item_favorites IF ON i.id = IF.item_id
@@ -248,9 +244,7 @@ export interface AggregatedIngredient {
 
 export async function getItemPicturePath(itemName: string): Promise<string | null> {
   const db = await getDb()
-  const rows = db.exec(`SELECT picture_path FROM items WHERE LOWER(name) = ?`, [
-    itemName.toLowerCase(),
-  ])[0]
+  const rows = db.exec(`SELECT picture_path FROM items WHERE name = ?`, [itemName])[0]
   if (!rows || rows.values.length === 0) return null
   return (rows.values[0]![0] as string | null) ?? null
 }
@@ -262,9 +256,9 @@ export async function getRecipeForItem(itemName: string): Promise<RecipeIngredie
      FROM items i
      JOIN item_recipe r ON r.item_id = i.id
      JOIN items ing ON r.ingredient_id = ing.id
-     WHERE LOWER(i.name) = ?
+     WHERE i.name = ?
      ORDER BY ing.name`,
-    [itemName.toLowerCase()],
+    [itemName],
   )[0]
   if (!rows) return []
   return rows.values.map((row) => ({
@@ -286,13 +280,13 @@ export async function getAggregatedIngredients(
        FROM items i
        JOIN item_recipe r ON r.item_id = i.id
        JOIN items ing ON r.ingredient_id = ing.id
-       WHERE LOWER(i.name) = ?`,
+       WHERE i.name = ?`,
     )
     .join(' UNION ALL ')
   const sql = `SELECT name, picture_path, SUM(scaled) as total FROM (${unions}) GROUP BY name, picture_path ORDER BY name`
   const params: (string | number)[] = []
   for (const item of cartItems) {
-    params.push(item.quantity, item.name.toLowerCase())
+    params.push(item.quantity, item.name)
   }
   const rows = db.exec(sql, params)[0]
   if (!rows) return []

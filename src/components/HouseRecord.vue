@@ -58,13 +58,7 @@ const sharedHabitats = computed(() => {
 const houseCartItems = computed(() => cartStore.itemsByHouse.get(props.house.houseId) ?? [])
 
 const fulfilledTags = computed(
-  () =>
-    new Set(
-      houseCartItems.value
-        .map((item) => item.tag)
-        .filter((t): t is string => !!t)
-        .map((t) => t.toLowerCase()),
-    ),
+  () => new Set(houseCartItems.value.map((item) => item.tag).filter((t): t is string => !!t)),
 )
 
 const fulfilledFavorites = ref<Set<string>>(new Set())
@@ -92,8 +86,7 @@ const houseFavoriteColumns = computed(() => {
   const freq = new Map<string, number>()
   for (const name of props.house.pokemon) {
     for (const fav of props.pokemonData[name]?.favorites ?? []) {
-      const lower = fav.toLowerCase()
-      freq.set(lower, (freq.get(lower) ?? 0) + 1)
+      freq.set(fav, (freq.get(fav) ?? 0) + 1)
     }
   }
   return Array.from(freq.entries())
@@ -103,7 +96,7 @@ const houseFavoriteColumns = computed(() => {
 
 const unfulfilledFavoriteColumns = computed(() => {
   const fulfilled = fulfilledFavorites.value
-  return houseFavoriteColumns.value.filter((col) => !fulfilled.has(col.favorite.toLowerCase()))
+  return houseFavoriteColumns.value.filter((col) => !fulfilled.has(col.favorite))
 })
 
 const allFulfilled = computed(
@@ -160,15 +153,12 @@ function buildTableRow(item: RecommendedHouseItem): TableItemRow {
     itemData: item,
     name: item.name,
     craftability: craftabilityText(item),
-    col_toy: item.tag?.toLowerCase() === 'toy',
-    col_relaxation: item.tag?.toLowerCase() === 'relaxation',
-    col_decoration: item.tag?.toLowerCase() === 'decoration',
+    col_toy: item.tag === 'Toy',
+    col_relaxation: item.tag === 'Relaxation',
+    col_decoration: item.tag === 'Decoration',
   }
   const cellVariants: Record<string, 'success'> = {}
-  if (row.col_toy) cellVariants['col_toy'] = 'success'
-  if (row.col_relaxation) cellVariants['col_relaxation'] = 'success'
-  if (row.col_decoration) cellVariants['col_decoration'] = 'success'
-  for (const col of unfulfilledFavoriteColumns.value) {
+  for (const col of houseFavoriteColumns.value) {
     const cellKey = favoriteCoverageColumnKey(col.favorite)
     const isCovered = item[cellKey] === true
     row[cellKey] = isCovered
@@ -183,18 +173,18 @@ function buildTableRow(item: RecommendedHouseItem): TableItemRow {
 }
 
 function buildCartRow(item: CartItem, itemFavs: string[]): CartTableItemRow {
-  const favSet = new Set(itemFavs.map((f) => f.toLowerCase()))
+  const favSet = new Set(itemFavs)
   const row: CartTableItemRow = {
     itemData: item,
     name: item.name,
-    col_toy: item.tag?.toLowerCase() === 'toy',
-    col_relaxation: item.tag?.toLowerCase() === 'relaxation',
-    col_decoration: item.tag?.toLowerCase() === 'decoration',
+    col_toy: item.tag === 'Toy',
+    col_relaxation: item.tag === 'Relaxation',
+    col_decoration: item.tag === 'Decoration',
   }
   const cellVariants: Record<string, 'success'> = {}
   for (const col of houseFavoriteColumns.value) {
     const cellKey = favoriteCoverageColumnKey(col.favorite)
-    const isCovered = favSet.has(col.favorite.toLowerCase())
+    const isCovered = favSet.has(col.favorite)
     row[cellKey] = isCovered
     if (isCovered) {
       cellVariants[cellKey] = 'success'
@@ -220,15 +210,13 @@ watch(
 
     if (run !== recommendationRun) return
 
-    const fulfilledFavoriteSet = new Set(
-      allFavsPerItem.flat().map((favorite) => favorite.toLowerCase()),
-    )
+    const fulfilledFavoriteSet = new Set(allFavsPerItem.flat())
     fulfilledFavorites.value = fulfilledFavoriteSet
     cartTableItems.value = items.map((item, i) => buildCartRow(item, allFavsPerItem[i]!))
 
     const allFavorites = pokemon.flatMap((name) => props.pokemonData[name]?.favorites ?? [])
     const unfulfilledFavorites = allFavorites.filter(
-      (favorite) => !fulfilledFavoriteSet.has(favorite.toLowerCase()),
+      (favorite) => !fulfilledFavoriteSet.has(favorite),
     )
 
     if (unfulfilledFavorites.length === 0) {
@@ -348,9 +336,7 @@ watchEffect(() => {
             <span
               v-if="label"
               :class="
-                fulfilledFavorites.has((label as string).toLowerCase())
-                  ? 'text-success fw-bold'
-                  : 'text-danger'
+                fulfilledFavorites.has(label as string) ? 'text-success fw-bold' : 'text-danger'
               "
               :data-testid="`fav-header-${column}`"
             >
@@ -364,11 +350,7 @@ watchEffect(() => {
           >
             <span
               v-if="label"
-              :class="
-                fulfilledTags.has((label as string).toLowerCase())
-                  ? 'text-success fw-bold'
-                  : 'text-danger'
-              "
+              :class="fulfilledTags.has(label as string) ? 'text-success fw-bold' : 'text-danger'"
             >
               {{ label }}
             </span>
@@ -475,9 +457,7 @@ watchEffect(() => {
           <template v-if="(column as string).startsWith('fav_')">
             <span
               :class="
-                fulfilledFavorites.has((label as string).toLowerCase())
-                  ? 'text-success fw-bold'
-                  : 'text-danger'
+                fulfilledFavorites.has(label as string) ? 'text-success fw-bold' : 'text-danger'
               "
             >
               {{ label }} &times;{{ (field as any).count }}
@@ -489,11 +469,7 @@ watchEffect(() => {
             "
           >
             <span
-              :class="
-                fulfilledTags.has((label as string).toLowerCase())
-                  ? 'text-success fw-bold'
-                  : 'text-danger'
-              "
+              :class="fulfilledTags.has(label as string) ? 'text-success fw-bold' : 'text-danger'"
             >
               {{ label }}
             </span>
