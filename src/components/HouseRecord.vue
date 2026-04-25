@@ -108,13 +108,13 @@ const recommendationTableFields = computed(() => [
   { key: 'col_image', label: '', sortable: false },
   { key: 'col_actions', label: '', sortable: false },
   { key: 'craftability', label: 'Craftability', sortable: true },
-  ...(!fulfilledTags.value.has('toy')
+  ...(!fulfilledTags.value.has('Toy')
     ? [{ key: 'col_toy', label: 'Toy', sortable: true, class: 'bool-col' }]
     : []),
-  ...(!fulfilledTags.value.has('relaxation')
+  ...(!fulfilledTags.value.has('Relaxation')
     ? [{ key: 'col_relaxation', label: 'Relaxation', sortable: true, class: 'bool-col' }]
     : []),
-  ...(!fulfilledTags.value.has('decoration')
+  ...(!fulfilledTags.value.has('Decoration')
     ? [{ key: 'col_decoration', label: 'Decoration', sortable: true, class: 'bool-col' }]
     : []),
   ...unfulfilledFavoriteColumns.value.map((col) => ({
@@ -134,9 +134,13 @@ const cartTableFields = computed(() => [
   { key: 'col_image', label: '' },
   { key: 'name', label: 'Item', class: 'text-col' },
   { key: 'col_actions', label: '' },
-  { key: 'col_toy', label: 'Toy', class: 'bool-col' },
-  { key: 'col_relaxation', label: 'Relaxation', class: 'bool-col' },
-  { key: 'col_decoration', label: 'Decoration', class: 'bool-col' },
+  ...(!fulfilledTags.value.has('Toy') ? [{ key: 'col_toy', label: 'Toy', class: 'bool-col' }] : []),
+  ...(!fulfilledTags.value.has('Relaxation')
+    ? [{ key: 'col_relaxation', label: 'Relaxation', class: 'bool-col' }]
+    : []),
+  ...(!fulfilledTags.value.has('Decoration')
+    ? [{ key: 'col_decoration', label: 'Decoration', class: 'bool-col' }]
+    : []),
   ...houseFavoriteColumns.value.map((col) => ({
     key: favoriteCoverageColumnKey(col.favorite),
     label: col.favorite,
@@ -158,6 +162,9 @@ function buildTableRow(item: RecommendedHouseItem): TableItemRow {
     col_decoration: item.tag === 'Decoration',
   }
   const cellVariants: Record<string, 'success'> = {}
+  if (row.col_toy) cellVariants['col_toy'] = 'success'
+  if (row.col_relaxation) cellVariants['col_relaxation'] = 'success'
+  if (row.col_decoration) cellVariants['col_decoration'] = 'success'
   for (const col of houseFavoriteColumns.value) {
     const cellKey = favoriteCoverageColumnKey(col.favorite)
     const isCovered = item[cellKey] === true
@@ -182,6 +189,9 @@ function buildCartRow(item: CartItem, itemFavs: string[]): CartTableItemRow {
     col_decoration: item.tag === 'Decoration',
   }
   const cellVariants: Record<string, 'success'> = {}
+  if (row.col_toy) cellVariants['col_toy'] = 'success'
+  if (row.col_relaxation) cellVariants['col_relaxation'] = 'success'
+  if (row.col_decoration) cellVariants['col_decoration'] = 'success'
   for (const col of houseFavoriteColumns.value) {
     const cellKey = favoriteCoverageColumnKey(col.favorite)
     const isCovered = favSet.has(col.favorite)
@@ -403,18 +413,6 @@ watchEffect(() => {
             @click="cartStore.removeItem(house.houseId, (item as any).itemData.name)"
             >&times;</BButton
           >
-        </template>
-
-        <template #cell(col_toy)="{ value }">
-          <span v-if="value" class="bool-check" data-testid="cart-tag-toy">✓</span>
-        </template>
-
-        <template #cell(col_relaxation)="{ value }">
-          <span v-if="value" class="bool-check" data-testid="cart-tag-relaxation">✓</span>
-        </template>
-
-        <template #cell(col_decoration)="{ value }">
-          <span v-if="value" class="bool-check" data-testid="cart-tag-decoration">✓</span>
         </template>
 
         <template #cell()="{ field, value }">

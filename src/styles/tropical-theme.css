@@ -644,6 +644,10 @@ body {
   color: var(--bs-success);
 }
 
+.recommended-items-table td.bool-col.success .bool-check {
+  color: #fff;
+}
+
 .cart-thumbnail-sm {
   width: 20px;
   height: 20px;

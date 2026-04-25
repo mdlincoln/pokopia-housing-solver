@@ -425,10 +425,12 @@ describe('HouseRecord', () => {
     await cartStore.addItem('S1', itemName)
     await flushPromises()
 
-    // Toy column should show ✓; Relaxation and Decoration should be empty
-    expect(wrapper.find('[data-testid="cart-tag-toy"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="cart-tag-relaxation"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="cart-tag-decoration"]').exists()).toBe(false)
+    // Toy column should be hidden once fulfilled by an item in cart; others still present
+    const coverageTable = wrapper.find('[data-testid="cart-coverage-table"]')
+    const headers = coverageTable.findAll('th')
+    expect(headers.some((h) => h.text().includes('Toy'))).toBe(false)
+    expect(headers.some((h) => h.text().includes('Relaxation'))).toBe(true)
+    expect(headers.some((h) => h.text().includes('Decoration'))).toBe(true)
   })
 
   it('cart coverage fav column header turns success when favorite is fulfilled', async () => {
