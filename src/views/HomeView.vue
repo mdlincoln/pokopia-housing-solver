@@ -105,6 +105,14 @@ function prunePokemonData(names: string[]) {
       nextPokemonData[name] = entry
     }
   }
+  // Preserve pinned pokemon data — they may remain in house assignments via
+  // pinStore.getPinnedAssignments() even when not in selectedPokemon.
+  for (const name of pinStore.allPinnedPokemonNames) {
+    const entry = pokemonData.value[name]
+    if (entry && !nextPokemonData[name]) {
+      nextPokemonData[name] = entry
+    }
+  }
   const currentKeys = Object.keys(pokemonData.value)
   const nextKeys = Object.keys(nextPokemonData)
   if (
