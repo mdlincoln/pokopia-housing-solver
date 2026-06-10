@@ -20,13 +20,23 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-const mockSolve = vi.fn()
+const mockSolve =
+  vi.fn<
+    (
+      pokemonNames: string[],
+      houses: import('@/stores/houses').HouseEntry[],
+      pokemonData: import('@/solver').PokemonData,
+      adjacencyMap?: import('@/solver').AdjacencyMap,
+      pinnedAssignments?: Map<string, string[]>,
+    ) => Promise<SolverResult>
+  >()
 
 vi.mock('@/solver', async (importOriginal) => {
   const actual = await importOriginal()
   return {
     ...(actual as object),
-    solve: (...args: unknown[]) => mockSolve(...args),
+    solve: ((...args: unknown[]) =>
+      mockSolve(...(args as Parameters<typeof mockSolve>))) as (typeof import('@/solver'))['solve'],
   }
 })
 
@@ -34,9 +44,9 @@ vi.mock('@/queries', async (importOriginal) => {
   const actual = await importOriginal()
   return {
     ...(actual as object),
-    loadPokemonNames: vi.fn(),
-    loadPokemonData: vi.fn(),
-    loadAdjacencyMap: vi.fn(),
+    loadPokemonNames: vi.fn<() => Promise<string[]>>(),
+    loadPokemonData: vi.fn<() => Promise<import('@/solver').PokemonData>>(),
+    loadAdjacencyMap: vi.fn<() => void>(),
   }
 })
 

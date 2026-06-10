@@ -1,10 +1,4 @@
-import {
-  favoriteCoverageColumnKey,
-  idealItems,
-  itemsForFavorite,
-  recommendedItemsForHouse,
-  type ItemDetails,
-} from '@/queries'
+import { idealItems, itemsForFavorite, type ItemDetails } from '@/queries'
 
 export {
   favoriteCoverageColumnKey,
