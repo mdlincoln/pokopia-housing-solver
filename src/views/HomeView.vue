@@ -33,9 +33,22 @@ const progressStore = useProgressStore()
 const pokemonNames = ref<string[]>([])
 const pokemonData = ref<PokemonData>({})
 const adjacencyData = ref<AdjacencyMap | null>(null)
-const hydratedPokemonReady = computed(() =>
-  selectedPokemon.value.every((name) => !!pokemonData.value[name]),
-)
+const hydratedPokemonReady = computed(() => {
+  const allSelected = selectedPokemon.value.every((name) => !!pokemonData.value[name])
+  if (!allSelected) return false
+
+  // During active hydration or pending loads, also verify that pokemon
+  // referenced by pinned assignments exist in pokemonData. This prevents
+  // the solver from running with stale data during a deselection race
+  // condition (old data hasn't been pruned yet but async prune is pending).
+  if (hydratingPokemonData.value || pendingPokemonLoads.size > 0) {
+    for (const name of pinStore.allPinnedPokemonNames) {
+      if (!pokemonData.value[name]) return false
+    }
+  }
+
+  return true
+})
 const selectedPokemon = ref<string[]>([])
 
 const small = ref(0)
