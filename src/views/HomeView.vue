@@ -561,7 +561,7 @@ defineExpose({
     <h2 class="section-heading">Results</h2>
 
     <BAlert
-      v-if="result.unhoused.length"
+      v-if="result!.unhoused.length"
       variant="warning"
       :model-value="true"
       data-testid="unhoused"
@@ -569,7 +569,7 @@ defineExpose({
     >
       <h5 class="alert-heading">Unhoused</h5>
       <ul class="mb-0">
-        <li v-for="name in result.unhoused" :key="name">{{ name }}</li>
+        <li v-for="name in result!.unhoused" :key="name">{{ name }}</li>
       </ul>
     </BAlert>
 
