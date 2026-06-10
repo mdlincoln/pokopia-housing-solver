@@ -5,6 +5,7 @@ import { loadAdjacencyMap, loadPokemonData, loadPokemonNames } from '@/queries'
 import { type AdjacencyMap, type PokemonData, type SolverResult } from '@/solver'
 import { solveInWorker, SupersededError } from '@/solverClient'
 import { debounce } from '@/utils/debounce'
+import { nextTick } from 'vue'
 import { useCartStore } from '@/stores/cart'
 import { useHouseStore } from '@/stores/houses'
 import { usePinStore } from '@/stores/pins'
@@ -49,6 +50,23 @@ const hydratedPokemonReady = computed(() => {
 
   return true
 })
+// Guard: only render results when all pokemon referenced by the result
+// actually exist in pokemonData. This prevents a race condition where Vue's
+// async DOM update batch causes the old <section> to briefly re-render with
+// stale house assignments against pruned pokemonData (e.g. during deselection,
+// URL restore, or clearAll). The solver validates names at solve-time but the
+// template accesses them at render-time — between those two moments,
+// pokemonData can be pruned by hydration while the result is still displayed.
+const resultsSafeToRender = computed(() => {
+  if (!result.value) return false
+  for (const house of result.value.houses) {
+    for (const name of house.pokemon) {
+      if (!pokemonData.value[name]) return false
+    }
+  }
+  return true
+})
+
 const selectedPokemon = ref<string[]>([])
 
 const small = ref(0)
@@ -139,6 +157,13 @@ function prunePokemonData(names: string[]) {
 
 async function hydratePokemonSelection(names: string[]) {
   prunePokemonData(names)
+
+  // Flush Vue's async DOM update batch so watchers that depend on the new
+  // pokemonData (e.g. the solve watch that sets result.value = null when
+  // hydratedPokemonReady goes false) complete before we proceed with async
+  // data loading. Without this, a brief re-render can occur where old
+  // HouseRecord components reference names no longer in pruned pokemonData.
+  await nextTick()
 
   const missingNames = names.filter(
     (name) => !pokemonData.value[name] && !pendingPokemonLoads.has(name),
@@ -321,7 +346,7 @@ watch(
   { deep: true },
 )
 
-function clearAll() {
+async function clearAll() {
   pinStore.clear()
   progressStore.restoreProgress({})
   houseStore.clear()
@@ -330,6 +355,11 @@ function clearAll() {
   large.value = 0
   selectedPokemon.value = []
   pokemonData.value = {}
+
+  // Flush Vue's async DOM update batch so watchers complete (they set
+  // result.value = null when selectedPokemon/pokemonData become empty) and
+  // the old results section is removed from the DOM before returning.
+  await nextTick()
 }
 
 function loadSample() {
@@ -527,7 +557,7 @@ defineExpose({
     {{ error }}
   </BAlert>
 
-  <section v-if="result" data-testid="results" class="mt-4 results-section">
+  <section v-if="resultsSafeToRender" data-testid="results" class="mt-4 results-section">
     <h2 class="section-heading">Results</h2>
 
     <BAlert
