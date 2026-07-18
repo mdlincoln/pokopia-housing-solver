@@ -655,4 +655,44 @@ describe('HouseRecord', () => {
     expect(title).toBeTruthy()
     expect(title!.length).toBeGreaterThan(0)
   })
+
+  it('does not throw when pokemonData is pruned while component is still mounted (TransitionGroup leave race)', async () => {
+    // Regression: HouseRecord can briefly re-render after its pokemonData prop
+    // is pruned (e.g. during deselection, clearAll, or URL restore) while a
+    // TransitionGroup leave transition keeps it alive in the DOM. The template
+    // must not crash on pokemonData[name]!.image when the entry is gone.
+    // See: TypeError: Cannot read properties of undefined (reading 'image')
+    const pokemonData: PokemonData = {
+      FitOne: { image: 'fitone.png', favorites: ['exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    // Capture render errors via Vue's errorHandler so the test fails (rather
+    // than emitting an unhandled rejection) when the template throws.
+    const errors: unknown[] = []
+    const wrapper = mount(HouseRecord, {
+      props: { house, pokemonData },
+      global: {
+        config: {
+          errorHandler(err: unknown) {
+            errors.push(err)
+          },
+        },
+      },
+    })
+    await flushPromises()
+
+    // Simulate the race: prune the pokemon from pokemonData while the
+    // HouseRecord is still mounted (as TransitionGroup does during its
+    // leave animation). This must not throw.
+    await wrapper.setProps({ pokemonData: {} })
+    await flushPromises()
+
+    expect(errors).toEqual([])
+  })
 })
