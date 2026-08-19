@@ -32,6 +32,19 @@ npx playwright test e2e/vue.spec.ts -g "Saves title with query"     # one e2e by
 
 A pre-commit hook runs lint-staged (eslint + oxlint + oxfmt) on staged `.js`/`.ts`/`.vue` files.
 
+# Data Maintenance
+
+`scripts/harvest_pokemon.py` syncs the pokemon catalog in `public/pokehousing.sqlite` with Serebii's Pokopia PokéDex. It scrapes Serebii's list pages, compares case-insensitively against the DB, downloads sprite images to `public/images/`, and inserts any missing pokemon with their image path, ideal habitat, and favorites. Any Serebii favorites not present in the DB `favorites` table are flagged (not auto-inserted) for manual review.
+
+```bash
+python3 scripts/harvest_pokemon.py              # scrape + add missing pokemon
+python3 scripts/harvest_pokemon.py --dry-run    # report only, no DB/image writes
+python3 scripts/harvest_pokemon.py --verify     # completeness + data-integrity check
+python3 scripts/harvest_pokemon.py --delay 1.0  # raise base request delay (jittered to [delay, 3.0]s)
+```
+
+The script uses only the Python standard library (no dependencies). It requests pages with a jittered delay to scrape politely. New form-variant pokemon use the Serebii image filename directly (e.g., `images/592-frillishmaleform.png`) rather than the legacy `images/<dex>.png` convention.
+
 # Architecture
 
 ## Data layer
