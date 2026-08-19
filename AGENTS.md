@@ -45,6 +45,27 @@ python3 scripts/harvest_pokemon.py --delay 1.0  # raise base request delay (jitt
 
 The script uses only the Python standard library (no dependencies). It requests pages with a jittered delay to scrape politely. New form-variant pokemon use the Serebii image filename directly (e.g., `images/592-frillishmaleform.png`) rather than the legacy `images/<dex>.png` convention.
 
+# Item Maintenance
+
+`scripts/harvest_items.py` syncs the `items`, `item_favorites`, and `item_recipe` tables in `public/pokehousing.sqlite` with Serebii's Pokémon Pokopia item database. It scrapes all 43 favorites-category list pages and the comprehensive items listing to discover items and their favorite-category mappings, then fetches each missing item's detail page to extract metadata (category, tag, flavor text), crafting recipe (ingredients + counts), and favorite mappings. Item sprite images are downloaded to `public/images/`.
+
+Recipes use a two-pass insertion approach: all new items are inserted first (Pass 1), then recipes and favorite mappings are inserted (Pass 2) referencing the newly created item IDs, ensuring foreign-key constraints on `item_recipe.ingredient_id` are satisfied. Existing items with incomplete favorite mappings are backfilled, and existing items lacking recipes (e.g., from a prior partial run) get their recipes backfilled on subsequent runs.
+
+```bash
+python3 scripts/harvest_items.py              # scrape + add missing items
+python3 scripts/harvest_items.py --dry-run    # report only, no DB/image writes
+python3 scripts/harvest_items.py --verify     # completeness + data-integrity check
+python3 scripts/harvest_items.py --delay 1.0  # raise base request delay (jittered to [delay, 3.0]s)
+```
+
+The script uses only the Python standard library (no dependencies). Like `harvest_pokemon.py`, it requests pages with a jittered delay to scrape politely. The DB `picture_path` follows the convention `images/<slug>.png`, where `<slug>` matches the Serebii detail-page URL slug.
+
+Unit tests live in `scripts/__tests__/test_harvest_items.py` and use Python's built-in `unittest` (no extra dependencies). Run with:
+
+```bash
+python3 -m unittest scripts.__tests__.test_harvest_items -v
+```
+
 # Architecture
 
 ## Data layer
