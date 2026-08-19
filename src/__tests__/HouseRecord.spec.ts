@@ -25,6 +25,18 @@ const testPokemonData: PokemonData = {
   GammaOne: { image: '', favorites: ['P', 'Q', 'R'], habitat: 'Cool' },
 }
 
+// Return the craftability cell text for the recommendation-table row whose
+// item-name cell equals ``name``. Recommendations are ordered, so this scopes
+// the assertion to a specific item rather than assuming it is the first row.
+function craftabilityOf(wrapper: ReturnType<typeof mount>, name: string): string {
+  const nameCells = wrapper.findAll('[data-testid="item-name"]')
+  const row = nameCells.find((cell) => cell.text() === name)?.element.closest('tr')
+  expect(row).toBeDefined()
+  const cell = row!.querySelector('[data-testid="item-craftability"]')
+  expect(cell).not.toBeNull()
+  return cell!.textContent ?? ''
+}
+
 describe('HouseRecord', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -286,9 +298,10 @@ describe('HouseRecord', () => {
     await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
     await flushPromises()
 
-    const cell = wrapper.find('[data-testid="item-craftability"]')
-    expect(cell.exists()).toBe(true)
-    expect(cell.text()).toMatch(/^Craftable/)
+    // 'exercise' returns several Toy-tagged recommendations ordered
+    // alphabetically, so locate the Punching Bag row specifically rather than
+    // assuming it is the first row.
+    expect(craftabilityOf(wrapper, 'Punching Bag')).toMatch(/^Craftable/)
   })
 
   it('shows Buy badge for items without recipes', async () => {
@@ -330,9 +343,8 @@ describe('HouseRecord', () => {
     await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
     await flushPromises()
 
-    const craftCell = wrapper.find('[data-testid="item-craftability"]')
-    expect(craftCell.exists()).toBe(true)
-    expect(craftCell.text()).toContain('Outdoor')
+    // Punching Bag's craftability text includes its category.
+    expect(craftabilityOf(wrapper, 'Punching Bag')).toContain('Outdoor')
   })
 
   it('cart coverage table is hidden when cart is empty', async () => {

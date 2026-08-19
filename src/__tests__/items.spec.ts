@@ -35,6 +35,40 @@ function itemNames(items: ItemDetails[]): string[] {
   return items.map((d) => d.name)
 }
 
+// ItemScore results use `.item` rather than `.name`.
+function scoreItemNames(scores: Array<{ item: string }>): string[] {
+  return scores.map((s) => s.item)
+}
+
+// Items that fulfill the 'exercise' favorite (per the current Serebii-corrected
+// DB). These tests load the real DB via @/db, so counts/scores are tied to the
+// harvested data.
+const EXERCISE_ITEMS = [
+  'Beach volleyball set',
+  'Bike',
+  'Punching Bag',
+  'Punching Game',
+  'Wobbuffet Wobbler',
+]
+
+// Items that fulfill the 'cleanliness' favorite.
+const CLEANLINESS_ITEMS = [
+  'Bathtime Set',
+  'Bathtub',
+  'Bouncy Blue Bathtub',
+  'Cleaning Supplies',
+  'Cooler',
+  'Large Mirror',
+  'Modern Sink',
+  'Shower',
+  'Sink',
+  'Toilet',
+  'Towel Rack',
+  'Washing Machine',
+  'Water Basin',
+  'Waterproof Seat',
+]
+
 describe('favoritesForItem', () => {
   it('returns all favorites fulfilled by a known item', async () => {
     const result = await favoritesForItem('Gaming Bed')
@@ -61,8 +95,8 @@ describe('idealItems', () => {
 
   it('returns items for a single favorite with score 1', async () => {
     const result = await idealItems(['exercise'])
-    // Exercise has exactly one item: "Punching Bag"
-    expect(result).toHaveLength(1)
+    // Exercise has five items; each scores 1 (unique to this favorite).
+    expect(scoreItemNames(result).sort()).toEqual([...EXERCISE_ITEMS].sort())
     expect(scoreOf(result, 'Punching Bag')).toBe(1)
   })
 
@@ -80,25 +114,25 @@ describe('idealItems', () => {
 
   it('ignores unknown favorites mixed with valid ones', async () => {
     const result = await idealItems(['exercise', 'Not A Real Favorite'])
-    expect(result).toHaveLength(1)
+    // Unknown favorite contributes nothing; exercise still yields its 5 items.
+    expect(scoreItemNames(result).sort()).toEqual([...EXERCISE_ITEMS].sort())
     expect(scoreOf(result, 'Punching Bag')).toBe(1)
   })
 
   it('returns all items from a multi-item favorite', async () => {
     const result = await idealItems(['cleanliness'])
-    // Cleanliness: Bathtime set, Cleaning supplies, Shower, Bathtub, Bouncy blue bathtub, Water basin
-    expect(result).toHaveLength(6)
+    expect(scoreItemNames(result).sort()).toEqual([...CLEANLINESS_ITEMS].sort())
     for (const { score } of result) {
       expect(score).toBe(1)
     }
   })
 
   it('scores shared items across three favorites', async () => {
-    // "Bonfire" appears in both Lots of Fire and Group Activities
-    // "Campfire" appears in Lots of Fire and Stone Stuff
+    // "Bonfire" is in Lots of Fire and Group Activities
+    // "Campfire" is in Lots of Fire, Group Activities, and Stone Stuff
     const result = await idealItems(['lots of fire', 'group activities', 'stone stuff'])
     expect(scoreOf(result, 'Bonfire')).toBe(2)
-    expect(scoreOf(result, 'Campfire')).toBe(2)
+    expect(scoreOf(result, 'Campfire')).toBe(3)
   })
 
   it('multiplies scores when a favorite appears multiple times', async () => {
@@ -126,7 +160,7 @@ describe('favoritesToItems', () => {
 
   it('handles a single favorite with count 1', async () => {
     const result = await favoritesToItems([{ favorite: 'exercise', count: 1 }])
-    expect(result).toHaveLength(1)
+    expect(scoreItemNames(result).sort()).toEqual([...EXERCISE_ITEMS].sort())
     expect(scoreOf(result, 'Punching Bag')).toBe(1)
   })
 
@@ -181,7 +215,7 @@ describe('clusterItemsByFavorites', () => {
 
   it('creates separate clusters for items fulfilling different favorite subsets', async () => {
     // "Bonfire" is in both Lots of Fire and Group Activities
-    // "Campfire" is only in Lots of Fire
+    // "Torch" is only in Lots of Fire
     const result = await clusterItemsByFavorites(['lots of fire', 'group activities'])
 
     expect(result.length).toBeGreaterThanOrEqual(2)
@@ -190,11 +224,11 @@ describe('clusterItemsByFavorites', () => {
     expect(result[0]!.favorites).toHaveLength(2)
     expect(itemNames(result[0]!.items)).toContain('Bonfire')
 
-    // Campfire should be in a single-favorite cluster
-    const campfireCluster = result.find((c) => itemNames(c.items).includes('Campfire'))
-    expect(campfireCluster).toBeDefined()
-    expect(campfireCluster!.favorites).toHaveLength(1)
-    expect(campfireCluster!.favorites).toContain('lots of fire')
+    // Torch should be in a single-favorite cluster
+    const torchCluster = result.find((c) => itemNames(c.items).includes('Torch'))
+    expect(torchCluster).toBeDefined()
+    expect(torchCluster!.favorites).toHaveLength(1)
+    expect(torchCluster!.favorites).toContain('lots of fire')
   })
 
   it('ranks clusters by number of favorites descending', async () => {

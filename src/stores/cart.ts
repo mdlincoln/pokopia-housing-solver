@@ -75,7 +75,17 @@ export const useCartStore = defineStore('cart', () => {
 
     const result = new Map<string, CartItem[]>()
     for (const [houseId, newItems] of grouped) {
-      const fingerprint = newItems.map((i) => i.name).join(',')
+      // Fingerprint covers all CartItem fields that can change independently
+      // of the item name — most importantly the recipe, which resolves
+      // asynchronously after items.value.set, so the cached array must
+      // invalidate when a recipe becomes available.
+      const fingerprint = newItems
+        .map(
+          (i) =>
+            `${i.name}|${i.picturePath}|${i.isCraftable}|${i.category}|${i.flavorText}|` +
+            `${i.tag}|${i.recipe.map((ing) => `${ing.ingredientName}:${ing.count}`).join(',')}`,
+        )
+        .join('§')
       const stable = _stableHouseArrays.get(houseId)
       if (stable?.fingerprint === fingerprint) {
         result.set(houseId, stable.items)
