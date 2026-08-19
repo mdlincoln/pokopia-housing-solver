@@ -1,14 +1,15 @@
+import { getDb } from '@/db'
 import { describe, expect, it, vi } from 'vitest'
 import {
-  clusterItemsByFavorites,
   favoriteCoverageColumnKey,
   favoritesForItem,
-  favoritesToItems,
-  idealItems,
+  getAggregatedIngredients,
+  getItemMetadata,
+  getItemPicturePath,
+  getRecipeForItem,
+  loadItemGraph,
   recommendedItemsForHouse,
-  type ItemDetails,
-  type ItemScore,
-} from '../items'
+} from '../queries'
 
 vi.mock('@/db', async () => {
   const { default: initSqlJs } = await import('sql.js')
@@ -27,46 +28,19 @@ vi.mock('@/db', async () => {
   }
 })
 
-function scoreOf(results: ItemScore[], item: string): number | undefined {
-  return results.find((r) => r.item === item)?.score
+// Parity fixtures from the real DB (loaded via the @/db mock above). Counts and
+// metadata are tied to the currently harvested Serebii data.
+const PUNCHING_BAG_METADATA = {
+  isCraftable: true,
+  category: 'Outdoor',
+  flavorText: 'Heavy and packed full of sand. Perfect for practicing punches and kicks!',
+  tag: 'Toy',
 }
-
-function itemNames(items: ItemDetails[]): string[] {
-  return items.map((d) => d.name)
-}
-
-// ItemScore results use `.item` rather than `.name`.
-function scoreItemNames(scores: Array<{ item: string }>): string[] {
-  return scores.map((s) => s.item)
-}
-
-// Items that fulfill the 'exercise' favorite (per the current Serebii-corrected
-// DB). These tests load the real DB via @/db, so counts/scores are tied to the
-// harvested data.
-const EXERCISE_ITEMS = [
-  'Beach volleyball set',
-  'Bike',
-  'Punching Bag',
-  'Punching Game',
-  'Wobbuffet Wobbler',
-]
-
-// Items that fulfill the 'cleanliness' favorite.
-const CLEANLINESS_ITEMS = [
-  'Bathtime Set',
-  'Bathtub',
-  'Bouncy Blue Bathtub',
-  'Cleaning Supplies',
-  'Cooler',
-  'Large Mirror',
-  'Modern Sink',
-  'Shower',
-  'Sink',
-  'Toilet',
-  'Towel Rack',
-  'Washing Machine',
-  'Water Basin',
-  'Waterproof Seat',
+const PUNCHING_BAG_RECIPE: Array<{ ingredientName: string; count: number }> = [
+  { ingredientName: 'Beach Sand', count: 1 },
+  { ingredientName: 'Iron Ore', count: 1 },
+  { ingredientName: 'Twine', count: 1 },
+  { ingredientName: 'Vine Rope', count: 1 },
 ]
 
 describe('favoritesForItem', () => {
@@ -79,197 +53,6 @@ describe('favoritesForItem', () => {
   it('returns empty list for unknown item', async () => {
     const result = await favoritesForItem('Not A Real Item')
     expect(result).toEqual([])
-  })
-})
-
-describe('idealItems', () => {
-  it('returns empty array for empty favorites list', async () => {
-    const result = await idealItems([])
-    expect(result).toEqual([])
-  })
-
-  it('returns empty array for unknown favorite', async () => {
-    const result = await idealItems(['Nonexistent Favorite'])
-    expect(result).toEqual([])
-  })
-
-  it('returns items for a single favorite with score 1', async () => {
-    const result = await idealItems(['exercise'])
-    // Exercise has five items; each scores 1 (unique to this favorite).
-    expect(scoreItemNames(result).sort()).toEqual([...EXERCISE_ITEMS].sort())
-    expect(scoreOf(result, 'Punching Bag')).toBe(1)
-  })
-
-  it('scores items that appear in multiple input favorites', async () => {
-    // "Gaming Bed" appears in both Colorful Stuff and Shiny Stuff
-    const result = await idealItems(['colorful stuff', 'shiny stuff'])
-    expect(scoreOf(result, 'Gaming Bed')).toBe(2)
-  })
-
-  it('returns score 1 for items unique to one favorite', async () => {
-    // "Stardust" is in Shiny Stuff but not in Colorful Stuff
-    const result = await idealItems(['colorful stuff', 'shiny stuff'])
-    expect(scoreOf(result, 'Stardust')).toBe(1)
-  })
-
-  it('ignores unknown favorites mixed with valid ones', async () => {
-    const result = await idealItems(['exercise', 'Not A Real Favorite'])
-    // Unknown favorite contributes nothing; exercise still yields its 5 items.
-    expect(scoreItemNames(result).sort()).toEqual([...EXERCISE_ITEMS].sort())
-    expect(scoreOf(result, 'Punching Bag')).toBe(1)
-  })
-
-  it('returns all items from a multi-item favorite', async () => {
-    const result = await idealItems(['cleanliness'])
-    expect(scoreItemNames(result).sort()).toEqual([...CLEANLINESS_ITEMS].sort())
-    for (const { score } of result) {
-      expect(score).toBe(1)
-    }
-  })
-
-  it('scores shared items across three favorites', async () => {
-    // "Bonfire" is in Lots of Fire and Group Activities
-    // "Campfire" is in Lots of Fire, Group Activities, and Stone Stuff
-    const result = await idealItems(['lots of fire', 'group activities', 'stone stuff'])
-    expect(scoreOf(result, 'Bonfire')).toBe(2)
-    expect(scoreOf(result, 'Campfire')).toBe(3)
-  })
-
-  it('multiplies scores when a favorite appears multiple times', async () => {
-    // Exercise has one item: "Punching Bag"
-    // Passing Exercise twice should give Punching Bag a score of 2
-    const result = await idealItems(['exercise', 'exercise'])
-    expect(scoreOf(result, 'Punching Bag')).toBe(2)
-  })
-
-  it('stacks duplicates with cross-favorite overlap', async () => {
-    // "Gaming Bed" is in both Colorful Stuff and Shiny Stuff
-    // With Shiny Stuff listed twice: Gaming Bed should score 3 (1 from Colorful + 2 from Shiny)
-    const result = await idealItems(['colorful stuff', 'shiny stuff', 'shiny stuff'])
-    expect(scoreOf(result, 'Gaming Bed')).toBe(3)
-    // Stardust is only in Shiny Stuff, so it scores 2
-    expect(scoreOf(result, 'Stardust')).toBe(2)
-  })
-})
-
-describe('favoritesToItems', () => {
-  it('returns empty array for empty input', async () => {
-    const result = await favoritesToItems([])
-    expect(result).toEqual([])
-  })
-
-  it('handles a single favorite with count 1', async () => {
-    const result = await favoritesToItems([{ favorite: 'exercise', count: 1 }])
-    expect(scoreItemNames(result).sort()).toEqual([...EXERCISE_ITEMS].sort())
-    expect(scoreOf(result, 'Punching Bag')).toBe(1)
-  })
-
-  it('multiplies item scores by favorite count', async () => {
-    // Exercise appears 3 times → Punching Bag scores 3
-    const result = await favoritesToItems([{ favorite: 'exercise', count: 3 }])
-    expect(scoreOf(result, 'Punching Bag')).toBe(3)
-  })
-
-  it('combines counts across multiple favorites', async () => {
-    // Gaming Bed is in both Colorful Stuff and Shiny Stuff
-    const result = await favoritesToItems([
-      { favorite: 'colorful stuff', count: 1 },
-      { favorite: 'shiny stuff', count: 1 },
-    ])
-    expect(scoreOf(result, 'Gaming Bed')).toBe(2)
-  })
-
-  it('stacks repeated favorites with cross-favorite overlap', async () => {
-    // Shiny Stuff ×2 + Colorful Stuff ×1 → Gaming Bed scores 3
-    const result = await favoritesToItems([
-      { favorite: 'colorful stuff', count: 1 },
-      { favorite: 'shiny stuff', count: 2 },
-    ])
-    expect(scoreOf(result, 'Gaming Bed')).toBe(3)
-    expect(scoreOf(result, 'Stardust')).toBe(2)
-  })
-
-  it('ignores favorites with count 0', async () => {
-    const result = await favoritesToItems([{ favorite: 'exercise', count: 0 }])
-    expect(result).toEqual([])
-  })
-})
-
-describe('clusterItemsByFavorites', () => {
-  it('returns empty array for empty input', async () => {
-    const result = await clusterItemsByFavorites([])
-    expect(result).toEqual([])
-  })
-
-  it('returns empty array for unknown favorite', async () => {
-    const result = await clusterItemsByFavorites(['Nonexistent Favorite'])
-    expect(result).toEqual([])
-  })
-
-  it('groups all items under one cluster for a single favorite', async () => {
-    const result = await clusterItemsByFavorites(['exercise'])
-    expect(result).toHaveLength(1)
-    expect(result[0]!.favorites).toEqual(['exercise'])
-    expect(itemNames(result[0]!.items)).toContain('Punching Bag')
-  })
-
-  it('creates separate clusters for items fulfilling different favorite subsets', async () => {
-    // "Bonfire" is in both Lots of Fire and Group Activities
-    // "Torch" is only in Lots of Fire
-    const result = await clusterItemsByFavorites(['lots of fire', 'group activities'])
-
-    expect(result.length).toBeGreaterThanOrEqual(2)
-
-    // The cluster with both favorites should appear first (2 > 1)
-    expect(result[0]!.favorites).toHaveLength(2)
-    expect(itemNames(result[0]!.items)).toContain('Bonfire')
-
-    // Torch should be in a single-favorite cluster
-    const torchCluster = result.find((c) => itemNames(c.items).includes('Torch'))
-    expect(torchCluster).toBeDefined()
-    expect(torchCluster!.favorites).toHaveLength(1)
-    expect(torchCluster!.favorites).toContain('lots of fire')
-  })
-
-  it('ranks clusters by number of favorites descending', async () => {
-    const result = await clusterItemsByFavorites([
-      'lots of fire',
-      'group activities',
-      'stone stuff',
-    ])
-    for (let i = 1; i < result.length; i++) {
-      expect(result[i]!.favorites.length).toBeLessThanOrEqual(result[i - 1]!.favorites.length)
-    }
-  })
-
-  it('uses alphabetical tie-break when coverage is equal', async () => {
-    const result = await clusterItemsByFavorites(['exercise', 'cleanliness'])
-    const singleFavoriteClusters = result.filter((cluster) => cluster.favorites.length === 1)
-    expect(singleFavoriteClusters[0]!.favorites).toEqual(['cleanliness'])
-    expect(singleFavoriteClusters[1]!.favorites).toEqual(['exercise'])
-  })
-
-  it('deduplicates exact-match input favorites', async () => {
-    const result = await clusterItemsByFavorites(['exercise', 'exercise'])
-    expect(result).toHaveLength(1)
-    expect(itemNames(result[0]!.items)).toContain('Punching Bag')
-  })
-
-  it('returns empty for unknown favorites', async () => {
-    const result = await clusterItemsByFavorites(['Exercise'])
-    expect(result).toHaveLength(0)
-  })
-
-  it('every item in a cluster fulfills all of that cluster favorites', async () => {
-    // Verify the invariant: items in a cluster are interchangeable
-    const result = await clusterItemsByFavorites(['lots of fire', 'group activities'])
-    // The 2-favorite cluster should only contain items in BOTH catalog entries
-    const topCluster = result[0]!
-    expect(topCluster.favorites).toHaveLength(2)
-    // Bonfire appears in both Lots of Fire and Group Activities
-    expect(itemNames(topCluster.items)).toContain('Bonfire')
-    // Torch only appears in Lots of Fire, not Group Activities — should NOT be here
-    expect(itemNames(topCluster.items)).not.toContain('Torch')
   })
 })
 
@@ -310,5 +93,96 @@ describe('recommendedItemsForHouse', () => {
   it('returns an empty array when no favorites match tagged items', async () => {
     const result = await recommendedItemsForHouse(['not a real favorite'])
     expect(result).toHaveLength(0)
+  })
+})
+
+describe('getItemMetadata', () => {
+  it('returns metadata for a known craftable item', async () => {
+    const result = await getItemMetadata('Punching Bag')
+    expect(result).toEqual(PUNCHING_BAG_METADATA)
+  })
+
+  it('returns the all-false/all-null contract for an unknown item', async () => {
+    const result = await getItemMetadata('Not A Real Item')
+    expect(result).toEqual({ isCraftable: false, category: null, flavorText: null, tag: null })
+  })
+})
+
+describe('getItemPicturePath', () => {
+  it('returns the picture path for a known item', async () => {
+    expect(await getItemPicturePath('Punching Bag')).toBe('images/punchingbag.png')
+  })
+
+  it('returns null for an unknown item', async () => {
+    expect(await getItemPicturePath('Not A Real Item')).toBeNull()
+  })
+})
+
+describe('getRecipeForItem', () => {
+  it('returns the multi-ingredient recipe for a craftable item, name-sorted', async () => {
+    const result = await getRecipeForItem('Punching Bag')
+    expect(result.map((r) => ({ ingredientName: r.ingredientName, count: r.count }))).toEqual(
+      PUNCHING_BAG_RECIPE,
+    )
+    for (const ingredient of result) {
+      expect(typeof ingredient.ingredientPicture).toBe('string')
+    }
+  })
+
+  it('returns an empty list for an unknown or uncraftable item', async () => {
+    expect(await getRecipeForItem('Not A Real Item')).toEqual([])
+  })
+})
+
+describe('getAggregatedIngredients', () => {
+  it('returns empty array for empty input', async () => {
+    expect(await getAggregatedIngredients([])).toEqual([])
+  })
+
+  it('aggregates a recipe with quantity scaling', async () => {
+    const result = await getAggregatedIngredients([{ name: 'Punching Bag', quantity: 3 }])
+    // Each Punching Bag ingredient (count 1) scales to 3; results are name-sorted.
+    expect(result.map((r) => ({ name: r.name, total: r.total }))).toEqual([
+      { name: 'Beach Sand', total: 3 },
+      { name: 'Iron Ore', total: 3 },
+      { name: 'Twine', total: 3 },
+      { name: 'Vine Rope', total: 3 },
+    ])
+  })
+
+  it('sums shared ingredients across multiple cart items', async () => {
+    const single = await getAggregatedIngredients([{ name: 'Punching Bag', quantity: 1 }])
+    const doubled = await getAggregatedIngredients([
+      { name: 'Punching Bag', quantity: 1 },
+      { name: 'Punching Bag', quantity: 1 },
+    ])
+    expect(doubled.map((r) => ({ name: r.name, total: r.total }))).toEqual(
+      single.map((r) => ({ name: r.name, total: r.total * 2 })),
+    )
+  })
+
+  it('ignores non-craftable and unknown items without error', async () => {
+    const result = await getAggregatedIngredients([{ name: 'Not A Real Item', quantity: 2 }])
+    expect(result).toEqual([])
+  })
+})
+
+describe('loadItemGraph caching', () => {
+  it('runs no additional SQL after the graph is loaded', async () => {
+    const db = await getDb()
+    const spy = vi.spyOn(db, 'exec')
+    await loadItemGraph()
+    // Normalize for test order: other suites may have loaded the graph already.
+    spy.mockClear()
+
+    await recommendedItemsForHouse(['exercise'])
+    await favoritesForItem('Punching Bag')
+    await getItemMetadata('Punching Bag')
+    await getItemPicturePath('Punching Bag')
+    await getRecipeForItem('Punching Bag')
+    await getAggregatedIngredients([{ name: 'Punching Bag', quantity: 2 }])
+
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
   })
 })

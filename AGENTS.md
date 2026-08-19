@@ -19,7 +19,7 @@ npx playwright install chromium   # first-run only
 
 npm run lint             # oxlint --fix then eslint --fix --cache
 npm run format           # oxfmt on src/
-npm run check            # format + lint + type-check + unit + e2e (the full gate)
+npm run check            # format + lint + type-check + unit (e2e is separate: npm run test:e2e)
 ```
 
 Running a single test:
@@ -79,7 +79,9 @@ python3 -m unittest scripts.__tests__.test_harvest_items -v
 - `items.tag` — Pokopia item tags (`Relaxation`, `Toy`, `Decoration`) used to filter recommendations.
 - `adjacency` — precomputed pairwise pokemon compatibility scores (shared favorites + habitat bonuses, `null` for opposite-axis exclusions).
 
-Exported query helpers include `loadPokemonNames`, `loadPokemonData(names?)` (hydrate lazily for the currently selected set only), `loadAdjacencyMap`, `itemsForFavorite`, `favoritesForItem` (cached), `idealItems`, `recommendedItemsForHouse` (builds a dynamic SELECT with one `MAX(CASE ...) AS "fav_<favorite>"` column per distinct favorite), `getItemMetadata`, `getItemPicturePath`, `getRecipeForItem`, and `getAggregatedIngredients`.
+Exported query helpers include `loadPokemonNames`, `loadPokemonData(names?)` (hydrate lazily for the currently selected set only), `loadAdjacencyMap`, `favoritesForItem`, `recommendedItemsForHouse` (one boolean `fav_<favorite>` key per distinct input favorite), `getItemMetadata`, `getItemPicturePath`, `getRecipeForItem`, and `getAggregatedIngredients`.
+
+All item-facing helpers (`favoritesForItem`, `recommendedItemsForHouse`, `getItemMetadata`, `getItemPicturePath`, `getRecipeForItem`, `getAggregatedIngredients`) are pure in-memory lookups over a once-loaded item graph: `loadItemGraph()` runs three flat SELECTs (items, item↔favorite mappings, recipes) on first use and is shared via a cached promise — no SQL executes on the item domain afterward (the whole item domain is ~1700 rows). HomeView pre-warms it on mount (`void loadItemGraph()`) alongside the names/adjacency loads. The graph reuses shared object references, so helpers that hand data to stores copy small results (`getRecipeForItem` deep-copies its recipe arrays; `recommendedItemsForHouse` builds fresh row objects).
 
 ## Solver (`src/solver.ts`)
 
@@ -116,7 +118,7 @@ Vue 3 + Pinia + Bootstrap Vue Next. `src/main.ts` wires Bootstrap CSS/Icons, `bo
 
 **Reactive solve.** Users configure house counts via `BFormSpinbutton` and select pokemon via the autocomplete `PokemonSelect`. Results update automatically via a `watch` — no submit button. The watch flips `solving=true` immediately (so the spinner appears without delay), then runs a 150ms trailing-edge debounce (`src/utils/debounce.ts`) before calling `solveInWorker`, collapsing bursts of rapid interactions into a single run.
 
-**Lazy hydration.** On mount HomeView calls `loadPokemonNames()` and `loadAdjacencyMap()` once. `loadPokemonData(selectedNames)` hydrates image/favorites/habitat only for the currently selected pokemon; entries are removed locally when deselected.
+**Lazy hydration.** On mount HomeView calls `loadPokemonNames()` and `loadAdjacencyMap()` once, and pre-warms the item graph with a fire-and-forget `loadItemGraph()`. `loadPokemonData(selectedNames)` hydrates image/favorites/habitat only for the currently selected pokemon; entries are removed locally when deselected.
 
 **Results.** A `TransitionGroup` renders one `HouseRecord` per assigned house; pinned houses sort to the bottom with a 750ms FLIP transition. Unhoused pokemon and errors appear in `BAlert` banners. While solving, the list carries a `results-pending` class (60% opacity, pointer-events disabled); the previous `result` is kept visible across solves so houses fade rather than flashing out.
 
@@ -137,7 +139,7 @@ Vue 3 + Pinia + Bootstrap Vue Next. `src/main.ts` wires Bootstrap CSS/Icons, `bo
 
 ## Components
 
-- `src/components/HouseRecord.vue` — house card. Shows size/capacity, PokemonCards, a "Shared habitats" badge section (habitat with 2+ occupants is a colored `BBadge` with `data-testid="shared-habitat-badge"`), a **cart fulfillment table** (`cart-items-coverage`, only when the house has cart items), and a collapsible recommendations `<details>` panel hidden outright once every favorite is fulfilled. Recommendations come from `recommendedItemsForHouse` (tagged Relaxation/Decoration/Toy), with vertical-rotated headers (`.recommended-items-table`) and one boolean `bool-col` per tag / unfulfilled favorite. A `+` button (`add-to-cart`) adds items to that house's cart.
+- `src/components/HouseRecord.vue` — house card. Shows size/capacity, PokemonCards, a "Shared habitats" badge section (habitat with 2+ occupants is a colored `BBadge` with `data-testid="shared-habitat-badge"`), a **cart fulfillment table** (`cart-items-coverage`, only when the house has cart items), and a collapsible recommendations `<details>` panel hidden outright once every favorite is fulfilled. Recommendations come from `recommendedItemsForHouse` (tagged Relaxation/Decoration/Toy), with vertical-rotated headers (`.recommended-items-table`) and one boolean `bool-col` per tag / unfulfilled favorite. A `+` button (`add-to-cart`) adds items to that house's cart. The recommendations table renders lazily: it mounts only after the panel is first opened (a `hasOpenedRecs` latch on the `<details>` toggle) and stays mounted afterwards. The `fulfilledFavorites` set keeps its reference stable across watch re-runs with unchanged contents (`sameFavorites` comparison) so PokemonCards don't re-render on no-op cart interactions.
 - `src/components/PokemonCard.vue` — horizontal card (`no-body`) with image + name + habitat pill (`habitat-badge`) + per-favorite `FavoriteBadge`s. Each favorite badge (`fave-badge`) is success+✓ when fulfilled by a cart item, danger+✗ when not.
 - `src/components/FavoriteBadge.vue` — shared pill component. Props: `favorite`, `fulfilled?` (drives success/danger + ✓/✗), `informational?` (secondary variant, no prefix; overrides `fulfilled`), `count?` (renders `×N`). Emits `click(favorite)` on click or Enter/Space. Pass `informational` explicitly when no fulfillment state applies — absent `fulfilled` is coerced to `false` by Vue's boolean prop casting.
 - `src/components/PokemonSelect.vue` — autocomplete multi-select. Accepts `pinnedNames: Set<string>` to disable close buttons for pinned entries.

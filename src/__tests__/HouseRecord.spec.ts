@@ -11,7 +11,7 @@ vi.mock('@/db', async () => {
   return { getDb: async () => db }
 })
 
-import HouseRecord from '@/components/HouseRecord.vue'
+import HouseRecord, { sameFavorites } from '@/components/HouseRecord.vue'
 import type { HouseAssignment, PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { flushPromises, mount } from '@vue/test-utils'
@@ -35,6 +35,20 @@ function craftabilityOf(wrapper: ReturnType<typeof mount>, name: string): string
   const cell = row!.querySelector('[data-testid="item-craftability"]')
   expect(cell).not.toBeNull()
   return cell!.textContent ?? ''
+}
+
+// The recommendation table renders lazily — it mounts only after the
+// <details data-testid="recommended-items"> panel has first been opened and
+// stays mounted afterwards. jsdom's summary-click activation behavior does not
+// reliably fire the toggle event within flushPromises, so this helper sets
+// `open` and dispatches `toggle` directly (the component's latch handler only
+// depends on those two).
+async function openRecommendations(wrapper: ReturnType<typeof mount>) {
+  const details = wrapper.find('[data-testid="recommended-items"]')
+  expect(details.exists()).toBe(true)
+  ;(details.element as HTMLDetailsElement).open = true
+  await details.trigger('toggle')
+  await flushPromises()
 }
 
 describe('HouseRecord', () => {
@@ -174,6 +188,7 @@ describe('HouseRecord', () => {
     const details = wrapper.find('[data-testid="recommended-items"]')
     expect(details.exists()).toBe(true)
 
+    await openRecommendations(wrapper)
     const itemNames = wrapper.findAll('[data-testid="item-name"]')
     expect(itemNames.length).toBeGreaterThan(0)
   })
@@ -195,6 +210,7 @@ describe('HouseRecord', () => {
       props: { house, pokemonData },
     })
     await flushPromises()
+    await openRecommendations(wrapper)
 
     const itemNames = wrapper.findAll('[data-testid="item-name"]')
     expect(itemNames.length).toBeGreaterThan(0)
@@ -266,8 +282,7 @@ describe('HouseRecord', () => {
       props: { house, pokemonData },
     })
     await flushPromises()
-    await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
-    await flushPromises()
+    await openRecommendations(wrapper)
 
     const table = wrapper.find('[data-testid="recommended-items-list"]')
     const rows = table.findAll('tbody tr')
@@ -295,8 +310,7 @@ describe('HouseRecord', () => {
 
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
-    await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
-    await flushPromises()
+    await openRecommendations(wrapper)
 
     // 'exercise' returns several Toy-tagged recommendations ordered
     // alphabetically, so locate the Punching Bag row specifically rather than
@@ -318,8 +332,7 @@ describe('HouseRecord', () => {
 
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
-    await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
-    await flushPromises()
+    await openRecommendations(wrapper)
 
     const cells = wrapper.findAll('[data-testid="item-craftability"]')
     const buyCell = cells.find((c) => c.text() === 'Buy')
@@ -340,8 +353,7 @@ describe('HouseRecord', () => {
 
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
-    await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
-    await flushPromises()
+    await openRecommendations(wrapper)
 
     // Punching Bag's craftability text includes its category.
     expect(craftabilityOf(wrapper, 'Punching Bag')).toContain('Outdoor')
@@ -376,6 +388,7 @@ describe('HouseRecord', () => {
 
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
+    await openRecommendations(wrapper)
 
     const itemName = wrapper.find('[data-testid="item-name"]').text()
     const cartStore = useCartStore()
@@ -402,6 +415,7 @@ describe('HouseRecord', () => {
 
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
+    await openRecommendations(wrapper)
 
     const itemName = wrapper.find('[data-testid="item-name"]').text()
     const cartStore = useCartStore()
@@ -431,6 +445,7 @@ describe('HouseRecord', () => {
 
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
+    await openRecommendations(wrapper)
 
     const itemName = wrapper.find('[data-testid="item-name"]').text()
     const cartStore = useCartStore()
@@ -458,6 +473,7 @@ describe('HouseRecord', () => {
 
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
+    await openRecommendations(wrapper)
 
     const itemName = wrapper.find('[data-testid="item-name"]').text()
     const cartStore = useCartStore()
@@ -483,6 +499,7 @@ describe('HouseRecord', () => {
 
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
+    await openRecommendations(wrapper)
 
     const itemName = wrapper.find('[data-testid="item-name"]').text()
     const cartStore = useCartStore()
@@ -515,6 +532,7 @@ describe('HouseRecord', () => {
     expect(favBadge.classes()).not.toContain('text-bg-success')
 
     // Add an Exercise item to the cart
+    await openRecommendations(wrapper)
     const itemName = wrapper.find('[data-testid="item-name"]').text()
     const cartStore = useCartStore()
     await cartStore.addItem('S1', itemName)
@@ -536,8 +554,7 @@ describe('HouseRecord', () => {
 
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
-    await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
-    await flushPromises()
+    await openRecommendations(wrapper)
 
     const successCells = wrapper.findAll('tbody td.table-success')
     expect(successCells.length).toBeGreaterThan(0)
@@ -560,8 +577,7 @@ describe('HouseRecord', () => {
 
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
-    await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
-    await flushPromises()
+    await openRecommendations(wrapper)
 
     const recommendationTable = wrapper.find('[data-testid="recommended-items-list"]')
     expect(recommendationTable.exists()).toBe(true)
@@ -632,6 +648,7 @@ describe('HouseRecord', () => {
     await flushPromises()
 
     // Add item only to house A
+    await openRecommendations(wrapperA)
     const itemName = wrapperA.find('[data-testid="item-name"]').text()
     const cartStore = useCartStore()
     await cartStore.addItem('A1', itemName)
@@ -658,8 +675,7 @@ describe('HouseRecord', () => {
 
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
-    await wrapper.find('[data-testid="recommended-items"] summary').trigger('click')
-    await flushPromises()
+    await openRecommendations(wrapper)
 
     const nameEl = wrapper.find('[data-testid="item-name"]')
     expect(nameEl.exists()).toBe(true)
@@ -706,5 +722,87 @@ describe('HouseRecord', () => {
     await flushPromises()
 
     expect(errors).toEqual([])
+  })
+
+  it('renders the recommendation table only after the panel is first opened, and keeps it mounted', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+
+    // Panel shell visible, but the table is not in the DOM yet
+    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="recommended-items-list"]').exists()).toBe(false)
+
+    // First open latches the table into the DOM
+    await openRecommendations(wrapper)
+    expect(wrapper.find('[data-testid="recommended-items-list"]').exists()).toBe(true)
+
+    // Collapsing again does not unmount it — repeat toggles are free
+    const details = wrapper.find('[data-testid="recommended-items"]')
+    ;(details.element as HTMLDetailsElement).open = false
+    await details.trigger('toggle')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="recommended-items-list"]').exists()).toBe(true)
+  })
+
+  it('keeps the fulfilledFavorites Set identity stable when watch re-runs with unchanged contents', async () => {
+    // Stub PokemonCard so we can capture the raw :fulfilled-favorites prop.
+    const pokemonCardStub = {
+      name: 'PokemonCard',
+      props: ['name', 'image', 'favorites', 'habitat', 'checked', 'fulfilledFavorites'],
+      template: '<div class="pokemon-card-stub"></div>',
+    }
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'A1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, {
+      props: { house, pokemonData },
+      global: { stubs: { PokemonCard: pokemonCardStub } },
+    })
+    await flushPromises()
+
+    const card = wrapper.findComponent(pokemonCardStub)
+    const propBefore = card.props('fulfilledFavorites')
+
+    // Trigger a second watch run whose cart contents are equal but whose array
+    // reference differs: adding an item to a DIFFERENT house makes this house's
+    // houseCartItems computed return a fresh empty-array literal with identical
+    // contents, re-firing the deep watch. The comparison in the watch must keep
+    // the Set reference identical.
+    const cartStore = useCartStore()
+    await cartStore.addItem('B1', 'Punching Bag')
+    await flushPromises()
+
+    const propAfter = wrapper.findComponent(pokemonCardStub).props('fulfilledFavorites')
+    expect(propAfter).toBe(propBefore)
+  })
+})
+
+describe('sameFavorites', () => {
+  it('returns true for equal sets', () => {
+    expect(sameFavorites(new Set(), new Set())).toBe(true)
+    expect(sameFavorites(new Set(['a', 'b']), new Set(['b', 'a']))).toBe(true)
+  })
+
+  it('returns false for different contents or sizes', () => {
+    expect(sameFavorites(new Set(['a']), new Set(['b']))).toBe(false)
+    expect(sameFavorites(new Set(['a']), new Set(['a', 'b']))).toBe(false)
+    expect(sameFavorites(new Set(), new Set(['a']))).toBe(false)
   })
 })

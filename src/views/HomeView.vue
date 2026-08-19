@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import HouseRecord from '@/components/HouseRecord.vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
-import { loadAdjacencyMap, loadPokemonData, loadPokemonNames } from '@/queries'
+import { loadAdjacencyMap, loadItemGraph, loadPokemonData, loadPokemonNames } from '@/queries'
 import { type AdjacencyMap, type PokemonData, type SolverResult } from '@/solver'
 import { solveInWorker, SupersededError } from '@/solverClient'
 import { debounce } from '@/utils/debounce'
@@ -305,6 +305,9 @@ watch(selectedTimestamp, async (ts) => {
 })
 
 onMounted(async () => {
+  // Fire-and-forget: preload the item graph so the first cart interaction is
+  // pure in-memory (the cached promise means every item helper shares this load).
+  void loadItemGraph()
   const [names, adjacency] = await Promise.all([loadPokemonNames(), loadAdjacencyMap()])
   pokemonNames.value = names
   adjacencyData.value = adjacency

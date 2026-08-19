@@ -1,3 +1,16 @@
+<script lang="ts">
+// Set equality by contents: same size and every element present. Used to keep
+// the fulfilledFavorites ref identity stable when a watch re-run computes an
+// unchanged set, avoiding no-op PokemonCard re-renders.
+export function sameFavorites(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) return false
+  for (const favorite of a) {
+    if (!b.has(favorite)) return false
+  }
+  return true
+}
+</script>
+
 <script setup lang="ts">
 import { assetPath } from '@/assetPath'
 import PokemonCard from '@/components/PokemonCard.vue'
@@ -8,7 +21,7 @@ import {
   recommendedItemsForHouse,
   type ItemDetails,
   type RecommendedHouseItem,
-} from '@/items'
+} from '@/queries'
 import { type HouseAssignment, type PokemonData } from '@/solver'
 import { useCartStore, type CartItem } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
@@ -62,6 +75,18 @@ const fulfilledTags = computed(
 )
 
 const fulfilledFavorites = ref<Set<string>>(new Set())
+
+// Lazy render latch: the recommendations BTable only mounts after the panel is
+// first opened (recommendation data is still computed eagerly so the summary's
+// visibility is unaffected). Once latched, the table stays mounted so repeat
+// toggles are free.
+const hasOpenedRecs = ref(false)
+
+function onRecsToggle(event: Event) {
+  if ((event.target as HTMLDetailsElement).open) {
+    hasOpenedRecs.value = true
+  }
+}
 
 interface TableItemRow extends Record<string, unknown> {
   itemData: ItemDetails
@@ -221,7 +246,11 @@ watch(
     if (run !== recommendationRun) return
 
     const fulfilledFavoriteSet = new Set(allFavsPerItem.flat())
-    fulfilledFavorites.value = fulfilledFavoriteSet
+    // Only swap the Set identity when contents actually changed so PokemonCards
+    // don't re-render on every no-op watch run.
+    if (!sameFavorites(fulfilledFavorites.value, fulfilledFavoriteSet)) {
+      fulfilledFavorites.value = fulfilledFavoriteSet
+    }
     cartTableItems.value = items.map((item, i) => buildCartRow(item, allFavsPerItem[i]!))
 
     const allFavorites = pokemon.flatMap((name) => props.pokemonData[name]?.favorites ?? [])
@@ -425,6 +454,7 @@ watchEffect(() => {
       v-if="activeTableItems.length"
       data-testid="recommended-items"
       class="mt-3 house-recommendations"
+      @toggle="onRecsToggle"
     >
       <summary>
         Recommended items
@@ -437,11 +467,8 @@ watchEffect(() => {
           >Craftable only</BFormCheckbox
         >
       </summary>
-      <p v-if="activeTableItems.length === 0" class="text-muted fst-italic mb-2">
-        All recommended favorites and tags are already covered for this house.
-      </p>
       <BTable
-        v-if="activeTableItems.length"
+        v-if="hasOpenedRecs"
         no-border-collapse
         small
         responsive
