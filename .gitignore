@@ -42,6 +42,3 @@ test-results/
 playwright-report/
 .claude
 .mcp.json
-
-# Python
-__pycache__/

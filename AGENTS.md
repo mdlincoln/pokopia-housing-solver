@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -18,8 +18,9 @@ npm run test:e2e         # Playwright (Chromium); auto-starts dev or preview ser
 npx playwright install chromium   # first-run only
 
 npm run lint             # oxlint --fix then eslint --fix --cache
-npm run format           # oxfmt on src/
-npm run check            # format + lint + type-check + unit (e2e is separate: npm run test:e2e)
+npm run format           # oxfmt on src/ and scripts/
+npm run check            # format + lint + type-check + unit + harvest tests (e2e is separate)
+npm run test:harvest     # node:test regression suite (scripts/*.test.js)
 ```
 
 Running a single test:
@@ -34,36 +35,38 @@ A pre-commit hook runs lint-staged (eslint + oxlint + oxfmt) on staged `.js`/`.t
 
 # Data Maintenance
 
-`scripts/harvest_pokemon.py` syncs the pokemon catalog in `public/pokehousing.sqlite` with Serebii's Pokopia PokéDex. It scrapes Serebii's list pages, compares case-insensitively against the DB, downloads sprite images to `public/images/`, and inserts any missing pokemon with their image path, ideal habitat, and favorites. Any Serebii favorites not present in the DB `favorites` table are flagged (not auto-inserted) for manual review.
+`scripts/harvest_pokemon.js` syncs the pokemon catalog in `public/pokehousing.sqlite` with Serebii's Pokopia PokéDex. It scrapes Serebii's list pages, compares case-insensitively against the DB, downloads sprite images to `public/images/`, and inserts any missing pokemon with their image path, ideal habitat, and favorites. Any Serebii favorites not present in the DB `favorites` table are flagged (not auto-inserted) for manual review.
 
 ```bash
-python3 scripts/harvest_pokemon.py              # scrape + add missing pokemon
-python3 scripts/harvest_pokemon.py --dry-run    # report only, no DB/image writes
-python3 scripts/harvest_pokemon.py --verify     # completeness + data-integrity check
-python3 scripts/harvest_pokemon.py --delay 1.0  # raise base request delay (jittered to [delay, 3.0]s)
+npm run harvest:pokemon              # scrape + add missing pokemon
+npm run harvest:pokemon -- --dry-run # report only, no DB/image writes
+npm run harvest:pokemon -- --verify  # completeness + data-integrity check
+npm run harvest:pokemon -- --delay 1.0  # raise base request delay (jittered to [delay, 3.0]s)
 ```
 
-The script uses only the Python standard library (no dependencies). It requests pages with a jittered delay to scrape politely. New form-variant pokemon use the Serebii image filename directly (e.g., `images/592-frillishmaleform.png`) rather than the legacy `images/<dex>.png` convention.
+The script uses only the Node standard library (`fetch`, `node:sqlite`, `node:util`). It requests pages with a jittered delay to scrape politely. New form-variant pokemon use the Serebii image filename directly (e.g., `images/592-frillishmaleform.png`) rather than the legacy `images/<dex>.png` convention.
 
 # Item Maintenance
 
-`scripts/harvest_items.py` syncs the `items`, `item_favorites`, and `item_recipe` tables in `public/pokehousing.sqlite` with Serebii's Pokémon Pokopia item database. It scrapes all 43 favorites-category list pages and the comprehensive items listing to discover items and their favorite-category mappings, then fetches each missing item's detail page to extract metadata (category, tag, flavor text), crafting recipe (ingredients + counts), and favorite mappings. Item sprite images are downloaded to `public/images/`.
+`scripts/harvest_items.js` syncs the `items`, `item_favorites`, and `item_recipe` tables in `public/pokehousing.sqlite` with Serebii's Pokémon Pokopia item database. It scrapes all 43 favorites-category list pages and the comprehensive items listing to discover items and their favorite-category mappings, then fetches each missing item's detail page to extract metadata (category, tag, flavor text), crafting recipe (ingredients + counts), and favorite mappings. Item sprite images are downloaded to `public/images/`.
 
 Recipes use a two-pass insertion approach: all new items are inserted first (Pass 1), then recipes and favorite mappings are inserted (Pass 2) referencing the newly created item IDs, ensuring foreign-key constraints on `item_recipe.ingredient_id` are satisfied. Existing items with incomplete favorite mappings are backfilled, and existing items lacking recipes (e.g., from a prior partial run) get their recipes backfilled on subsequent runs.
 
 ```bash
-python3 scripts/harvest_items.py              # scrape + add missing items
-python3 scripts/harvest_items.py --dry-run    # report only, no DB/image writes
-python3 scripts/harvest_items.py --verify     # completeness + data-integrity check
-python3 scripts/harvest_items.py --delay 1.0  # raise base request delay (jittered to [delay, 3.0]s)
+npm run harvest:items              # scrape + add missing items
+npm run harvest:items -- --dry-run # report only, no DB/image writes
+npm run harvest:items -- --verify  # completeness + data-integrity check
+npm run harvest:items -- --delay 1.0  # raise base request delay (jittered to [delay, 3.0]s)
 ```
 
-The script uses only the Python standard library (no dependencies). Like `harvest_pokemon.py`, it requests pages with a jittered delay to scrape politely. The DB `picture_path` follows the convention `images/<slug>.png`, where `<slug>` matches the Serebii detail-page URL slug.
+The script uses only the Node standard library (`fetch`, `node:sqlite`, `node:util`). Like `harvest_pokemon.js`, it requests pages with a jittered delay to scrape politely. The DB `picture_path` follows the convention `images/<slug>.png`, where `<slug>` matches the Serebii detail-page URL slug.
 
-Unit tests live in `scripts/__tests__/test_harvest_items.py` and use Python's built-in `unittest` (no extra dependencies). Run with:
+`node:sqlite` is experimental and requires **Node 22+** (`.nvmrc` pins `22.22.2`); it prints a harmless `ExperimentalWarning`.
+
+Unit tests live in `scripts/harvest_items.test.js` and `scripts/harvest_pokemon.test.js` and use Node's built-in `node:test` (no extra dependencies). Run with:
 
 ```bash
-python3 -m unittest scripts.__tests__.test_harvest_items -v
+npm run test:harvest
 ```
 
 # Architecture
