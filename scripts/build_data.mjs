@@ -17,6 +17,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { DEFAULT_DB_PATH, openReadOnlyDb, PROJECT_ROOT } from './harvest_lib.js'
+import { formatDataJson } from './format_data.mjs'
 
 const POKEMON_OUT = path.join(PROJECT_ROOT, 'src', 'data', 'pokemon.json')
 const ITEMS_OUT = path.join(PROJECT_ROOT, 'src', 'data', 'items.json')
@@ -147,11 +148,15 @@ function main() {
     fs.mkdirSync(path.dirname(ITEMS_OUT), { recursive: true })
     fs.mkdirSync(path.dirname(ADJACENCY_OUT), { recursive: true })
 
-    fs.writeFileSync(POKEMON_OUT, JSON.stringify(pokemon) + '\n')
-    fs.writeFileSync(ITEMS_OUT, JSON.stringify(items) + '\n')
+    // Format via the same deterministic pretty-printer the committed files
+    // carry (matches lint-staged's oxfmt pass on src/**), so re-running the
+    // bake never dirties the tree. JSON.parse ignores whitespace, so this
+    // has no runtime effect.
+    fs.writeFileSync(POKEMON_OUT, formatDataJson(pokemon))
+    fs.writeFileSync(ITEMS_OUT, formatDataJson(items))
     fs.writeFileSync(
       ADJACENCY_OUT,
-      JSON.stringify({ names: adjacency.names, size: adjacency.size, data: adjacency.data }) + '\n',
+      formatDataJson({ names: adjacency.names, size: adjacency.size, data: adjacency.data }),
     )
 
     console.log(`pokemon.json: ${pokemon.names.length} pokemon`)

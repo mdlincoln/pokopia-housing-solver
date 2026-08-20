@@ -379,13 +379,7 @@
     },
     "Absol": {
       "image": "images/359.png",
-      "favorites": [
-        "complicated stuff",
-        "exercise",
-        "letters and words",
-        "nice breezes",
-        "soft stuff"
-      ],
+      "favorites": ["complicated stuff", "exercise", "letters and words", "nice breezes", "soft stuff"],
       "habitat": "Dark"
     },
     "Aerodactyl": {
@@ -395,13 +389,7 @@
     },
     "Alakazam": {
       "image": "images/065.png",
-      "favorites": [
-        "letters and words",
-        "metal stuff",
-        "strange stuff",
-        "watching stuff",
-        "wobbly stuff"
-      ],
+      "favorites": ["letters and words", "metal stuff", "strange stuff", "watching stuff", "wobbly stuff"],
       "habitat": "Dark"
     },
     "Alomomola": {
@@ -426,13 +414,7 @@
     },
     "Arbok": {
       "image": "images/024.png",
-      "favorites": [
-        "garbage",
-        "lots of nature",
-        "slender objects",
-        "spinning stuff",
-        "watching stuff"
-      ],
+      "favorites": ["garbage", "lots of nature", "slender objects", "spinning stuff", "watching stuff"],
       "habitat": "Dark"
     },
     "Arcanine": {
@@ -482,13 +464,7 @@
     },
     "Barboach": {
       "image": "images/339.png",
-      "favorites": [
-        "lots of dirt",
-        "lots of water",
-        "slender objects",
-        "soft stuff",
-        "watching stuff"
-      ],
+      "favorites": ["lots of dirt", "lots of water", "slender objects", "soft stuff", "watching stuff"],
       "habitat": "Humid"
     },
     "Bastiodon": {
@@ -498,13 +474,7 @@
     },
     "Beldum": {
       "image": "images/374.png",
-      "favorites": [
-        "complicated stuff",
-        "hard stuff",
-        "metal stuff",
-        "stone stuff",
-        "strange stuff"
-      ],
+      "favorites": ["complicated stuff", "hard stuff", "metal stuff", "stone stuff", "strange stuff"],
       "habitat": "Cool"
     },
     "Bellossom": {
@@ -514,13 +484,7 @@
     },
     "Bellsprout": {
       "image": "images/069.png",
-      "favorites": [
-        "lots of dirt",
-        "lots of nature",
-        "lots of water",
-        "pretty flowers",
-        "wooden stuff"
-      ],
+      "favorites": ["lots of dirt", "lots of nature", "lots of water", "pretty flowers", "wooden stuff"],
       "habitat": "Humid"
     },
     "Blastoise": {
@@ -545,46 +509,22 @@
     },
     "Brionne": {
       "image": "images/729.png",
-      "favorites": [
-        "cleanliness",
-        "group activities",
-        "lots of water",
-        "noisy stuff",
-        "play spaces"
-      ],
+      "favorites": ["cleanliness", "group activities", "lots of water", "noisy stuff", "play spaces"],
       "habitat": "Bright"
     },
     "Bruxish": {
       "image": "images/779.png",
-      "favorites": [
-        "colorful stuff",
-        "hard stuff",
-        "lots of water",
-        "strange stuff",
-        "watching stuff"
-      ],
+      "favorites": ["colorful stuff", "hard stuff", "lots of water", "strange stuff", "watching stuff"],
       "habitat": "Warm"
     },
     "Buizel": {
       "image": "images/418.png",
-      "favorites": [
-        "group activities",
-        "lots of water",
-        "play spaces",
-        "soft stuff",
-        "spinning stuff"
-      ],
+      "favorites": ["group activities", "lots of water", "play spaces", "soft stuff", "spinning stuff"],
       "habitat": "Bright"
     },
     "Bulbasaur": {
       "image": "images/001.png",
-      "favorites": [
-        "cute stuff",
-        "group activities",
-        "lots of nature",
-        "lots of water",
-        "soft stuff"
-      ],
+      "favorites": ["cute stuff", "group activities", "lots of nature", "lots of water", "soft stuff"],
       "habitat": "Bright"
     },
     "Cacnea": {
@@ -614,13 +554,7 @@
     },
     "Chandelure": {
       "image": "images/609.png",
-      "favorites": [
-        "lots of fire",
-        "spooky stuff",
-        "strange stuff",
-        "watching stuff",
-        "wobbly stuff"
-      ],
+      "favorites": ["lots of fire", "spooky stuff", "strange stuff", "watching stuff", "wobbly stuff"],
       "habitat": "Warm"
     },
     "Chansey": {
@@ -640,13 +574,7 @@
     },
     "Charjabug": {
       "image": "images/737.png",
-      "favorites": [
-        "blocky stuff",
-        "electronics",
-        "glass stuff",
-        "lots of nature",
-        "watching stuff"
-      ],
+      "favorites": ["blocky stuff", "electronics", "glass stuff", "lots of nature", "watching stuff"],
       "habitat": "Bright"
     },
     "Charmander": {
@@ -681,13 +609,7 @@
     },
     "Cinderace": {
       "image": "images/815.png",
-      "favorites": [
-        "group activities",
-        "lots of fire",
-        "play spaces",
-        "round stuff",
-        "stone stuff"
-      ],
+      "favorites": ["group activities", "lots of fire", "play spaces", "round stuff", "stone stuff"],
       "habitat": "Warm"
     },
     "Clefable": {
@@ -722,13 +644,7 @@
     },
     "Combee": {
       "image": "images/415.png",
-      "favorites": [
-        "gatherings",
-        "group activities",
-        "lots of nature",
-        "nice breezes",
-        "wooden stuff"
-      ],
+      "favorites": ["gatherings", "group activities", "lots of nature", "nice breezes", "wooden stuff"],
       "habitat": "Bright"
     },
     "Combusken": {
@@ -738,13 +654,7 @@
     },
     "Conkeldurr": {
       "image": "images/534.png",
-      "favorites": [
-        "construction",
-        "exercise",
-        "group activities",
-        "slender objects",
-        "stone stuff"
-      ],
+      "favorites": ["construction", "exercise", "group activities", "slender objects", "stone stuff"],
       "habitat": "Bright"
     },
     "Corphish": {
@@ -769,13 +679,7 @@
     },
     "Cramorant": {
       "image": "images/845.png",
-      "favorites": [
-        "looks like food",
-        "lots of water",
-        "nice breezes",
-        "ocean vibes",
-        "slender objects"
-      ],
+      "favorites": ["looks like food", "lots of water", "nice breezes", "ocean vibes", "slender objects"],
       "habitat": "Humid"
     },
     "Cranidos": {
@@ -800,13 +704,7 @@
     },
     "Cubone": {
       "image": "images/104.png",
-      "favorites": [
-        "construction",
-        "exercise",
-        "group activities",
-        "lots of dirt",
-        "slender objects"
-      ],
+      "favorites": ["construction", "exercise", "group activities", "lots of dirt", "slender objects"],
       "habitat": "Dry"
     },
     "Cyndaquil": {
@@ -816,46 +714,22 @@
     },
     "Dachsbun": {
       "image": "images/927.png",
-      "favorites": [
-        "cute stuff",
-        "group activities",
-        "looks like food",
-        "lots of fire",
-        "watching stuff"
-      ],
+      "favorites": ["cute stuff", "group activities", "looks like food", "lots of fire", "watching stuff"],
       "habitat": "Warm"
     },
     "Dartrix": {
       "image": "images/723.png",
-      "favorites": [
-        "cleanliness",
-        "lots of nature",
-        "nice breezes",
-        "slender objects",
-        "wooden stuff"
-      ],
+      "favorites": ["cleanliness", "lots of nature", "nice breezes", "slender objects", "wooden stuff"],
       "habitat": "Dark"
     },
     "Decidueye": {
       "image": "images/724.png",
-      "favorites": [
-        "letters and words",
-        "lots of nature",
-        "nice breezes",
-        "spooky stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["letters and words", "lots of nature", "nice breezes", "spooky stuff", "wooden stuff"],
       "habitat": "Dark"
     },
     "Dedenne": {
       "image": "images/702.png",
-      "favorites": [
-        "cute stuff",
-        "electronics",
-        "group activities",
-        "looks like food",
-        "watching stuff"
-      ],
+      "favorites": ["cute stuff", "electronics", "group activities", "looks like food", "watching stuff"],
       "habitat": "Bright"
     },
     "Dhelmise": {
@@ -865,16 +739,14 @@
     },
     "Diglett": {
       "image": "images/050.png",
-      "favorites": [
-        "cute stuff",
-        "group activities",
-        "lots of dirt",
-        "play spaces",
-        "slender objects"
-      ],
+      "favorites": ["cute stuff", "group activities", "lots of dirt", "play spaces", "slender objects"],
       "habitat": "Dark"
     },
-    "Ditto": { "image": "images/132.png", "favorites": [], "habitat": "Bright" },
+    "Ditto": {
+      "image": "images/132.png",
+      "favorites": [],
+      "habitat": "Bright"
+    },
     "Dragapult": {
       "image": "images/887.png",
       "favorites": ["group activities", "lots of fire", "rides", "spooky stuff", "strange stuff"],
@@ -882,13 +754,7 @@
     },
     "Dragonair": {
       "image": "images/148.png",
-      "favorites": [
-        "cleanliness",
-        "glass stuff",
-        "lots of fire",
-        "lots of water",
-        "slender objects"
-      ],
+      "favorites": ["cleanliness", "glass stuff", "lots of fire", "lots of water", "slender objects"],
       "habitat": "Humid"
     },
     "Dragonite": {
@@ -903,13 +769,7 @@
     },
     "Dratini": {
       "image": "images/147.png",
-      "favorites": [
-        "cleanliness",
-        "cute stuff",
-        "lots of fire",
-        "lots of water",
-        "slender objects"
-      ],
+      "favorites": ["cleanliness", "cute stuff", "lots of fire", "lots of water", "slender objects"],
       "habitat": "Humid"
     },
     "Drednaw": {
@@ -924,13 +784,7 @@
     },
     "Drifblim": {
       "image": "images/426.png",
-      "favorites": [
-        "nice breezes",
-        "spinning stuff",
-        "spooky stuff",
-        "strange stuff",
-        "wobbly stuff"
-      ],
+      "favorites": ["nice breezes", "spinning stuff", "spooky stuff", "strange stuff", "wobbly stuff"],
       "habitat": "Warm"
     },
     "Drifloon": {
@@ -940,24 +794,12 @@
     },
     "Drilbur": {
       "image": "images/529.png",
-      "favorites": [
-        "lots of dirt",
-        "lots of nature",
-        "sharp stuff",
-        "strange stuff",
-        "watching stuff"
-      ],
+      "favorites": ["lots of dirt", "lots of nature", "sharp stuff", "strange stuff", "watching stuff"],
       "habitat": "Dark"
     },
     "Dugtrio": {
       "image": "images/051.png",
-      "favorites": [
-        "gatherings",
-        "group activities",
-        "lots of dirt",
-        "play spaces",
-        "slender objects"
-      ],
+      "favorites": ["gatherings", "group activities", "lots of dirt", "play spaces", "slender objects"],
       "habitat": "Dark"
     },
     "Dusclops": {
@@ -977,24 +819,12 @@
     },
     "Eevee": {
       "image": "images/133.png",
-      "favorites": [
-        "cute stuff",
-        "group activities",
-        "letters and words",
-        "soft stuff",
-        "stone stuff"
-      ],
+      "favorites": ["cute stuff", "group activities", "letters and words", "soft stuff", "stone stuff"],
       "habitat": "Warm"
     },
     "Ekans": {
       "image": "images/023.png",
-      "favorites": [
-        "garbage",
-        "lots of nature",
-        "slender objects",
-        "spinning stuff",
-        "watching stuff"
-      ],
+      "favorites": ["garbage", "lots of nature", "slender objects", "spinning stuff", "watching stuff"],
       "habitat": "Dark"
     },
     "Electabuzz": {
@@ -1019,13 +849,7 @@
     },
     "Empoleon": {
       "image": "images/395.png",
-      "favorites": [
-        "cleanliness",
-        "letters and words",
-        "lots of water",
-        "metal stuff",
-        "ocean vibes"
-      ],
+      "favorites": ["cleanliness", "letters and words", "lots of water", "metal stuff", "ocean vibes"],
       "habitat": "Humid"
     },
     "Entei": {
@@ -1035,13 +859,7 @@
     },
     "Espeon": {
       "image": "images/196.png",
-      "favorites": [
-        "complicated stuff",
-        "cute stuff",
-        "nice breezes",
-        "strange stuff",
-        "watching stuff"
-      ],
+      "favorites": ["complicated stuff", "cute stuff", "nice breezes", "strange stuff", "watching stuff"],
       "habitat": "Bright"
     },
     "Excadrill": {
@@ -1051,24 +869,12 @@
     },
     "Exeggcute": {
       "image": "images/102.png",
-      "favorites": [
-        "gatherings",
-        "group activities",
-        "lots of nature",
-        "strange stuff",
-        "watching stuff"
-      ],
+      "favorites": ["gatherings", "group activities", "lots of nature", "strange stuff", "watching stuff"],
       "habitat": "Bright"
     },
     "Exeggutor": {
       "image": "images/103.png",
-      "favorites": [
-        "gatherings",
-        "lots of nature",
-        "strange stuff",
-        "watching stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["gatherings", "lots of nature", "strange stuff", "watching stuff", "wooden stuff"],
       "habitat": "Bright"
     },
     "Farfetch'd": {
@@ -1083,13 +889,7 @@
     },
     "Feebas": {
       "image": "images/349.png",
-      "favorites": [
-        "glass stuff",
-        "group activities",
-        "lots of nature",
-        "lots of water",
-        "shiny stuff"
-      ],
+      "favorites": ["glass stuff", "group activities", "lots of nature", "lots of water", "shiny stuff"],
       "habitat": "Humid"
     },
     "Feraligatr": {
@@ -1099,13 +899,7 @@
     },
     "Fidough": {
       "image": "images/926.png",
-      "favorites": [
-        "cute stuff",
-        "letters and words",
-        "lots of fire",
-        "soft stuff",
-        "watching stuff"
-      ],
+      "favorites": ["cute stuff", "letters and words", "lots of fire", "soft stuff", "watching stuff"],
       "habitat": "Warm"
     },
     "Finneon": {
@@ -1130,24 +924,12 @@
     },
     "Floragato": {
       "image": "images/907.png",
-      "favorites": [
-        "colorful stuff",
-        "cute stuff",
-        "lots of nature",
-        "pretty flowers",
-        "sharp stuff"
-      ],
+      "favorites": ["colorful stuff", "cute stuff", "lots of nature", "pretty flowers", "sharp stuff"],
       "habitat": "Bright"
     },
     "Flygon": {
       "image": "images/330.png",
-      "favorites": [
-        "lots of dirt",
-        "lots of fire",
-        "lots of nature",
-        "stone stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["lots of dirt", "lots of fire", "lots of nature", "stone stuff", "wooden stuff"],
       "habitat": "Dry"
     },
     "Fraxure": {
@@ -1222,24 +1004,12 @@
     },
     "Gholdengo": {
       "image": "images/1000.png",
-      "favorites": [
-        "complicated stuff",
-        "metal stuff",
-        "shiny stuff",
-        "spooky stuff",
-        "strange stuff"
-      ],
+      "favorites": ["complicated stuff", "metal stuff", "shiny stuff", "spooky stuff", "strange stuff"],
       "habitat": "Bright"
     },
     "Gimmighoul": {
       "image": "images/999.png",
-      "favorites": [
-        "complicated stuff",
-        "metal stuff",
-        "shiny stuff",
-        "spooky stuff",
-        "strange stuff"
-      ],
+      "favorites": ["complicated stuff", "metal stuff", "shiny stuff", "spooky stuff", "strange stuff"],
       "habitat": "Dark"
     },
     "Girafarig": {
@@ -1249,13 +1019,7 @@
     },
     "Glaceon": {
       "image": "images/471.png",
-      "favorites": [
-        "cute stuff",
-        "glass stuff",
-        "group activities",
-        "lots of water",
-        "shiny stuff"
-      ],
+      "favorites": ["cute stuff", "glass stuff", "group activities", "lots of water", "shiny stuff"],
       "habitat": "Cool"
     },
     "Glimmet": {
@@ -1275,24 +1039,12 @@
     },
     "Golbat": {
       "image": "images/042.png",
-      "favorites": [
-        "complicated stuff",
-        "nice breezes",
-        "noisy stuff",
-        "spooky stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["complicated stuff", "nice breezes", "noisy stuff", "spooky stuff", "wooden stuff"],
       "habitat": "Dark"
     },
     "Golduck": {
       "image": "images/055.png",
-      "favorites": [
-        "complicated stuff",
-        "lots of water",
-        "ocean vibes",
-        "sharp stuff",
-        "strange stuff"
-      ],
+      "favorites": ["complicated stuff", "lots of water", "ocean vibes", "sharp stuff", "strange stuff"],
       "habitat": "Humid"
     },
     "Golem": {
@@ -1337,24 +1089,12 @@
     },
     "Growlithe": {
       "image": "images/058.png",
-      "favorites": [
-        "letters and words",
-        "lots of fire",
-        "nice breezes",
-        "pretty flowers",
-        "stone stuff"
-      ],
+      "favorites": ["letters and words", "lots of fire", "nice breezes", "pretty flowers", "stone stuff"],
       "habitat": "Warm"
     },
     "Grubbin": {
       "image": "images/736.png",
-      "favorites": [
-        "containers",
-        "electronics",
-        "lots of dirt",
-        "lots of nature",
-        "watching stuff"
-      ],
+      "favorites": ["containers", "electronics", "lots of dirt", "lots of nature", "watching stuff"],
       "habitat": "Bright"
     },
     "Gulpin": {
@@ -1364,24 +1104,12 @@
     },
     "Gurdurr": {
       "image": "images/533.png",
-      "favorites": [
-        "construction",
-        "exercise",
-        "group activities",
-        "metal stuff",
-        "slender objects"
-      ],
+      "favorites": ["construction", "exercise", "group activities", "metal stuff", "slender objects"],
       "habitat": "Bright"
     },
     "Gyarados": {
       "image": "images/130.png",
-      "favorites": [
-        "cleanliness",
-        "lots of water",
-        "nice breezes",
-        "ocean vibes",
-        "slender objects"
-      ],
+      "favorites": ["cleanliness", "lots of water", "nice breezes", "ocean vibes", "slender objects"],
       "habitat": "Humid"
     },
     "Happiny": {
@@ -1406,13 +1134,7 @@
     },
     "Heracross": {
       "image": "images/214.png",
-      "favorites": [
-        "exercise",
-        "looks like food",
-        "lots of nature",
-        "pretty flowers",
-        "wooden stuff"
-      ],
+      "favorites": ["exercise", "looks like food", "lots of nature", "pretty flowers", "wooden stuff"],
       "habitat": "Bright"
     },
     "Hitmonchan": {
@@ -1437,13 +1159,7 @@
     },
     "Honchkrow": {
       "image": "images/430.png",
-      "favorites": [
-        "glass stuff",
-        "letters and words",
-        "nice breezes",
-        "shiny stuff",
-        "spooky stuff"
-      ],
+      "favorites": ["glass stuff", "letters and words", "nice breezes", "shiny stuff", "spooky stuff"],
       "habitat": "Dark"
     },
     "Hoothoot": {
@@ -1453,24 +1169,12 @@
     },
     "Hoppip": {
       "image": "images/187.png",
-      "favorites": [
-        "lots of nature",
-        "nice breezes",
-        "pretty flowers",
-        "soft stuff",
-        "wobbly stuff"
-      ],
+      "favorites": ["lots of nature", "nice breezes", "pretty flowers", "soft stuff", "wobbly stuff"],
       "habitat": "Bright"
     },
     "Horsea": {
       "image": "images/116.png",
-      "favorites": [
-        "group activities",
-        "lots of water",
-        "play spaces",
-        "slender objects",
-        "spinning stuff"
-      ],
+      "favorites": ["group activities", "lots of water", "play spaces", "slender objects", "spinning stuff"],
       "habitat": "Humid"
     },
     "Igglybuff": {
@@ -1480,35 +1184,17 @@
     },
     "Illumise": {
       "image": "images/314.png",
-      "favorites": [
-        "cute stuff",
-        "group activities",
-        "lots of nature",
-        "shiny stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["cute stuff", "group activities", "lots of nature", "shiny stuff", "wooden stuff"],
       "habitat": "Dark"
     },
     "Inkay": {
       "image": "images/686.png",
-      "favorites": [
-        "colorful stuff",
-        "complicated stuff",
-        "noisy stuff",
-        "spinning stuff",
-        "strange stuff"
-      ],
+      "favorites": ["colorful stuff", "complicated stuff", "noisy stuff", "spinning stuff", "strange stuff"],
       "habitat": "Dark"
     },
     "Ivysaur": {
       "image": "images/002.png",
-      "favorites": [
-        "colorful stuff",
-        "cute stuff",
-        "lots of nature",
-        "pretty flowers",
-        "soft stuff"
-      ],
+      "favorites": ["colorful stuff", "cute stuff", "lots of nature", "pretty flowers", "soft stuff"],
       "habitat": "Bright"
     },
     "Jellicent Female Form": {
@@ -1528,13 +1214,7 @@
     },
     "Jirachi": {
       "image": "images/385.png",
-      "favorites": [
-        "metal stuff",
-        "shiny stuff",
-        "strange stuff",
-        "watching stuff",
-        "wobbly stuff"
-      ],
+      "favorites": ["metal stuff", "shiny stuff", "strange stuff", "watching stuff", "wobbly stuff"],
       "habitat": "Bright"
     },
     "Jolteon": {
@@ -1544,13 +1224,7 @@
     },
     "Jumpluff": {
       "image": "images/189.png",
-      "favorites": [
-        "lots of nature",
-        "nice breezes",
-        "pretty flowers",
-        "round stuff",
-        "soft stuff"
-      ],
+      "favorites": ["lots of nature", "nice breezes", "pretty flowers", "round stuff", "soft stuff"],
       "habitat": "Bright"
     },
     "Kadabra": {
@@ -1580,24 +1254,12 @@
     },
     "Kricketot": {
       "image": "images/401.png",
-      "favorites": [
-        "colorful stuff",
-        "lots of nature",
-        "noisy stuff",
-        "watching stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["colorful stuff", "lots of nature", "noisy stuff", "watching stuff", "wooden stuff"],
       "habitat": "Dark"
     },
     "Kricketune": {
       "image": "images/402.png",
-      "favorites": [
-        "colorful stuff",
-        "lots of nature",
-        "noisy stuff",
-        "watching stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["colorful stuff", "lots of nature", "noisy stuff", "watching stuff", "wooden stuff"],
       "habitat": "Dark"
     },
     "Kyogre": {
@@ -1637,13 +1299,7 @@
     },
     "Litwick": {
       "image": "images/607.png",
-      "favorites": [
-        "blocky stuff",
-        "lots of fire",
-        "spooky stuff",
-        "strange stuff",
-        "wobbly stuff"
-      ],
+      "favorites": ["blocky stuff", "lots of fire", "spooky stuff", "strange stuff", "wobbly stuff"],
       "habitat": "Warm"
     },
     "Lombre": {
@@ -1673,13 +1329,7 @@
     },
     "Lumineon": {
       "image": "images/457.png",
-      "favorites": [
-        "colorful stuff",
-        "glass stuff",
-        "group activities",
-        "lots of water",
-        "shiny stuff"
-      ],
+      "favorites": ["colorful stuff", "glass stuff", "group activities", "lots of water", "shiny stuff"],
       "habitat": "Dark"
     },
     "Luvdisc": {
@@ -1744,13 +1394,7 @@
     },
     "Malamar": {
       "image": "images/687.png",
-      "favorites": [
-        "colorful stuff",
-        "complicated stuff",
-        "letters and words",
-        "spooky stuff",
-        "strange stuff"
-      ],
+      "favorites": ["colorful stuff", "complicated stuff", "letters and words", "spooky stuff", "strange stuff"],
       "habitat": "Bright"
     },
     "Manaphy": {
@@ -1780,24 +1424,12 @@
     },
     "Marshtomp": {
       "image": "images/259.png",
-      "favorites": [
-        "construction",
-        "lots of dirt",
-        "lots of water",
-        "soft stuff",
-        "watching stuff"
-      ],
+      "favorites": ["construction", "lots of dirt", "lots of water", "soft stuff", "watching stuff"],
       "habitat": "Bright"
     },
     "Mawile": {
       "image": "images/303.png",
-      "favorites": [
-        "colorful stuff",
-        "cute stuff",
-        "group activities",
-        "looks like food",
-        "metal stuff"
-      ],
+      "favorites": ["colorful stuff", "cute stuff", "group activities", "looks like food", "metal stuff"],
       "habitat": "Bright"
     },
     "Meowscarada": {
@@ -1817,35 +1449,17 @@
     },
     "Metang": {
       "image": "images/375.png",
-      "favorites": [
-        "complicated stuff",
-        "hard stuff",
-        "metal stuff",
-        "stone stuff",
-        "strange stuff"
-      ],
+      "favorites": ["complicated stuff", "hard stuff", "metal stuff", "stone stuff", "strange stuff"],
       "habitat": "Cool"
     },
     "Mew": {
       "image": "images/151.png",
-      "favorites": [
-        "complicated stuff",
-        "luxury",
-        "play spaces",
-        "strange stuff",
-        "watching stuff"
-      ],
+      "favorites": ["complicated stuff", "luxury", "play spaces", "strange stuff", "watching stuff"],
       "habitat": "Warm"
     },
     "Mewtwo": {
       "image": "images/150.png",
-      "favorites": [
-        "complicated stuff",
-        "letters and words",
-        "stone stuff",
-        "strange stuff",
-        "watching stuff"
-      ],
+      "favorites": ["complicated stuff", "letters and words", "stone stuff", "strange stuff", "watching stuff"],
       "habitat": "Dark"
     },
     "Milotic": {
@@ -1875,24 +1489,12 @@
     },
     "Misdreavus": {
       "image": "images/200.png",
-      "favorites": [
-        "colorful stuff",
-        "shiny stuff",
-        "spooky stuff",
-        "strange stuff",
-        "watching stuff"
-      ],
+      "favorites": ["colorful stuff", "shiny stuff", "spooky stuff", "strange stuff", "watching stuff"],
       "habitat": "Dark"
     },
     "Mismagius": {
       "image": "images/429.png",
-      "favorites": [
-        "group activities",
-        "noisy stuff",
-        "spooky stuff",
-        "strange stuff",
-        "wobbly stuff"
-      ],
+      "favorites": ["group activities", "noisy stuff", "spooky stuff", "strange stuff", "wobbly stuff"],
       "habitat": "Dark"
     },
     "Moltres": {
@@ -1922,13 +1524,7 @@
     },
     "Munchlax": {
       "image": "images/446.png",
-      "favorites": [
-        "group activities",
-        "looks like food",
-        "lots of nature",
-        "soft stuff",
-        "wobbly stuff"
-      ],
+      "favorites": ["group activities", "looks like food", "lots of nature", "soft stuff", "wobbly stuff"],
       "habitat": "Warm"
     },
     "Murkrow": {
@@ -1943,13 +1539,7 @@
     },
     "Noctowl": {
       "image": "images/164.png",
-      "favorites": [
-        "containers",
-        "letters and words",
-        "nice breezes",
-        "soft stuff",
-        "watching stuff"
-      ],
+      "favorites": ["containers", "letters and words", "nice breezes", "soft stuff", "watching stuff"],
       "habitat": "Dark"
     },
     "Noibat": {
@@ -1959,24 +1549,12 @@
     },
     "Noivern": {
       "image": "images/715.png",
-      "favorites": [
-        "looks like food",
-        "lots of fire",
-        "nice breezes",
-        "play spaces",
-        "watching stuff"
-      ],
+      "favorites": ["looks like food", "lots of fire", "nice breezes", "play spaces", "watching stuff"],
       "habitat": "Dark"
     },
     "Oddish": {
       "image": "images/043.png",
-      "favorites": [
-        "lots of dirt",
-        "lots of nature",
-        "lots of water",
-        "pretty flowers",
-        "soft stuff"
-      ],
+      "favorites": ["lots of dirt", "lots of nature", "lots of water", "pretty flowers", "soft stuff"],
       "habitat": "Humid"
     },
     "Onix": {
@@ -1991,24 +1569,12 @@
     },
     "Paras": {
       "image": "images/046.png",
-      "favorites": [
-        "looks like food",
-        "lots of dirt",
-        "lots of nature",
-        "watching stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["looks like food", "lots of dirt", "lots of nature", "watching stuff", "wooden stuff"],
       "habitat": "Humid"
     },
     "Parasect": {
       "image": "images/047.png",
-      "favorites": [
-        "lots of dirt",
-        "lots of nature",
-        "strange stuff",
-        "watching stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["lots of dirt", "lots of nature", "strange stuff", "watching stuff", "wooden stuff"],
       "habitat": "Humid"
     },
     "Pawmi": {
@@ -2033,13 +1599,7 @@
     },
     "Pelipper": {
       "image": "images/279.png",
-      "favorites": [
-        "cleanliness",
-        "lots of water",
-        "nice breezes",
-        "ocean vibes",
-        "watching stuff"
-      ],
+      "favorites": ["cleanliness", "lots of water", "nice breezes", "ocean vibes", "watching stuff"],
       "habitat": "Humid"
     },
     "Persian": {
@@ -2064,24 +1624,12 @@
     },
     "Pidgeotto": {
       "image": "images/017.png",
-      "favorites": [
-        "looks like food",
-        "lots of nature",
-        "nice breezes",
-        "soft stuff",
-        "watching stuff"
-      ],
+      "favorites": ["looks like food", "lots of nature", "nice breezes", "soft stuff", "watching stuff"],
       "habitat": "Bright"
     },
     "Pidgey": {
       "image": "images/016.png",
-      "favorites": [
-        "lots of nature",
-        "nice breezes",
-        "play spaces",
-        "soft stuff",
-        "watching stuff"
-      ],
+      "favorites": ["lots of nature", "nice breezes", "play spaces", "soft stuff", "watching stuff"],
       "habitat": "Bright"
     },
     "Pikachu": {
@@ -2111,13 +1659,7 @@
     },
     "Politoed": {
       "image": "images/186.png",
-      "favorites": [
-        "gatherings",
-        "group activities",
-        "lots of water",
-        "noisy stuff",
-        "play spaces"
-      ],
+      "favorites": ["gatherings", "group activities", "lots of water", "noisy stuff", "play spaces"],
       "habitat": "Humid"
     },
     "Poliwag": {
@@ -2142,13 +1684,7 @@
     },
     "Porygon": {
       "image": "images/137.png",
-      "favorites": [
-        "blocky stuff",
-        "colorful stuff",
-        "construction",
-        "soft stuff",
-        "strange stuff"
-      ],
+      "favorites": ["blocky stuff", "colorful stuff", "construction", "soft stuff", "strange stuff"],
       "habitat": "Bright"
     },
     "Porygon-z": {
@@ -2184,13 +1720,7 @@
     },
     "Psyduck": {
       "image": "images/054.png",
-      "favorites": [
-        "complicated stuff",
-        "healing",
-        "lots of water",
-        "ocean vibes",
-        "strange stuff"
-      ],
+      "favorites": ["complicated stuff", "healing", "lots of water", "ocean vibes", "strange stuff"],
       "habitat": "Humid"
     },
     "Pupitar": {
@@ -2245,13 +1775,7 @@
     },
     "Rowlet": {
       "image": "images/722.png",
-      "favorites": [
-        "containers",
-        "lots of nature",
-        "nice breezes",
-        "spinning stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["containers", "lots of nature", "nice breezes", "spinning stuff", "wooden stuff"],
       "habitat": "Dark"
     },
     "Sableye": {
@@ -2276,35 +1800,17 @@
     },
     "Seadra": {
       "image": "images/117.png",
-      "favorites": [
-        "lots of water",
-        "ocean vibes",
-        "sharp stuff",
-        "slender objects",
-        "spinning stuff"
-      ],
+      "favorites": ["lots of water", "ocean vibes", "sharp stuff", "slender objects", "spinning stuff"],
       "habitat": "Humid"
     },
     "Serperior": {
       "image": "images/497.png",
-      "favorites": [
-        "containers",
-        "lots of nature",
-        "lots of water",
-        "slender objects",
-        "wooden stuff"
-      ],
+      "favorites": ["containers", "lots of nature", "lots of water", "slender objects", "wooden stuff"],
       "habitat": "Humid"
     },
     "Servine": {
       "image": "images/496.png",
-      "favorites": [
-        "cleanliness",
-        "lots of nature",
-        "lots of water",
-        "shiny stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["cleanliness", "lots of nature", "lots of water", "shiny stuff", "wooden stuff"],
       "habitat": "Humid"
     },
     "Sharpedo": {
@@ -2339,24 +1845,12 @@
     },
     "Skiploom": {
       "image": "images/188.png",
-      "favorites": [
-        "lots of nature",
-        "nice breezes",
-        "pretty flowers",
-        "soft stuff",
-        "spinning stuff"
-      ],
+      "favorites": ["lots of nature", "nice breezes", "pretty flowers", "soft stuff", "spinning stuff"],
       "habitat": "Bright"
     },
     "Skwovet": {
       "image": "images/819.png",
-      "favorites": [
-        "looks like food",
-        "round stuff",
-        "soft stuff",
-        "watching stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["looks like food", "round stuff", "soft stuff", "watching stuff", "wooden stuff"],
       "habitat": "Warm"
     },
     "Sliggoo": {
@@ -2386,13 +1880,7 @@
     },
     "Snivy": {
       "image": "images/495.png",
-      "favorites": [
-        "lots of nature",
-        "lots of water",
-        "shiny stuff",
-        "wobbly stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["lots of nature", "lots of water", "shiny stuff", "wobbly stuff", "wooden stuff"],
       "habitat": "Humid"
     },
     "Snorlax": {
@@ -2407,13 +1895,7 @@
     },
     "Sprigatito": {
       "image": "images/906.png",
-      "favorites": [
-        "colorful stuff",
-        "containers",
-        "cute stuff",
-        "lots of nature",
-        "pretty flowers"
-      ],
+      "favorites": ["colorful stuff", "containers", "cute stuff", "lots of nature", "pretty flowers"],
       "habitat": "Bright"
     },
     "Squirtle": {
@@ -2423,24 +1905,12 @@
     },
     "Starmie": {
       "image": "images/121.png",
-      "favorites": [
-        "colorful stuff",
-        "complicated stuff",
-        "lots of water",
-        "spinning stuff",
-        "strange stuff"
-      ],
+      "favorites": ["colorful stuff", "complicated stuff", "lots of water", "spinning stuff", "strange stuff"],
       "habitat": "Bright"
     },
     "Staryu": {
       "image": "images/120.png",
-      "favorites": [
-        "colorful stuff",
-        "lots of water",
-        "sharp stuff",
-        "spinning stuff",
-        "strange stuff"
-      ],
+      "favorites": ["colorful stuff", "lots of water", "sharp stuff", "spinning stuff", "strange stuff"],
       "habitat": "Bright"
     },
     "Steelix": {
@@ -2450,13 +1920,7 @@
     },
     "Stereo Rotom": {
       "image": "images/128.png",
-      "favorites": [
-        "blocky stuff",
-        "glass stuff",
-        "group activities",
-        "noisy stuff",
-        "shiny stuff"
-      ],
+      "favorites": ["blocky stuff", "glass stuff", "group activities", "noisy stuff", "shiny stuff"],
       "habitat": "Bright"
     },
     "Stunfisk": {
@@ -2466,13 +1930,7 @@
     },
     "Sudowoodo": {
       "image": "images/185.png",
-      "favorites": [
-        "hard stuff",
-        "lots of nature",
-        "stone stuff",
-        "watching stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["hard stuff", "lots of nature", "stone stuff", "watching stuff", "wooden stuff"],
       "habitat": "Dry"
     },
     "Suicune": {
@@ -2502,24 +1960,12 @@
     },
     "Tangela": {
       "image": "images/114.png",
-      "favorites": [
-        "gatherings",
-        "lots of nature",
-        "lots of water",
-        "pretty flowers",
-        "slender objects"
-      ],
+      "favorites": ["gatherings", "lots of nature", "lots of water", "pretty flowers", "slender objects"],
       "habitat": "Bright"
     },
     "Tangrowth": {
       "image": "images/465.png",
-      "favorites": [
-        "gatherings",
-        "lots of nature",
-        "lots of water",
-        "pretty flowers",
-        "watching stuff"
-      ],
+      "favorites": ["gatherings", "lots of nature", "lots of water", "pretty flowers", "watching stuff"],
       "habitat": "Humid"
     },
     "Tatsugiri Curly Form": {
@@ -2529,24 +1975,12 @@
     },
     "Tatsugiri Droopy Form": {
       "image": "images/979.png",
-      "favorites": [
-        "blocky stuff",
-        "group activities",
-        "lots of water",
-        "ocean vibes",
-        "spinning stuff"
-      ],
+      "favorites": ["blocky stuff", "group activities", "lots of water", "ocean vibes", "spinning stuff"],
       "habitat": "Humid"
     },
     "Tatsugiri Stretchy Form": {
       "image": "images/977.png",
-      "favorites": [
-        "containers",
-        "group activities",
-        "letters and words",
-        "lots of water",
-        "ocean vibes"
-      ],
+      "favorites": ["containers", "group activities", "letters and words", "lots of water", "ocean vibes"],
       "habitat": "Humid"
     },
     "Timburr": {
@@ -2581,13 +2015,7 @@
     },
     "Totodile": {
       "image": "images/158.png",
-      "favorites": [
-        "group activities",
-        "lots of water",
-        "play spaces",
-        "sharp stuff",
-        "wobbly stuff"
-      ],
+      "favorites": ["group activities", "lots of water", "play spaces", "sharp stuff", "wobbly stuff"],
       "habitat": "Bright"
     },
     "Toxapex": {
@@ -2657,13 +2085,7 @@
     },
     "Vaporeon": {
       "image": "images/134.png",
-      "favorites": [
-        "cleanliness",
-        "cute stuff",
-        "lots of water",
-        "pretty flowers",
-        "watching stuff"
-      ],
+      "favorites": ["cleanliness", "cute stuff", "lots of water", "pretty flowers", "watching stuff"],
       "habitat": "Humid"
     },
     "Veluza": {
@@ -2673,24 +2095,12 @@
     },
     "Venomoth": {
       "image": "images/049.png",
-      "favorites": [
-        "lots of nature",
-        "nice breezes",
-        "pretty flowers",
-        "watching stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["lots of nature", "nice breezes", "pretty flowers", "watching stuff", "wooden stuff"],
       "habitat": "Bright"
     },
     "Venonat": {
       "image": "images/048.png",
-      "favorites": [
-        "complicated stuff",
-        "letters and words",
-        "lots of nature",
-        "watching stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["complicated stuff", "letters and words", "lots of nature", "watching stuff", "wooden stuff"],
       "habitat": "Bright"
     },
     "Venusaur": {
@@ -2700,13 +2110,7 @@
     },
     "Vespiquen": {
       "image": "images/416.png",
-      "favorites": [
-        "complicated stuff",
-        "gatherings",
-        "lots of nature",
-        "nice breezes",
-        "wooden stuff"
-      ],
+      "favorites": ["complicated stuff", "gatherings", "lots of nature", "nice breezes", "wooden stuff"],
       "habitat": "Bright"
     },
     "Vibrava": {
@@ -2716,13 +2120,7 @@
     },
     "Victreebel": {
       "image": "images/071.png",
-      "favorites": [
-        "colorful stuff",
-        "lots of dirt",
-        "lots of nature",
-        "pretty flowers",
-        "wooden stuff"
-      ],
+      "favorites": ["colorful stuff", "lots of dirt", "lots of nature", "pretty flowers", "wooden stuff"],
       "habitat": "Humid"
     },
     "Vikavolt": {
@@ -2732,24 +2130,12 @@
     },
     "Vileplume": {
       "image": "images/045.png",
-      "favorites": [
-        "colorful stuff",
-        "lots of dirt",
-        "lots of nature",
-        "pretty flowers",
-        "soft stuff"
-      ],
+      "favorites": ["colorful stuff", "lots of dirt", "lots of nature", "pretty flowers", "soft stuff"],
       "habitat": "Humid"
     },
     "Volbeat": {
       "image": "images/313.png",
-      "favorites": [
-        "cute stuff",
-        "group activities",
-        "lots of nature",
-        "shiny stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["cute stuff", "group activities", "lots of nature", "shiny stuff", "wooden stuff"],
       "habitat": "Dark"
     },
     "Volcanion": {
@@ -2759,24 +2145,12 @@
     },
     "Volcarona": {
       "image": "images/637.png",
-      "favorites": [
-        "letters and words",
-        "lots of fire",
-        "lots of nature",
-        "symbols",
-        "wooden stuff"
-      ],
+      "favorites": ["letters and words", "lots of fire", "lots of nature", "symbols", "wooden stuff"],
       "habitat": "Dry"
     },
     "Voltorb": {
       "image": "images/100.png",
-      "favorites": [
-        "colorful stuff",
-        "electronics",
-        "round stuff",
-        "shiny stuff",
-        "spinning stuff"
-      ],
+      "favorites": ["colorful stuff", "electronics", "round stuff", "shiny stuff", "spinning stuff"],
       "habitat": "Bright"
     },
     "Vulpix": {
@@ -2791,24 +2165,12 @@
     },
     "Wattrel": {
       "image": "images/940.png",
-      "favorites": [
-        "complicated stuff",
-        "electronics",
-        "gatherings",
-        "nice breezes",
-        "ocean vibes"
-      ],
+      "favorites": ["complicated stuff", "electronics", "gatherings", "nice breezes", "ocean vibes"],
       "habitat": "Bright"
     },
     "Weepinbell": {
       "image": "images/070.png",
-      "favorites": [
-        "colorful stuff",
-        "lots of dirt",
-        "lots of nature",
-        "pretty flowers",
-        "wooden stuff"
-      ],
+      "favorites": ["colorful stuff", "lots of dirt", "lots of nature", "pretty flowers", "wooden stuff"],
       "habitat": "Humid"
     },
     "Weezing": {
@@ -2818,13 +2180,7 @@
     },
     "Whiscash": {
       "image": "images/340.png",
-      "favorites": [
-        "lots of dirt",
-        "lots of water",
-        "soft stuff",
-        "watching stuff",
-        "wobbly stuff"
-      ],
+      "favorites": ["lots of dirt", "lots of water", "soft stuff", "watching stuff", "wobbly stuff"],
       "habitat": "Humid"
     },
     "Wigglytuff": {
@@ -2834,46 +2190,22 @@
     },
     "Wiglett": {
       "image": "images/960.png",
-      "favorites": [
-        "gatherings",
-        "group activities",
-        "lots of dirt",
-        "lots of water",
-        "slender objects"
-      ],
+      "favorites": ["gatherings", "group activities", "lots of dirt", "lots of water", "slender objects"],
       "habitat": "Humid"
     },
     "Wimpod": {
       "image": "images/767.png",
-      "favorites": [
-        "garbage",
-        "group activities",
-        "lots of nature",
-        "lots of water",
-        "ocean vibes"
-      ],
+      "favorites": ["garbage", "group activities", "lots of nature", "lots of water", "ocean vibes"],
       "habitat": "Dark"
     },
     "Wingull": {
       "image": "images/278.png",
-      "favorites": [
-        "cleanliness",
-        "lots of water",
-        "nice breezes",
-        "ocean vibes",
-        "watching stuff"
-      ],
+      "favorites": ["cleanliness", "lots of water", "nice breezes", "ocean vibes", "watching stuff"],
       "habitat": "Humid"
     },
     "Wugtrio": {
       "image": "images/961.png",
-      "favorites": [
-        "gatherings",
-        "group activities",
-        "lots of water",
-        "slender objects",
-        "stone stuff"
-      ],
+      "favorites": ["gatherings", "group activities", "lots of water", "slender objects", "stone stuff"],
       "habitat": "Humid"
     },
     "Zapdos": {
@@ -2893,13 +2225,7 @@
     },
     "Zubat": {
       "image": "images/041.png",
-      "favorites": [
-        "complicated stuff",
-        "nice breezes",
-        "noisy stuff",
-        "spooky stuff",
-        "wooden stuff"
-      ],
+      "favorites": ["complicated stuff", "nice breezes", "noisy stuff", "spooky stuff", "wooden stuff"],
       "habitat": "Dark"
     }
   }

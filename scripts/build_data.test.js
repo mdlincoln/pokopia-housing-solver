@@ -16,6 +16,7 @@ import { DatabaseSync } from 'node:sqlite'
 
 import { DEFAULT_DB_PATH, openReadOnlyDb, PROJECT_ROOT } from './harvest_lib.js'
 import { buildAdjacency, buildItems, buildPokemon } from './build_data.mjs'
+import { formatDataJson } from './format_data.mjs'
 
 const POKEMON_JSON = path.join(PROJECT_ROOT, 'src', 'data', 'pokemon.json')
 const ITEMS_JSON = path.join(PROJECT_ROOT, 'src', 'data', 'items.json')
@@ -111,6 +112,13 @@ test('itemsByFavorite ordering equals direct SQL with the same ORDER BY', () => 
       ;(expected[row.favorite_name] ??= []).push(row.item_name)
     }
     assert.deepStrictEqual(graph.itemsByFavorite, expected)
+
+    // favoritesByItem derives from the same ordered loop; assert it too.
+    const expectedByItem = {}
+    for (const row of rows) {
+      ;(expectedByItem[row.item_name] ??= []).push(row.favorite_name)
+    }
+    assert.deepStrictEqual(graph.favoritesByItem, expectedByItem)
   })
 })
 
@@ -233,23 +241,20 @@ test('npm run build:data is deterministic (identical bytes on re-run)', () => {
 // build without running build:data first, so staleness is a silent-skew risk).
 // ---------------------------------------------------------------------------
 
-test('committed generated files are in sync with the generator output', () => {
+test('committed generated files are byte-identical to the generator output', () => {
   withDb((db) => {
-    assert.deepStrictEqual(
-      JSON.parse(fs.readFileSync(POKEMON_JSON, 'utf8')),
-      buildPokemon(db),
-      'src/data/pokemon.json is stale — run npm run build:data',
-    )
-    assert.deepStrictEqual(
-      JSON.parse(fs.readFileSync(ITEMS_JSON, 'utf8')),
-      buildItems(db),
-      'src/data/items.json is stale — run npm run build:data',
-    )
     const adj = buildAdjacency(db)
-    assert.deepStrictEqual(
-      JSON.parse(fs.readFileSync(ADJACENCY_JSON, 'utf8')),
-      { names: adj.names, size: adj.size, data: adj.data },
-      'public/data/adjacency.json is stale — run npm run build:data',
-    )
+    const expected = [
+      [POKEMON_JSON, formatDataJson(buildPokemon(db))],
+      [ITEMS_JSON, formatDataJson(buildItems(db))],
+      [ADJACENCY_JSON, formatDataJson({ names: adj.names, size: adj.size, data: adj.data })],
+    ]
+    for (const [file, expectedText] of expected) {
+      assert.strictEqual(
+        fs.readFileSync(file, 'utf8'),
+        expectedText,
+        `${path.basename(file)} is stale — run npm run build:data`,
+      )
+    }
   })
 })
