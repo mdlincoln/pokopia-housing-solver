@@ -1,0 +1,45 @@
+{
+  "_comment": "Genuine legacy URL hash captured by driving the c016616 build (sql.js runtime queries against public/pokehousing.sqlite) in a throwaway git worktree. Capture flow: clicked \"Show a sample island\" (1 small / 3 medium / 2 large, 13 randomly-sampled pokemon), opened the first house's recommendations panel, and added three recommended items (Pinwheels, Antique Bed, Cd Rack) to the cart. `hash` is byte-for-byte what the old build emitted via encodeState() and appeared in location.hash; `decoded` is JSON.parse(atob(hash)) and is re-derived from `hash` in tests (never trusted blindly). This is a v2 SharedState captured BEFORE the sql.js → baked-data migration — not a synthetic v1 legacy shape.",
+  "sourceCommit": "c01661681cb01dc28f47772b8a7791f7ea7a4dc2",
+  "capturedAt": "2026-08-20T21:26:48.425Z",
+  "hash": "eyJ2ZXJzaW9uIjoyLCJzbWFsbCI6MSwibWVkaXVtIjozLCJsYXJnZSI6MiwicG9rZW1vbiI6WyJUYXRzdWdpcmkgQ3VybHkgRm9ybSIsIkdyaW1lciIsIkhvb3Rob290IiwiRW50ZWkiLCJIaXRtb25sZWUiLCJHYXJkZXZvaXIiLCJQaXBsdXAiLCJRdWlsYXZhIiwiUGlkZ2VvdHRvIiwiRXhjYWRyaWxsIiwiRXNwZW9uIiwiUHN5ZHVjayIsIlJhaWtvdSJdLCJjYXJ0IjpbeyJob3VzZUlkIjoiTDEiLCJuYW1lIjoiUGlud2hlZWxzIn0seyJob3VzZUlkIjoiTDEiLCJuYW1lIjoiQW50aXF1ZSBCZWQifSx7ImhvdXNlSWQiOiJMMSIsIm5hbWUiOiJDZCBSYWNrIn1dLCJjaGVja2VkQ2FydEl0ZW1zIjpbXSwicGxhY2VkSXRlbXMiOltdLCJwaW5uZWRIb3VzZXMiOltdLCJwaW5uZWRQb2tlbW9uIjpbXSwiaG91c2VSZWdpc3RyeSI6W3siaWQiOiJTMSIsInNpemUiOiJzbWFsbCJ9LHsiaWQiOiJNMSIsInNpemUiOiJtZWRpdW0ifSx7ImlkIjoiTTIiLCJzaXplIjoibWVkaXVtIn0seyJpZCI6Ik0zIiwic2l6ZSI6Im1lZGl1bSJ9LHsiaWQiOiJMMSIsInNpemUiOiJsYXJnZSJ9LHsiaWQiOiJMMiIsInNpemUiOiJsYXJnZSJ9XSwiaG91c2VDb3VudGVycyI6eyJzbWFsbCI6MSwibWVkaXVtIjozLCJsYXJnZSI6Mn19",
+  "decoded": {
+    "version": 2,
+    "small": 1,
+    "medium": 3,
+    "large": 2,
+    "pokemon": [
+      "Tatsugiri Curly Form",
+      "Grimer",
+      "Hoothoot",
+      "Entei",
+      "Hitmonlee",
+      "Gardevoir",
+      "Piplup",
+      "Quilava",
+      "Pidgeotto",
+      "Excadrill",
+      "Espeon",
+      "Psyduck",
+      "Raikou"
+    ],
+    "cart": [
+      { "houseId": "L1", "name": "Pinwheels" },
+      { "houseId": "L1", "name": "Antique Bed" },
+      { "houseId": "L1", "name": "Cd Rack" }
+    ],
+    "checkedCartItems": [],
+    "placedItems": [],
+    "pinnedHouses": [],
+    "pinnedPokemon": [],
+    "houseRegistry": [
+      { "id": "S1", "size": "small" },
+      { "id": "M1", "size": "medium" },
+      { "id": "M2", "size": "medium" },
+      { "id": "M3", "size": "medium" },
+      { "id": "L1", "size": "large" },
+      { "id": "L2", "size": "large" }
+    ],
+    "houseCounters": { "small": 1, "medium": 3, "large": 2 }
+  }
+}

@@ -486,6 +486,32 @@ describe('HomeView', () => {
     expect(restoreItemsSpy).toHaveBeenCalledWith([{ name: 'Berry Pots', quantity: 3 }])
   })
 
+  // @lat: [[ui#HomeView#Saved Queries#Loads legacy cart entry with houseIndex]]
+  it('restores legacy cart entry using houseIndex and quantity through full restoreState', async () => {
+    const legacyEntry = {
+      title: 'Legacy houseIndex cart',
+      timestamp: 1700000000013,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['AlphaOne'],
+      cart: [{ houseIndex: 0, name: 'Punching Bag', quantity: 2 }], // no houseId
+    }
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([legacyEntry]))
+
+    // Do NOT mock cartStore.restoreItems: this exercises the real restoreState →
+    // restoreItems path (AC.5), including the houseId ?? String(houseIndex ?? 0)
+    // fallback, against the real item graph in src/data/items.json.
+    const wrapper = await mountHome()
+    const cartStore = useCartStore()
+
+    wrapper.vm.selectedTimestamp = 1700000000013
+    await flushPromises()
+
+    expect(cartStore.items.has('0:Punching Bag')).toBe(true)
+    expect(cartStore.items.get('0:Punching Bag')!.houseId).toBe('0')
+  })
+
   // @lat: [[ui#HomeView#Saved Queries#Loads legacy entry with no cart field]]
   it('restores legacy entry with no cart field by passing empty array to restoreItems', async () => {
     const legacyEntry = {
