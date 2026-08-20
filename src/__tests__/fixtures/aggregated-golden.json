@@ -1,0 +1,115 @@
+{
+  "_comment": "Golden snapshot of getAggregatedIngredients captured pre-refactor by scripts/capture_baseline.mjs. Inputs below; expected arrays must match the post-refactor implementation exactly (AC.7). Do not regenerate after the refactor.",
+  "inputs": [
+    [
+      {
+        "name": "Punching Bag",
+        "quantity": 3
+      }
+    ],
+    [
+      {
+        "name": "Punching Bag",
+        "quantity": 1
+      },
+      {
+        "name": "Gaming Bed",
+        "quantity": 1
+      },
+      {
+        "name": "Wooden Table",
+        "quantity": 2
+      }
+    ]
+  ],
+  "expected": [
+    {
+      "cartItems": [
+        {
+          "name": "Punching Bag",
+          "quantity": 3
+        }
+      ],
+      "results": [
+        {
+          "name": "Beach Sand",
+          "picturePath": "images/beachsand.png",
+          "total": 3
+        },
+        {
+          "name": "Iron Ore",
+          "picturePath": "images/ironore.png",
+          "total": 3
+        },
+        {
+          "name": "Twine",
+          "picturePath": "images/twine.png",
+          "total": 3
+        },
+        {
+          "name": "Vine Rope",
+          "picturePath": "images/vinerope.png",
+          "total": 3
+        }
+      ]
+    },
+    {
+      "cartItems": [
+        {
+          "name": "Punching Bag",
+          "quantity": 1
+        },
+        {
+          "name": "Gaming Bed",
+          "quantity": 1
+        },
+        {
+          "name": "Wooden Table",
+          "quantity": 2
+        }
+      ],
+      "results": [
+        {
+          "name": "Beach Sand",
+          "picturePath": "images/beachsand.png",
+          "total": 1
+        },
+        {
+          "name": "Fluff",
+          "picturePath": "images/fluff.png",
+          "total": 2
+        },
+        {
+          "name": "Gold Ingot",
+          "picturePath": "images/goldingot.png",
+          "total": 2
+        },
+        {
+          "name": "Iron Ore",
+          "picturePath": "images/ironore.png",
+          "total": 1
+        },
+        {
+          "name": "Lumber",
+          "picturePath": "images/lumber.png",
+          "total": 2
+        },
+        {
+          "name": "Pokémetal",
+          "picturePath": "images/pokemetal.png",
+          "total": 2
+        },
+        {
+          "name": "Twine",
+          "picturePath": "images/twine.png",
+          "total": 1
+        },
+        {
+          "name": "Vine Rope",
+          "picturePath": "images/vinerope.png",
+          "total": 1
+        }
+      ]
+    }
+  ]
+}
