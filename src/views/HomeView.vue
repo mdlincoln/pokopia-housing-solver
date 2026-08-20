@@ -91,6 +91,13 @@ const minLarge = computed(() => {
 const hydratingPokemonData = ref(false)
 const solving = ref(false)
 const loading = computed(() => hydratingPokemonData.value || solving.value)
+
+// Catalog-ready gate: false until the initial names/adjacency load (and any
+// URL-hash restore) inside onMounted has finished. `restoringQuery` covers
+// restores of saved queries from localStorage via the saved-queries select.
+const catalogReady = ref(false)
+const restoringQuery = ref(false)
+const showCatalogLoading = computed(() => !catalogReady.value || restoringQuery.value)
 const error = ref('')
 const result = ref<SolverResult | null>(null)
 const sortedHouses = computed(() => {
@@ -301,22 +308,33 @@ watch(selectedTimestamp, async (ts) => {
   if (ts === null) return
   const query = savedQueries.value.find((q) => q.timestamp === ts)
   if (!query) return
-  await restoreState(query)
+  restoringQuery.value = true
+  try {
+    await restoreState(query)
+  } finally {
+    restoringQuery.value = false
+  }
 })
 
 onMounted(async () => {
-  // Fire-and-forget: preload the item graph so the first cart interaction is
-  // pure in-memory (the cached promise means every item helper shares this load).
-  void loadItemGraph()
-  const [names, adjacency] = await Promise.all([loadPokemonNames(), loadAdjacencyMap()])
-  pokemonNames.value = names
-  adjacencyData.value = adjacency
+  try {
+    // Fire-and-forget: preload the item graph so the first cart interaction is
+    // pure in-memory (the cached promise means every item helper shares this load).
+    void loadItemGraph()
+    const [names, adjacency] = await Promise.all([loadPokemonNames(), loadAdjacencyMap()])
+    pokemonNames.value = names
+    adjacencyData.value = adjacency
 
-  const shared = decodeStateFromUrl()
-  if (shared) {
-    restoringFromUrl = true
-    await restoreState(shared)
-    restoringFromUrl = false
+    const shared = decodeStateFromUrl()
+    if (shared) {
+      restoringFromUrl = true
+      await restoreState(shared)
+      restoringFromUrl = false
+    }
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    catalogReady.value = true
   }
 })
 
@@ -452,7 +470,18 @@ defineExpose({
 </script>
 
 <template>
-  <div class="home-theme content-stack">
+  <div
+    v-if="showCatalogLoading"
+    data-testid="catalog-loading"
+    class="d-flex flex-column align-items-center justify-content-center gap-3 my-5"
+    role="status"
+    aria-live="polite"
+  >
+    <BSpinner />
+    <p>{{ restoringQuery ? 'Restoring saved query…' : 'Loading catalog…' }}</p>
+  </div>
+
+  <div v-if="!showCatalogLoading" class="home-theme content-stack">
     <BCard class="mb-3 shell-card config-card">
       <BCardBody class="p-3 p-md-4">
         <h5 class="section-heading">Houses</h5>
@@ -560,7 +589,11 @@ defineExpose({
     {{ error }}
   </BAlert>
 
-  <section v-if="resultsSafeToRender" data-testid="results" class="mt-4 results-section">
+  <section
+    v-if="resultsSafeToRender && !showCatalogLoading"
+    data-testid="results"
+    class="mt-4 results-section"
+  >
     <h2 class="section-heading">Results</h2>
 
     <BAlert

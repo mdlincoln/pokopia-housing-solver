@@ -42,6 +42,21 @@ export const useCartStore = defineStore('cart', () => {
   const aggregated = ref<AggregatedIngredient[]>([])
   const totalItems = computed(() => items.value.size)
 
+  // Busy counter: incremented while any cart mutation (add/remove/restore/clear)
+  // is in flight so the UI can show an "updating cart" indicator. A counter (not
+  // a boolean) so overlapping mutations stay busy until all settle.
+  const pendingMutations = ref(0)
+  const busy = computed(() => pendingMutations.value > 0)
+
+  async function withBusy<T>(fn: () => Promise<T> | T): Promise<T> {
+    pendingMutations.value++
+    try {
+      return await fn()
+    } finally {
+      pendingMutations.value--
+    }
+  }
+
   const itemList = computed<CartItem[]>(() =>
     Array.from(items.value.entries()).map(([key, entry]) => ({
       houseId: entry.houseId,
@@ -120,51 +135,14 @@ export const useCartStore = defineStore('cart', () => {
   )
 
   async function addItem(houseId: string, name: string) {
-    const key = cartKey(houseId, name)
-    if (items.value.has(key)) return
-    const [picturePath, metadata] = await Promise.all([
-      getItemPicturePath(name),
-      getItemMetadata(name),
-    ])
-    items.value.set(key, {
-      houseId,
-      picturePath,
-      isCraftable: metadata.isCraftable,
-      category: metadata.category,
-      flavorText: metadata.flavorText,
-      tag: metadata.tag,
-    })
-    if (!recipes.value.has(name)) {
-      recipes.value.set(name, await getRecipeForItem(name))
-    }
-    await recomputeAggregated()
-  }
-
-  async function restoreItems(
-    entries: Array<{ houseId?: string; houseIndex?: number; name: string; quantity?: number }>,
-  ) {
-    items.value.clear()
-    recipes.value.clear()
-
-    if (entries.length === 0) {
-      aggregated.value = []
-      return
-    }
-
-    const results = await Promise.all(
-      entries.map(async ({ houseId, houseIndex, name }) => {
-        const id = houseId ?? String(houseIndex ?? 0)
-        const [picturePath, metadata, recipe] = await Promise.all([
-          getItemPicturePath(name),
-          getItemMetadata(name),
-          getRecipeForItem(name),
-        ])
-        return { houseId: id, name, picturePath, metadata, recipe }
-      }),
-    )
-
-    for (const { houseId, name, picturePath, metadata, recipe } of results) {
-      items.value.set(cartKey(houseId, name), {
+    await withBusy(async () => {
+      const key = cartKey(houseId, name)
+      if (items.value.has(key)) return
+      const [picturePath, metadata] = await Promise.all([
+        getItemPicturePath(name),
+        getItemMetadata(name),
+      ])
+      items.value.set(key, {
         houseId,
         picturePath,
         isCraftable: metadata.isCraftable,
@@ -172,21 +150,66 @@ export const useCartStore = defineStore('cart', () => {
         flavorText: metadata.flavorText,
         tag: metadata.tag,
       })
-      recipes.value.set(name, recipe)
-    }
-
-    await recomputeAggregated()
+      if (!recipes.value.has(name)) {
+        recipes.value.set(name, await getRecipeForItem(name))
+      }
+      await recomputeAggregated()
+    })
   }
 
-  function removeItem(houseId: string, name: string) {
-    items.value.delete(cartKey(houseId, name))
-    progressStore.clearItemProgress(houseId, name)
-    recomputeAggregated()
+  async function restoreItems(
+    entries: Array<{ houseId?: string; houseIndex?: number; name: string; quantity?: number }>,
+  ) {
+    await withBusy(async () => {
+      items.value.clear()
+      recipes.value.clear()
+
+      if (entries.length === 0) {
+        aggregated.value = []
+        return
+      }
+
+      const results = await Promise.all(
+        entries.map(async ({ houseId, houseIndex, name }) => {
+          const id = houseId ?? String(houseIndex ?? 0)
+          const [picturePath, metadata, recipe] = await Promise.all([
+            getItemPicturePath(name),
+            getItemMetadata(name),
+            getRecipeForItem(name),
+          ])
+          return { houseId: id, name, picturePath, metadata, recipe }
+        }),
+      )
+
+      for (const { houseId, name, picturePath, metadata, recipe } of results) {
+        items.value.set(cartKey(houseId, name), {
+          houseId,
+          picturePath,
+          isCraftable: metadata.isCraftable,
+          category: metadata.category,
+          flavorText: metadata.flavorText,
+          tag: metadata.tag,
+        })
+        recipes.value.set(name, recipe)
+      }
+
+      await recomputeAggregated()
+    })
   }
 
-  function clearCart() {
-    items.value.clear()
-    aggregated.value = []
+  async function removeItem(houseId: string, name: string) {
+    await withBusy(async () => {
+      items.value.delete(cartKey(houseId, name))
+      progressStore.clearItemProgress(houseId, name)
+      await recomputeAggregated()
+    })
+  }
+
+  async function clearCart() {
+    await withBusy(() => {
+      items.value.clear()
+      aggregated.value = []
+    })
   }
 
   return {
@@ -196,6 +219,8 @@ export const useCartStore = defineStore('cart', () => {
     totalItems,
     itemList,
     itemsByHouse,
+    busy,
+    pendingMutations,
     addItem,
     restoreItems,
     removeItem,

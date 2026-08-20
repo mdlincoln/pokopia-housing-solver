@@ -18,6 +18,7 @@ import HomeView from '@/views/HomeView.vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 const mockSolve =
@@ -46,7 +47,7 @@ vi.mock('@/queries', async (importOriginal) => {
     ...(actual as object),
     loadPokemonNames: vi.fn<() => Promise<string[]>>(),
     loadPokemonData: vi.fn<() => Promise<import('@/solver').PokemonData>>(),
-    loadAdjacencyMap: vi.fn<() => void>(),
+    loadAdjacencyMap: vi.fn<() => Promise<import('@/solver').AdjacencyMap>>(),
   }
 })
 
@@ -69,6 +70,19 @@ async function mountHome() {
   })
   await flushPromises()
   return wrapper
+}
+
+// Mounts without flushing, keeping the onMounted catalog-load window open so
+// the catalog-loading gate can be observed mid-flight.
+function mountHomeRaw() {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/', component: HomeView }],
+  })
+  router.push('/')
+  return mount(HomeView, {
+    global: { plugins: [router, createPinia()] },
+  })
 }
 
 describe('HomeView', () => {
@@ -105,6 +119,89 @@ describe('HomeView', () => {
     expect(loadPokemonNames).toHaveBeenCalledOnce()
     expect(loadPokemonData).not.toHaveBeenCalled()
     expect(loadAdjacencyMap).toHaveBeenCalledOnce()
+  })
+
+  it('shows a catalog-loading gate while the initial catalog loads, then reveals the config UI', async () => {
+    let resolveNames!: (names: string[]) => void
+    vi.mocked(loadPokemonNames).mockReturnValue(
+      new Promise((res) => {
+        resolveNames = res
+      }),
+    )
+
+    const wrapper = mountHomeRaw()
+    await nextTick()
+
+    expect(wrapper.find('[data-testid="catalog-loading"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Loading catalog…')
+    expect(wrapper.find('[role="spinbutton"]').exists()).toBe(false)
+
+    resolveNames(Object.keys(testPokemonData).sort())
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="catalog-loading"]').exists()).toBe(false)
+    expect(wrapper.findAll('[role="spinbutton"]')).toHaveLength(3)
+  })
+
+  it('keeps the catalog-loading gate up while restoring a query from the URL hash', async () => {
+    const shared = { small: 1, medium: 0, large: 0, pokemon: ['AlphaOne'] }
+    window.location.hash = `#${btoa(JSON.stringify(shared))}`
+
+    let resolveHydrate!: (data: import('@/solver').PokemonData) => void
+    vi.mocked(loadPokemonData).mockReturnValue(
+      new Promise((res) => {
+        resolveHydrate = res
+      }),
+    )
+
+    const wrapper = mountHomeRaw()
+    await nextTick()
+
+    // Names/adjacency resolve immediately but the hash restore is still
+    // waiting on pokemon hydration, so the gate must remain visible.
+    expect(wrapper.find('[data-testid="catalog-loading"]').exists()).toBe(true)
+
+    resolveHydrate({ AlphaOne: testPokemonData.AlphaOne })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="catalog-loading"]').exists()).toBe(false)
+    expect(wrapper.findAll('[role="spinbutton"]')).toHaveLength(3)
+    expect(wrapper.vm.selectedPokemon).toEqual(['AlphaOne'])
+  })
+
+  it('shows a restoring indicator while a saved query restores from localStorage', async () => {
+    const entry = {
+      title: 'Slow restore',
+      timestamp: 1700000000123,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['AlphaOne'],
+    }
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([entry]))
+
+    const wrapper = await mountHome()
+    const cartStore = useCartStore()
+    vi.spyOn(cartStore, 'restoreItems').mockResolvedValue(undefined)
+
+    let resolveHydrate!: (data: import('@/solver').PokemonData) => void
+    vi.mocked(loadPokemonData).mockReturnValue(
+      new Promise((res) => {
+        resolveHydrate = res
+      }),
+    )
+
+    wrapper.vm.selectedTimestamp = entry.timestamp
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="catalog-loading"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Restoring saved query…')
+
+    resolveHydrate({ AlphaOne: testPokemonData.AlphaOne })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="catalog-loading"]').exists()).toBe(false)
+    expect(wrapper.findAll('[role="spinbutton"]')).toHaveLength(3)
   })
 
   it('hydrates pokemon data when names are selected', async () => {

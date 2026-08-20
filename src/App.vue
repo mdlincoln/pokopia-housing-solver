@@ -1,6 +1,36 @@
 <script setup lang="ts">
 import ShoppingCart from '@/components/ShoppingCart.vue'
-import { BContainer } from 'bootstrap-vue-next'
+import { useCartStore } from '@/stores/cart'
+import { BContainer, BSpinner } from 'bootstrap-vue-next'
+import { onBeforeUnmount, ref, watch } from 'vue'
+
+const cartStore = useCartStore()
+
+// Busy-overlay flicker guard: only surface the overlay if the cart stays busy
+// for at least 150ms — fast mutations resolve without any flash.
+const showCartBusy = ref(false)
+let cartBusyTimer: ReturnType<typeof setTimeout> | undefined
+
+watch(
+  () => cartStore.busy,
+  (isBusy) => {
+    if (cartBusyTimer) {
+      clearTimeout(cartBusyTimer)
+      cartBusyTimer = undefined
+    }
+    if (isBusy) {
+      cartBusyTimer = setTimeout(() => {
+        if (cartStore.busy) showCartBusy.value = true
+      }, 150)
+    } else {
+      showCartBusy.value = false
+    }
+  },
+)
+
+onBeforeUnmount(() => {
+  if (cartBusyTimer) clearTimeout(cartBusyTimer)
+})
 </script>
 
 <template>
@@ -39,5 +69,31 @@ import { BContainer } from 'bootstrap-vue-next'
       </footer>
     </BContainer>
     <ShoppingCart />
+    <div
+      v-if="showCartBusy"
+      data-testid="cart-busy-overlay"
+      class="cart-busy-overlay"
+      style="pointer-events: none"
+      role="status"
+      aria-live="polite"
+    >
+      <BSpinner />
+      <span>Updating cart…</span>
+    </div>
   </div>
 </template>
+
+<style>
+.cart-busy-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: rgb(36 80 107 / 35%);
+  color: #fff;
+  z-index: 2000;
+}
+</style>
