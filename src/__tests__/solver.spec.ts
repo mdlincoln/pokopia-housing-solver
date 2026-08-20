@@ -5,30 +5,34 @@ import {
   clusterPreAssign,
   countSharedFavorites,
   enumerateHouses,
+  getScore,
   greedyMaxWeightMatching,
   solve,
-  type AdjacencyMap,
+  type AdjacencyData,
   type HouseWithId,
   type HousingConfig,
   type PokemonData,
   type SolverResult,
 } from '../solver'
 
-// Helper to convert matrix to AdjacencyMap
-function matrixToMap(pokemon: string[], matrix: (number | null | undefined)[][]): AdjacencyMap {
-  const map = new Map<string, Map<string, number | null>>()
-  for (let i = 0; i < pokemon.length; i++) {
-    if (!map.has(pokemon[i]!)) {
-      map.set(pokemon[i]!, new Map())
-    }
-    for (let j = 0; j < pokemon.length; j++) {
-      if (i !== j) {
-        const val = matrix[i]![j]
-        map.get(pokemon[i]!)!.set(pokemon[j]!, val === undefined ? null : val)
-      }
+// Helper to convert a name-keyed matrix fixture into the flat AdjacencyData
+// shape (mirrors scripts/build_data.mjs encoding: null → -1, absent → 0).
+function matrixToMap(pokemon: string[], matrix: (number | null | undefined)[][]): AdjacencyData {
+  const size = pokemon.length
+  const flat = new Int16Array(size * size)
+  for (let i = 0; i < size; i++) {
+    for (let j = 0; j < size; j++) {
+      if (i === j) continue
+      const val = matrix[i]![j]
+      flat[i * size + j] = val === null || val === undefined ? -1 : val
     }
   }
-  return map
+  return {
+    names: [...pokemon],
+    indexByName: new Map(pokemon.map((name, i) => [name, i])),
+    size,
+    matrix: flat,
+  }
 }
 
 // Helper to create HouseWithId[] from a HousingConfig
@@ -51,7 +55,7 @@ function makeHouses(config: HousingConfig): HouseWithId[] {
 // A-B: 4, A-C: 1, A-D: 0
 // B-C: 1, B-D: 0
 // C-D: 3
-const fixture: AdjacencyMap = matrixToMap(
+const fixture: AdjacencyData = matrixToMap(
   ['A', 'B', 'C', 'D'],
   [
     [0, 4, 1, 0],
@@ -113,7 +117,7 @@ describe('buildSubMatrix', () => {
 // Cluster1: E,F,G,H form a tight clique (weight 5 between all pairs), habitat: Cool
 // Cluster2: I,J are connected (weight 3), habitat: Warm
 // Cross-cluster connections are null (habitat-incompatible: Cool ↔ Warm)
-const clusterFixture: AdjacencyMap = matrixToMap(
+const clusterFixture: AdjacencyData = matrixToMap(
   ['E', 'F', 'G', 'H', 'I', 'J'],
   [
     //     E     F     G     H     I     J
@@ -242,7 +246,7 @@ const testData: PokemonData = {
 
 // Explicit adjacency fixture matching testData order.
 // Includes habitat effects: same-habitat bonus (+1), opposite-axis exclusions (null).
-const testDataFixture: AdjacencyMap = matrixToMap(
+const testDataFixture: AdjacencyData = matrixToMap(
   ['AlphaOne', 'AlphaTwo', 'BetaOne', 'BetaTwo', 'Loner', 'ClashCool', 'ClashWarm', 'NeutralDark'],
   [
     // AlphaOne  AlphaTwo BetaOne BetaTwo Loner ClashCool ClashWarm NeutralDark
@@ -506,7 +510,7 @@ describe('habitat incompatibility', () => {
       N1: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
       N2: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
     }
-    const bridgeAdj: AdjacencyMap = matrixToMap(
+    const bridgeAdj: AdjacencyData = matrixToMap(
       ['X', 'Y', 'N1', 'N2'],
       [
         //   X     Y     N1    N2
@@ -655,6 +659,61 @@ describe('pinned assignments', () => {
     expect(l1.pokemon).not.toContain('BetaOne')
     expect(l1.pokemon).not.toContain('BetaTwo')
   }, 30_000)
+})
+
+describe('getScore (AdjacencyData accessors)', () => {
+  it('decodes the -1 exclusion sentinel to null', () => {
+    expect(getScore(testDataFixture, 'ClashCool', 'ClashWarm')).toBeNull()
+    expect(getScore(testDataFixture, 'AlphaOne', 'AlphaTwo')).toBe(5)
+    expect(getScore(testDataFixture, 'AlphaOne', 'BetaOne')).toBe(0)
+  })
+
+  it('is symmetric', () => {
+    expect(getScore(testDataFixture, 'AlphaTwo', 'AlphaOne')).toBe(
+      getScore(testDataFixture, 'AlphaOne', 'AlphaTwo'),
+    )
+    expect(getScore(testDataFixture, 'ClashWarm', 'ClashCool')).toBeNull()
+  })
+
+  it('scores 0 (no edge) for pokemon absent from the adjacency data', () => {
+    // Once adjacency is loaded, an unknown name is a 0 — not the
+    // countSharedFavorites fallback (which only applies when no adjacency
+    // data was provided at all).
+    expect(getScore(testDataFixture, 'AlphaOne', 'NotInTheMatrix')).toBe(0)
+    expect(getScore(testDataFixture, 'NotInTheMatrix', 'AlphaOne')).toBe(0)
+  })
+})
+
+describe('solve() exclusion via the -1 sentinel', () => {
+  it('never cohabitates a hard-excluded pair even when they top the affinity ranking', async () => {
+    // X↔Y is a -1 (excluded) edge; both score 5 with N1/N2. If the sentinel
+    // leaked through solve() as a number, clustering would happily seat X+Y
+    // together (they have the highest shared-favorites count).
+    const data: PokemonData = {
+      X: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Cool' },
+      Y: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Warm' },
+      N1: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
+      N2: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
+    }
+    const adjacency: AdjacencyData = matrixToMap(
+      ['X', 'Y', 'N1', 'N2'],
+      [
+        [0, null, 5, 5],
+        [null, 0, 5, 5],
+        [5, 5, 0, 6],
+        [5, 5, 6, 0],
+      ],
+    )
+    const result = await solve(
+      ['X', 'Y', 'N1', 'N2'],
+      makeHouses({ small: 0, medium: 0, large: 1 }),
+      data,
+      adjacency,
+    )
+    for (const house of result.houses) {
+      expect(house.pokemon.includes('X') && house.pokemon.includes('Y')).toBe(false)
+    }
+  })
 })
 
 describe('input order independence', () => {

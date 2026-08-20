@@ -222,7 +222,5 @@ fs.writeFileSync(
   JSON.stringify(aggregatedFixture, null, 2) + '\n',
 )
 
-console.log(
-  `Wrote recommendations-golden.json (${recommendationsFixture.expected.length} inputs)`,
-)
+console.log(`Wrote recommendations-golden.json (${recommendationsFixture.expected.length} inputs)`)
 console.log(`Wrote aggregated-golden.json (${aggregatedFixture.expected.length} inputs)`)

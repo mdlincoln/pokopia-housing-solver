@@ -1,6 +1,6 @@
 import {
   solve,
-  type AdjacencyMap,
+  type AdjacencyData,
   type HouseWithId,
   type PokemonData,
   type SolverResult,
@@ -54,7 +54,7 @@ export interface SolveArgs {
   pokemonNames: string[]
   houses: HouseWithId[]
   pokemonData: PokemonData
-  adjacencyMap?: AdjacencyMap
+  adjacencyData?: AdjacencyData
   pinnedAssignments?: Map<string, string[]>
 }
 
@@ -69,7 +69,7 @@ export function solveInWorker(args: SolveArgs): Promise<SolverResult> {
       args.pokemonNames,
       args.houses,
       args.pokemonData,
-      args.adjacencyMap,
+      args.adjacencyData,
       args.pinnedAssignments,
     )
   }
@@ -94,12 +94,16 @@ export function solveInWorker(args: SolveArgs): Promise<SolverResult> {
       }
     }
 
+    // AdjacencyData is flat (string[], Map, Int16Array) and fully
+    // structured-clonable; pass it through as-is. The Int16Array could be
+    // transferred ([matrix.buffer]) to avoid a copy, but transfer detaches
+    // the main-thread copy that later solves still need.
     const request: SolverRequest = {
       id,
       pokemonNames: [...toRaw(args.pokemonNames)],
       houses: args.houses.map((h) => ({ ...toRaw(h) })),
       pokemonData: rawPokemonData,
-      adjacencyMap: args.adjacencyMap ? toRaw(args.adjacencyMap) : undefined,
+      adjacencyData: args.adjacencyData ? toRaw(args.adjacencyData) : undefined,
       pinnedAssignments: args.pinnedAssignments,
     }
     w.postMessage(request)

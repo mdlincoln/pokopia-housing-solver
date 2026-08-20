@@ -1,6 +1,6 @@
 import {
   solve,
-  type AdjacencyMap,
+  type AdjacencyData,
   type HouseWithId,
   type PokemonData,
   type SolverResult,
@@ -11,7 +11,7 @@ export interface SolverRequest {
   pokemonNames: string[]
   houses: HouseWithId[]
   pokemonData: PokemonData
-  adjacencyMap?: AdjacencyMap
+  adjacencyData?: AdjacencyData
   pinnedAssignments?: Map<string, string[]>
 }
 
@@ -26,7 +26,7 @@ self.addEventListener('message', async (event: MessageEvent<SolverRequest>) => {
       req.pokemonNames,
       req.houses,
       req.pokemonData,
-      req.adjacencyMap,
+      req.adjacencyData,
       req.pinnedAssignments,
     )
     const response: SolverResponse = { id: req.id, ok: true, result }

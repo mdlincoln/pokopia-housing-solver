@@ -4,13 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # Project
 
-Pokopia Housing Solver — a browser-only Vue 3 SPA that optimizes cohousing assignments for Pokopia Pokémon using agglomerative clustering on a precomputed adjacency graph. There is no backend: all data lives in `public/pokehousing.sqlite` and is queried in-browser via `sql.js` (WASM).
+Pokopia Housing Solver — a browser-only Vue 3 SPA that optimizes cohousing assignments for Pokopia Pokémon using agglomerative clustering on a precomputed adjacency graph. There is no backend and no runtime SQL: `public/pokehousing.sqlite` remains the source of truth, but it is baked into static payloads at build time (`npm run build:data`) and the app ships zero WASM.
 
 # Commands
 
 ```bash
 npm run dev              # Vite dev server at http://localhost:5173
-npm run build            # type-check (vue-tsc) + vite build
+npm run build            # build:data bake, then type-check (vue-tsc) + vite build
+npm run build:data       # bake src/data/*.json + public/data/adjacency.json from the sqlite DB
 npm run preview          # serve the production bundle locally
 
 npm run test:unit        # Vitest (jsdom) — src/__tests__/*.spec.ts
@@ -63,6 +64,8 @@ The script uses only the Node standard library (`fetch`, `node:sqlite`, `node:ut
 
 `node:sqlite` is experimental and requires **Node 22+** (`.nvmrc` pins `22.22.2`); it prints a harmless `ExperimentalWarning`.
 
+**After any harvest, re-run `npm run build:data`** to regenerate the baked payloads (`src/data/*.json`, `public/data/adjacency.json`) and commit them together with the DB. The full workflow is: harvest (writes sqlite) → `npm run build:data` (bakes static payloads) → build/test.
+
 Unit tests live in `scripts/harvest_items.test.js` and `scripts/harvest_pokemon.test.js` and use Node's built-in `node:test` (no extra dependencies). Run with:
 
 ```bash
@@ -73,9 +76,15 @@ npm run test:harvest
 
 ## Data layer
 
-`public/pokehousing.sqlite` is loaded once into `sql.js` (`src/db.ts#getDb`) on first use. The WASM binary is served by a Vite middleware from `node_modules/sql.js/dist/sql-wasm.wasm` in dev and copied to `dist/wasm/` at build time (see `vite.config.ts`). Production assets are served under `/pokopia-housing-solver/`; `src/assetPath.ts` wraps `import.meta.env.BASE_URL` so fetches work in both dev and prod.
+`public/pokehousing.sqlite` is the source of truth, but no SQL or WASM runs in the browser. `scripts/build_data.mjs` (`npm run build:data`, Node 22+ `node:sqlite`, stdlib only) reads the DB at build time and emits three denormalized payloads:
 
-**`src/queries.ts` is the only module that calls `db.exec()`.** All SQL is centralized there — never write inline SQL in components or other modules. The schema lives in `scripts/db.sql`. Key tables:
+- `src/data/pokemon.json` — `{ names: string[] (sorted), dataByName }`; bundled by Vite.
+- `src/data/items.json` — the item-graph shape (`itemDetailsByName`, `itemsByFavorite`, `favoritesByItem`, `recipeByItem`); bundled by Vite. **Key insertion order is load-bearing** — it mirrors the generator's SQL `ORDER BY` and drives recommendation/aggregation ordering; never re-sort at runtime.
+- `public/data/adjacency.json` — `{ names, size, data }` where `data` is base64 of a dense `Int16Array(N×N)` keyed by pokemon id: `-1` = hard exclusion (opposite habitat axis), `0` = no edge, `>0` = score. Fetched once at runtime (kept out of the JS bundle).
+
+The generated files are **committed**; `scripts/build_data.test.js` asserts they stay in sync with the generator output (re-run `npm run build:data` after any harvest). `src/data/index.ts` loads them: pokemon/items via bundled import, adjacency via one `fetch` decoded into the flat `AdjacencyData` (`{ names, indexByName, size, matrix }`) that is cheap to structured-clone to the solver worker. Production assets are served under `/pokopia-housing-solver/`; `src/assetPath.ts` wraps `import.meta.env.BASE_URL` so the adjacency fetch works in both dev and prod.
+
+**`src/queries.ts` is the only module that reads the baked data** (via `src/data/index.ts`) — never import `src/data/*` from components or other modules. The DB schema lives in `scripts/db.sql`. Key tables:
 
 - `pokemon`, `pokemon_favorites`, `favorites`, `habitats` — pokemon catalog and their favorite items, plus habitat axes.
 - `items`, `item_favorites`, `item_recipe` — item catalog, which favorites each fulfills, and crafting recipes.
@@ -84,7 +93,7 @@ npm run test:harvest
 
 Exported query helpers include `loadPokemonNames`, `loadPokemonData(names?)` (hydrate lazily for the currently selected set only), `loadAdjacencyMap`, `favoritesForItem`, `recommendedItemsForHouse` (one boolean `fav_<favorite>` key per distinct input favorite), `getItemMetadata`, `getItemPicturePath`, `getRecipeForItem`, and `getAggregatedIngredients`.
 
-All item-facing helpers (`favoritesForItem`, `recommendedItemsForHouse`, `getItemMetadata`, `getItemPicturePath`, `getRecipeForItem`, `getAggregatedIngredients`) are pure in-memory lookups over a once-loaded item graph: `loadItemGraph()` runs three flat SELECTs (items, item↔favorite mappings, recipes) on first use and is shared via a cached promise — no SQL executes on the item domain afterward (the whole item domain is ~1700 rows). HomeView pre-warms it on mount (`void loadItemGraph()`) alongside the names/adjacency loads. The graph reuses shared object references, so helpers that hand data to stores copy small results (`getRecipeForItem` deep-copies its recipe arrays; `recommendedItemsForHouse` builds fresh row objects).
+All item-facing helpers (`favoritesForItem`, `recommendedItemsForHouse`, `getItemMetadata`, `getItemPicturePath`, `getRecipeForItem`, `getAggregatedIngredients`) are pure in-memory lookups over a once-hydrated item graph: `loadItemGraph()` converts the bundled `items.json` into Map-based structures on first use and is shared via a cached promise (the whole item domain is ~1700 rows). HomeView pre-warms it on mount (`void loadItemGraph()`) alongside the names/adjacency loads. The graph reuses shared object references, so helpers that hand data to stores copy small results (`getRecipeForItem` deep-copies its recipe arrays; `recommendedItemsForHouse` builds fresh row objects).
 
 ## Solver (`src/solver.ts`)
 
@@ -92,7 +101,7 @@ Exports a single `solve()` function that assigns pokemon to houses using a three
 
 Houses have fixed capacities: small=1, medium=2, large=4, each with a stable string ID like `S1`, `M2`, `L1`.
 
-**Habitat compatibility.** Three axes — light (`Dark`/`Bright`), temperature (`Cool`/`Warm`), moisture (`Dry`/`Humid`). Same habitat value = +1 bonus; **opposite ends of the same axis = `null`** in the adjacency map (hard exclusion — pair cannot cohabitate and is removed from clustering/matching/greedy-fill entirely). Different axes = no effect.
+**Habitat compatibility.** Three axes — light (`Dark`/`Bright`), temperature (`Cool`/`Warm`), moisture (`Dry`/`Humid`). Same habitat value = +1 bonus; **opposite ends of the same axis = hard exclusion** (pair cannot cohabitate and is removed from clustering/matching/greedy-fill entirely). In the baked `AdjacencyData` matrix exclusions are stored as a `-1` sentinel and decoded back to `null` by `buildSubMatrix` / `getScore`. Different axes = no effect.
 
 **Pipeline** (executed in order, each phase operating on pokemon left by the previous):
 

@@ -1,5 +1,4 @@
-import { getDb } from '@/db'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
   favoriteCoverageColumnKey,
   favoritesForItem,
@@ -7,28 +6,18 @@ import {
   getItemMetadata,
   getItemPicturePath,
   getRecipeForItem,
-  loadItemGraph,
   recommendedItemsForHouse,
 } from '../queries'
+// The baked item-graph payload the query layer hydrates from. No mock needed:
+// the baked JSON is the real committed output of scripts/build_data.mjs.
+import bakedItems from '@/data/items.json'
+// Golden snapshots captured from the pre-refactor sql.js implementation by
+// scripts/capture_baseline.mjs (AC.7). Inputs are recorded in the fixtures;
+// the baked-data implementations must reproduce them exactly.
+import recommendationsGolden from './fixtures/recommendations-golden.json'
+import aggregatedGolden from './fixtures/aggregated-golden.json'
 
-vi.mock('@/db', async () => {
-  const { default: initSqlJs } = await import('sql.js')
-  const { readFileSync } = await import('node:fs')
-  const { resolve } = await import('node:path')
-  let _db: import('sql.js').Database | null = null
-  return {
-    getDb: async () => {
-      if (_db) return _db
-      const wasmPath = resolve(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm')
-      const SQL = await initSqlJs({ locateFile: () => wasmPath })
-      const dbPath = resolve(process.cwd(), 'public/pokehousing.sqlite')
-      _db = new SQL.Database(new Uint8Array(readFileSync(dbPath)))
-      return _db
-    },
-  }
-})
-
-// Parity fixtures from the real DB (loaded via the @/db mock above). Counts and
+// Parity fixtures from the real DB (served via the baked item graph). Counts and
 // metadata are tied to the currently harvested Serebii data.
 const PUNCHING_BAG_METADATA = {
   isCraftable: true,
@@ -93,6 +82,23 @@ describe('recommendedItemsForHouse', () => {
   it('returns an empty array when no favorites match tagged items', async () => {
     const result = await recommendedItemsForHouse(['not a real favorite'])
     expect(result).toHaveLength(0)
+  })
+})
+
+describe('AC.7 ordering parity with the pre-refactor sql.js implementation', () => {
+  it('recommendedItemsForHouse matches the golden snapshot for every recorded input', async () => {
+    for (const { favorites, results } of recommendationsGolden.expected) {
+      const actual = await recommendedItemsForHouse(favorites)
+      // Exact structural equality covers ordering, values, and key order.
+      expect(actual).toEqual(results)
+    }
+  })
+
+  it('getAggregatedIngredients matches the golden snapshot for every recorded input', async () => {
+    for (const { cartItems, results } of aggregatedGolden.expected) {
+      const actual = await getAggregatedIngredients(cartItems)
+      expect(actual).toEqual(results)
+    }
   })
 })
 
@@ -167,22 +173,27 @@ describe('getAggregatedIngredients', () => {
   })
 })
 
-describe('loadItemGraph caching', () => {
-  it('runs no additional SQL after the graph is loaded', async () => {
-    const db = await getDb()
-    const spy = vi.spyOn(db, 'exec')
-    await loadItemGraph()
-    // Normalize for test order: other suites may have loaded the graph already.
-    spy.mockClear()
+describe('baked item graph', () => {
+  // Reframed from the pre-refactor raw-SQL assertion: instead of spying on
+  // db.exec (there is no runtime SQL anymore), assert the baked structure
+  // directly carries the ordering and mappings the helpers depend on.
+  it('carries the recipe for a known craftable item in deterministic order', () => {
+    const recipe = bakedItems.recipeByItem['Punching Bag' as keyof typeof bakedItems.recipeByItem]
+    expect(recipe).toBeDefined()
+    expect(recipe.map((r) => r.ingredientName)).toEqual([
+      'Beach Sand',
+      'Iron Ore',
+      'Twine',
+      'Vine Rope',
+    ])
+  })
 
-    await recommendedItemsForHouse(['exercise'])
-    await favoritesForItem('Punching Bag')
-    await getItemMetadata('Punching Bag')
-    await getItemPicturePath('Punching Bag')
-    await getRecipeForItem('Punching Bag')
-    await getAggregatedIngredients([{ name: 'Punching Bag', quantity: 2 }])
-
-    expect(spy).not.toHaveBeenCalled()
-    spy.mockRestore()
+  it('maps favorites to items and items back to favorites consistently', () => {
+    const forExercise =
+      bakedItems.itemsByFavorite['exercise' as keyof typeof bakedItems.itemsByFavorite]
+    expect(forExercise).toContain('Punching Bag')
+    const punchingBagFavorites =
+      bakedItems.favoritesByItem['Punching Bag' as keyof typeof bakedItems.favoritesByItem]
+    expect(punchingBagFavorites).toContain('exercise')
   })
 })

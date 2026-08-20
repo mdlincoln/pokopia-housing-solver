@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "run-p type-check \"build-only {@}\" --",
+    "build": "npm run build:data && run-p type-check \"build-only {@}\" --",
+    "build:data": "node scripts/build_data.mjs",
     "preview": "vite preview",
     "test:unit": "vitest",
     "test:e2e": "playwright test",
@@ -27,7 +28,6 @@
     "bootstrap-vue-next": "^0.45.5",
     "pinia": "^3.0.4",
     "posthog-js": "^1.384.3",
-    "sql.js": "^1.14.1",
     "vue": "^3.5.35",
     "vue-router": "^5.1.0"
   },
@@ -36,7 +36,6 @@
     "@tsconfig/node24": "^24.0.4",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^25.9.2",
-    "@types/sql.js": "^1.4.11",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vitest/eslint-plugin": "^1.6.20",
     "@vue/eslint-config-typescript": "^14.8.0",

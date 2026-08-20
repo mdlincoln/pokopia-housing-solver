@@ -1,14 +1,3 @@
-vi.mock('@/db', async () => {
-  const { default: initSqlJs } = await import('sql.js')
-  const { readFileSync } = await import('node:fs')
-  const { resolve } = await import('node:path')
-  const wasmPath = resolve(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm')
-  const SQL = await initSqlJs({ locateFile: () => wasmPath })
-  const dbPath = resolve(process.cwd(), 'public/pokehousing.sqlite')
-  const db = new SQL.Database(new Uint8Array(readFileSync(dbPath)))
-  return { getDb: async () => db }
-})
-
 import { loadAdjacencyMap, loadPokemonData, loadPokemonNames } from '@/queries'
 import type { SolverResult } from '@/solver'
 import { useCartStore } from '@/stores/cart'
@@ -27,7 +16,7 @@ const mockSolve =
       pokemonNames: string[],
       houses: import('@/stores/houses').HouseEntry[],
       pokemonData: import('@/solver').PokemonData,
-      adjacencyMap?: import('@/solver').AdjacencyMap,
+      adjacencyData?: import('@/solver').AdjacencyData,
       pinnedAssignments?: Map<string, string[]>,
     ) => Promise<SolverResult>
   >()
@@ -47,7 +36,7 @@ vi.mock('@/queries', async (importOriginal) => {
     ...(actual as object),
     loadPokemonNames: vi.fn<() => Promise<string[]>>(),
     loadPokemonData: vi.fn<() => Promise<import('@/solver').PokemonData>>(),
-    loadAdjacencyMap: vi.fn<() => Promise<import('@/solver').AdjacencyMap>>(),
+    loadAdjacencyMap: vi.fn<() => Promise<import('@/solver').AdjacencyData>>(),
   }
 })
 
@@ -100,7 +89,12 @@ describe('HomeView', () => {
           .filter(([, value]) => !!value),
       )
     })
-    vi.mocked(loadAdjacencyMap).mockResolvedValue(new Map())
+    vi.mocked(loadAdjacencyMap).mockResolvedValue({
+      names: [],
+      indexByName: new Map(),
+      size: 0,
+      matrix: new Int16Array(0),
+    })
     window.location.hash = ''
   })
 

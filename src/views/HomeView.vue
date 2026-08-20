@@ -2,7 +2,7 @@
 import HouseRecord from '@/components/HouseRecord.vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
 import { loadAdjacencyMap, loadItemGraph, loadPokemonData, loadPokemonNames } from '@/queries'
-import { type AdjacencyMap, type PokemonData, type SolverResult } from '@/solver'
+import { type AdjacencyData, type PokemonData, type SolverResult } from '@/solver'
 import { solveInWorker, SupersededError } from '@/solverClient'
 import { debounce } from '@/utils/debounce'
 import { nextTick } from 'vue'
@@ -33,7 +33,7 @@ const progressStore = useProgressStore()
 
 const pokemonNames = ref<string[]>([])
 const pokemonData = ref<PokemonData>({})
-const adjacencyData = ref<AdjacencyMap | null>(null)
+const adjacencyData = ref<AdjacencyData | null>(null)
 const hydratedPokemonReady = computed(() => {
   const allSelected = selectedPokemon.value.every((name) => !!pokemonData.value[name])
   if (!allSelected) return false
@@ -402,7 +402,7 @@ async function runSolve() {
       pokemonNames: selectedPokemon.value,
       houses: houseStore.orderedHouses,
       pokemonData: pokemonData.value,
-      adjacencyMap: adjacencyData.value ?? undefined,
+      adjacencyData: adjacencyData.value ?? undefined,
       pinnedAssignments: pinStore.getPinnedAssignments(),
     })
     solving.value = false

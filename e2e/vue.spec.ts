@@ -25,6 +25,22 @@ async function setSpinbutton(page: import('@playwright/test').Page, id: string, 
 }
 
 test.describe('Homepage', () => {
+  test('boots with no WASM: no sql.js/sql-wasm network requests are made', async ({ page }) => {
+    const wasmRequests: string[] = []
+    page.on('request', (req) => {
+      const url = req.url()
+      if (url.includes('wasm') || url.includes('sql.js') || url.endsWith('.sqlite')) {
+        wasmRequests.push(url)
+      }
+    })
+    await page.goto('/')
+    // Exercise the full initial load: catalog names + adjacency fetch + a solve.
+    await setSpinbutton(page, 'house-small', 1)
+    await selectPokemon(page, 'Bulbasaur')
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+    expect(wasmRequests).toEqual([])
+  })
+
   test('solves and displays results', async ({ page }) => {
     await page.goto('/')
 

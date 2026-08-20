@@ -1,5 +1,11 @@
-import { getDb } from '@/db'
-import type { AdjacencyMap, PokemonData } from '@/solver'
+// Query layer over the build-time baked data (see scripts/build_data.mjs and
+// src/data/index.ts). No SQL or WASM runs in the browser: the pokemon catalog
+// and item graph are bundled JSON, and the adjacency matrix is a single fetch
+// decoded into a flat Int16Array. This module is the only one that reads the
+// baked data — never import src/data/* from components or other modules.
+
+import { loadAdjacencyData, loadItemGraphData, loadPokemonCatalog } from '@/data'
+import type { AdjacencyData, PokemonData } from '@/solver'
 
 export interface ItemDetails {
   name: string
@@ -22,7 +28,7 @@ export interface AggregatedIngredient {
   total: number
 }
 
-interface ItemGraph {
+export interface ItemGraph {
   itemDetailsByName: Map<string, ItemDetails>
   itemsByFavorite: Map<string, ItemDetails[]> // shared ItemDetails refs
   favoritesByItem: Map<string, string[]>
@@ -37,85 +43,40 @@ function compareCodepoints(a: string, b: string): number {
 
 let _itemGraphPromise: Promise<ItemGraph> | null = null
 
-// Loads the entire item domain in 3 flat SELECTs and builds shared-object maps.
+// Hydrates the bundled item-graph JSON into the Map-based ItemGraph the
+// helpers below consume. Key insertion order of the baked itemsByFavorite /
+// recipeByItem objects mirrors the generator's SQL ORDER BY and is preserved
+// verbatim here (Map preserves insertion order) — do not re-sort; ordering is
+// load-bearing for recommendedItemsForHouse and aggregation parity (AC.7).
 // Self-initializing on first use; the promise is cached so all item-facing
-// helpers below are pure in-memory map lookups with no further SQL.
+// helpers below are pure in-memory map lookups.
 export function loadItemGraph(): Promise<ItemGraph> {
   _itemGraphPromise ??= (async (): Promise<ItemGraph> => {
-    const db = await getDb()
+    const baked = loadItemGraphData()
 
-    const itemDetailsByName: Map<string, ItemDetails> = new Map()
-    const itemRows = db.exec(
-      `SELECT i.name, i.category, i.flavor_text, i.picture_path, i.tag,
-              CASE WHEN EXISTS(SELECT 1 FROM item_recipe r WHERE r.item_id = i.id) THEN 1 ELSE 0 END
-       FROM items i
-       ORDER BY i.id`,
-    )[0]
-    if (itemRows) {
-      for (const row of itemRows.values) {
-        const detail: ItemDetails = {
-          name: row[0] as string,
-          category: (row[1] as string | null) ?? null,
-          flavorText: (row[2] as string | null) ?? null,
-          picturePath: (row[3] as string | null) ?? null,
-          tag: (row[4] as string | null) ?? null,
-          isCraftable: (row[5] as number) === 1,
-        }
-        itemDetailsByName.set(detail.name, detail)
-      }
+    const itemDetailsByName = new Map<string, ItemDetails>()
+    for (const detail of Object.values(baked.itemDetailsByName)) {
+      itemDetailsByName.set(detail.name, detail)
     }
 
-    const itemsByFavorite: Map<string, ItemDetails[]> = new Map()
-    const favoritesByItem: Map<string, string[]> = new Map()
-    const favoriteRows = db.exec(
-      `SELECT i.name, IF.favorite_name
-       FROM item_favorites IF
-       JOIN items i ON i.id = IF.item_id
-       ORDER BY i.id, IF.favorite_name`,
-    )[0]
-    if (favoriteRows) {
-      for (const row of favoriteRows.values) {
-        const itemName = row[0] as string
-        const favorite = row[1] as string
-        const detail = itemDetailsByName.get(itemName)
-        if (!detail) continue
-        let items = itemsByFavorite.get(favorite)
-        if (!items) {
-          items = []
-          itemsByFavorite.set(favorite, items)
-        }
-        items.push(detail)
-        let favorites = favoritesByItem.get(itemName)
-        if (!favorites) {
-          favorites = []
-          favoritesByItem.set(itemName, favorites)
-        }
-        favorites.push(favorite)
+    const itemsByFavorite = new Map<string, ItemDetails[]>()
+    for (const [favorite, names] of Object.entries(baked.itemsByFavorite)) {
+      const items: ItemDetails[] = []
+      for (const name of names) {
+        const detail = itemDetailsByName.get(name)
+        if (detail) items.push(detail)
       }
+      itemsByFavorite.set(favorite, items)
     }
 
-    const recipeByItem: Map<string, RecipeIngredient[]> = new Map()
-    const recipeRows = db.exec(
-      `SELECT i.name, ing.name, ing.picture_path, r.count
-       FROM item_recipe r
-       JOIN items i ON i.id = r.item_id
-       JOIN items ing ON ing.id = r.ingredient_id
-       ORDER BY i.id, ing.name`,
-    )[0]
-    if (recipeRows) {
-      for (const row of recipeRows.values) {
-        const itemName = row[0] as string
-        let recipe = recipeByItem.get(itemName)
-        if (!recipe) {
-          recipe = []
-          recipeByItem.set(itemName, recipe)
-        }
-        recipe.push({
-          ingredientName: row[1] as string,
-          ingredientPicture: (row[2] as string | null) ?? null,
-          count: row[3] as number,
-        })
-      }
+    const favoritesByItem = new Map<string, string[]>()
+    for (const [itemName, favorites] of Object.entries(baked.favoritesByItem)) {
+      favoritesByItem.set(itemName, favorites)
+    }
+
+    const recipeByItem = new Map<string, RecipeIngredient[]>()
+    for (const [itemName, recipe] of Object.entries(baked.recipeByItem)) {
+      recipeByItem.set(itemName, recipe)
     }
 
     return { itemDetailsByName, itemsByFavorite, favoritesByItem, recipeByItem }
@@ -213,40 +174,23 @@ export async function recommendedItemsForHouse(
 }
 
 export async function loadPokemonNames(): Promise<string[]> {
-  const db = await getDb()
-  const rows = db.exec(
-    `SELECT p.name
-     FROM pokemon p
-     ORDER BY p.name ASC`,
-  )[0]
-  if (!rows) return []
-  return rows.values.map((row) => row[0] as string)
+  return loadPokemonCatalog().names
 }
 
 export async function loadPokemonData(names?: string[]): Promise<PokemonData> {
-  const db = await getDb()
+  const catalog = loadPokemonCatalog()
   const pokemonData: PokemonData = {}
   if (names && names.length === 0) return pokemonData
 
-  const whereClause = names ? `WHERE p.name IN (${names.map(() => '?').join(', ')})` : ''
-  const rows = db.exec(
-    `SELECT p.name, p.image_path, p.habitat,
-            GROUP_CONCAT(pf.favorite_name, '|') as favorites_str
-     FROM pokemon p
-     LEFT JOIN pokemon_favorites pf ON p.id = pf.pokemon_id
-     ${whereClause}
-     GROUP BY p.id, p.name, p.image_path, p.habitat
-     ORDER BY p.name ASC`,
-    names ?? [],
-  )[0]
-  if (rows) {
-    for (const row of rows.values) {
-      const [name, imagePath, habitat, favoritesStr] = row as [string, string, string, string]
-      pokemonData[name] = {
-        image: imagePath || '',
-        favorites: favoritesStr ? favoritesStr.split('|') : [],
-        habitat: habitat || undefined,
-      }
+  // Lazy hydration: with a names list, hydrate only the selected set.
+  const selected = names ?? catalog.names
+  for (const name of selected) {
+    const detail = catalog.dataByName[name]
+    if (!detail) continue
+    pokemonData[name] = {
+      image: detail.image,
+      favorites: detail.favorites,
+      habitat: detail.habitat,
     }
   }
   return pokemonData
@@ -289,23 +233,8 @@ export async function getAggregatedIngredients(
   return Array.from(totals.values()).sort((a, b) => compareCodepoints(a.name, b.name))
 }
 
-export async function loadAdjacencyMap(): Promise<AdjacencyMap> {
-  const db = await getDb()
-  const adjacencyMap: AdjacencyMap = new Map()
-  const rows = db.exec(
-    `SELECT p1.name as pokemon_a, p2.name as pokemon_b, a.score
-     FROM adjacency a
-     JOIN pokemon p1 ON a.pokemon_a = p1.id
-     JOIN pokemon p2 ON a.pokemon_b = p2.id`,
-  )[0]
-  if (rows) {
-    for (const row of rows.values) {
-      const [pokemonA, pokemonB, score] = row as [string, string, number | null]
-      if (!adjacencyMap.has(pokemonA)) adjacencyMap.set(pokemonA, new Map())
-      if (!adjacencyMap.has(pokemonB)) adjacencyMap.set(pokemonB, new Map())
-      adjacencyMap.get(pokemonA)!.set(pokemonB, score)
-      adjacencyMap.get(pokemonB)!.set(pokemonA, score)
-    }
-  }
-  return adjacencyMap
+// Name kept for call-site stability; the return shape changed from the old
+// nested-Map AdjacencyMap to the flat typed-array AdjacencyData (AC.4).
+export function loadAdjacencyMap(): Promise<AdjacencyData> {
+  return loadAdjacencyData()
 }

@@ -19,33 +19,66 @@
  * Small houses (capacity 1) are never pre-assigned — they are filled in phase 3.
  */
 
-export type AdjacencyMap = Map<string, Map<string, number | null>>
+/**
+ * Flat, typed-array adjacency structure baked at build time (see
+ * scripts/build_data.mjs). Replaces the old nested-Map AdjacencyMap:
+ * structured-clones cheaply to the solver worker and lookups are O(1).
+ *
+ * matrix[a * size + b] holds the score between names[a] and names[b]:
+ *   -1  = hard exclusion (opposite habitat axis; cannot cohabitate)
+ *    0  = no edge (also the diagonal)
+ *   >0  = compatibility score (shared favorites + habitat bonus)
+ */
+export interface AdjacencyData {
+  names: string[] // index → pokemon name (ordered by pokemon id)
+  indexByName: Map<string, number> // name → index (built once, from names)
+  size: number
+  matrix: Int16Array
+}
+
+/**
+ * Look up the adjacency score between two pokemon by name.
+ * Returns null for hard exclusions (the -1 sentinel), a score otherwise.
+ * Pokemon absent from the baked data score 0 (no edge), matching
+ * buildSubMatrix's not-found behavior.
+ */
+export function getScore(adj: AdjacencyData, a: string, b: string): number | null {
+  const ia = adj.indexByName.get(a)
+  const ib = adj.indexByName.get(b)
+  if (ia === undefined || ib === undefined) return 0
+  const v = adj.matrix[ia * adj.size + ib]!
+  return v === -1 ? null : v
+}
 
 /**
  * Phase 0: Extract an N×N sub-matrix for the selected pokemon from the
- * adjacency map. This converts the global pokemon-name space into a local
+ * adjacency data. This converts the global pokemon-name space into a local
  * index space that the clustering functions operate on.
  *
  * subMatrix[i][j] = adjacency score between pokemonNames[i] and pokemonNames[j].
  * Pokemon not found in adjacency data get 0 for all their connections.
+ * The -1 exclusion sentinel is decoded back to null here (and again in
+ * getScore for the greedy path) because agglomerativeCluster4 /
+ * greedyMaxWeightMatching null-check semantics depend on null, not -1.
  */
 export function buildSubMatrix(
   pokemonNames: string[],
-  adjacency: AdjacencyMap,
+  adjacency: AdjacencyData,
 ): (number | null)[][] {
   const n = pokemonNames.length
   const matrix: (number | null)[][] = Array.from({ length: n }, () =>
     Array.from({ length: n }, (): number | null => 0),
   )
 
+  const indices = pokemonNames.map((name) => adjacency.indexByName.get(name))
   for (let i = 0; i < n; i++) {
-    const nameA = pokemonNames[i]!
-    const mapA = adjacency.get(nameA)
-    if (!mapA) continue
+    const idxA = indices[i]
+    if (idxA === undefined) continue
     for (let j = i + 1; j < n; j++) {
-      const nameB = pokemonNames[j]!
-      const raw = mapA.get(nameB)
-      const val = raw === undefined ? 0 : raw
+      const idxB = indices[j]
+      if (idxB === undefined) continue
+      const v = adjacency.matrix[idxA * adjacency.size + idxB]!
+      const val = v === -1 ? null : v
       matrix[i]![j] = val
       matrix[j]![i] = val
     }
@@ -403,7 +436,7 @@ function greedyFillRemaining(
   occupants: Map<string, string[]>,
   remainingCapacity: Map<string, number>,
   pokemonData: PokemonData,
-  adjacencyMap?: AdjacencyMap,
+  adjacencyData?: AdjacencyData,
 ): Map<string, string> {
   const result = new Map<string, string>()
   const pool = new Set(remaining)
@@ -415,19 +448,18 @@ function greedyFillRemaining(
     let bestHouseCapacity = -1
 
     for (const name of pool) {
-      const mapA = adjacencyMap?.get(name)
       for (const [houseId, cap] of remainingCapacity) {
         if (cap <= 0) continue
         let score = 0
         let incompatible = false
         for (const occupant of occupants.get(houseId) ?? []) {
-          if (adjacencyMap && mapA) {
-            const val = mapA.get(occupant)
+          if (adjacencyData) {
+            const val = getScore(adjacencyData, name, occupant)
             if (val === null) {
               incompatible = true
               break
             }
-            score += val ?? 0
+            score += val
           } else {
             score += countSharedFavorites(name, occupant, pokemonData)
           }
@@ -461,7 +493,7 @@ export async function solve(
   pokemonNames: string[],
   houses: HouseWithId[],
   pokemonData: PokemonData,
-  adjacencyMap?: AdjacencyMap,
+  adjacencyData?: AdjacencyData,
   pinnedAssignments?: Map<string, string[]>,
 ): Promise<SolverResult> {
   const numHouses = houses.length
@@ -547,7 +579,7 @@ export async function solve(
         occupants,
         remainingCapacity,
         pokemonData,
-        adjacencyMap,
+        adjacencyData,
       )
       for (const name of pinFillResult.keys()) {
         pinComplementAssigned.add(name)
@@ -562,13 +594,13 @@ export async function solve(
 
   // Phase 1+2: Cluster remaining unpinned pokemon into empty houses
   let preAssignments = new Map<string, string>()
-  if (adjacencyMap && unpinnedNames.length > 0) {
+  if (adjacencyData && unpinnedNames.length > 0) {
     const clusterNames = unpinnedNames.filter((n) => !pinComplementAssigned.has(n))
     const availableHouses: HouseWithId[] = houses
       .filter((h) => (remainingCapacity.get(h.id) ?? 0) > 0)
       .map((h) => ({ ...h, capacity: remainingCapacity.get(h.id)! }))
     if (clusterNames.length > 0) {
-      const subMatrix = buildSubMatrix(clusterNames, adjacencyMap)
+      const subMatrix = buildSubMatrix(clusterNames, adjacencyData)
       preAssignments = clusterPreAssign(clusterNames, availableHouses, subMatrix)
     }
   }
@@ -590,7 +622,7 @@ export async function solve(
     occupants,
     remainingCapacity,
     pokemonData,
-    adjacencyMap,
+    adjacencyData,
   )
 
   // Merge all assignments (occupants already reflects all placements; this map is used

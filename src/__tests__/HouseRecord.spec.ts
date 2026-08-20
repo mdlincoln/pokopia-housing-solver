@@ -1,16 +1,3 @@
-import { vi } from 'vitest'
-
-vi.mock('@/db', async () => {
-  const { default: initSqlJs } = await import('sql.js')
-  const { readFileSync } = await import('node:fs')
-  const { resolve } = await import('node:path')
-  const wasmPath = resolve(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm')
-  const SQL = await initSqlJs({ locateFile: () => wasmPath })
-  const dbPath = resolve(process.cwd(), 'public/pokehousing.sqlite')
-  const db = new SQL.Database(new Uint8Array(readFileSync(dbPath)))
-  return { getDb: async () => db }
-})
-
 import HouseRecord, { sameFavorites } from '@/components/HouseRecord.vue'
 import type { HouseAssignment, PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
