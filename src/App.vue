@@ -6,6 +6,9 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 
 const cartStore = useCartStore()
 
+// Stamped at build time by the `__BUILD_DATE__` define in vite.config.ts.
+const buildDate = __BUILD_DATE__
+
 // Busy-overlay flicker guard: only surface the overlay if the cart stays busy
 // for at least 150ms — fast mutations resolve without any flash.
 const showCartBusy = ref(false)
@@ -52,11 +55,9 @@ onBeforeUnmount(() => {
         </p>
         <p>
           Made for fun by <a href="https://matthewlincoln.net">Matt Lincoln</a>, drawing on crucial
-          datasets compiled by
-          <a href="https://pokopia-roommate-matchmaker.netlify.app">Pokopia Roommate Matchmaker</a>
-          and the
-          <a href="https://github.com/mdlincoln/PokopiaPlanning">PokopiaPlanning dataset</a>.
+          datasets compiled by <a href="https://www.serebii.net">serebii.net</a>.
         </p>
+        <p class="hero-updated mb-0" data-testid="last-updated">Last updated: {{ buildDate }}</p>
       </header>
       <main class="page-main">
         <RouterView />

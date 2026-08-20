@@ -21,6 +21,14 @@ describe('App', () => {
     expect(wrapper.text()).toContain('Pokopia Housing Solver')
   })
 
+  it('renders the build date in the hero card', () => {
+    const wrapper = mountApp()
+    const updated = wrapper.find('[data-testid="last-updated"]')
+    expect(updated.exists()).toBe(true)
+    expect(updated.text()).toContain('Last updated:')
+    expect(updated.text()).toMatch(/Last updated: \d{4}-\d{2}-\d{2}/)
+  })
+
   it('shows the cart-busy overlay only after 150ms of sustained busy, then clears', async () => {
     vi.useFakeTimers()
     const wrapper = mountApp()

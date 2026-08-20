@@ -45,6 +45,24 @@ test.describe('Homepage', () => {
     await expect(cards).toHaveCount(2)
   })
 
+  test('shows the build date in the hero card', async ({ page }) => {
+    await page.goto('/')
+    const updated = page.getByTestId('last-updated')
+    // Static hero element — default 2s expect timeout is enough (30s is only
+    // needed for async solver/WASM results like `results`).
+    await expect(updated).toBeVisible()
+    await expect(updated).toContainText('Last updated:')
+    const text = (await updated.textContent()) ?? ''
+    const rendered = text.match(/(\d{4}-\d{2}-\d{2})/)?.[1]
+    expect(rendered).toBeTruthy()
+    // Verify the date is actually current (not a stale literal): compare to
+    // the browser's own clock. Build and e2e run in the same CI workflow on
+    // the same UTC day in practice; ±1 day absorbs UTC-midnight crossings.
+    const today = new Date().toISOString().slice(0, 10)
+    const diffMs = Math.abs(Date.parse(rendered!) - Date.parse(today))
+    expect(diffMs).toBeLessThanOrEqual(86_400_000)
+  })
+
   test('displays unhoused pokemon when capacity is exceeded', async ({ page }) => {
     await page.goto('/')
 
