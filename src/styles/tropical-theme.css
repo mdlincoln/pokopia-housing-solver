@@ -668,6 +668,9 @@ body {
   line-height: 1.2;
   font-size: 0.78rem;
   flex-shrink: 0;
+  /* Keep the visual size compact while meeting a 24×24px hit area */
+  min-width: 1.5rem;
+  min-height: 1.5rem;
 }
 
 .cart-controls {
@@ -734,6 +737,31 @@ body {
     padding: var(--space-2) var(--space-3);
     flex-grow: 1;
   }
+}
+
+/* Floating cart toggle — visible only below lg (d-lg-none hides it at lg+).
+   Fixed bottom-end for one-handed reach; sits below the offcanvas backdrop
+   (z 1040) and is hidden while the cart overlay is open. */
+.cart-mobile-toggle {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 1030;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgb(22 86 104 / 35%);
+  font-weight: 600;
+}
+
+/* Orphaned cart groups: items kept for a house that no longer exists */
+.cart-house-group--orphan {
+  border: 1px dashed var(--bs-warning, #e8a33d);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  background: color-mix(in srgb, var(--bs-warning-bg-subtle, #fff3cd) 70%, transparent);
+}
+
+.cart-orphan-note {
+  color: var(--bs-warning-text-emphasis, #664d03);
 }
 
 /* Progress tracking */

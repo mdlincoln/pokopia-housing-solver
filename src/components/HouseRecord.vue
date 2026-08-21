@@ -275,6 +275,39 @@ watch(
 const sortBy = ref<BTableSortBy[]>([])
 const showCraftableOnly = ref(false)
 
+const recsDetails = ref<HTMLDetailsElement | null>(null)
+
+// Favorite-badge clicks (re-emitted by PokemonCard) route the user to the
+// items that fulfill that favorite: open the recommendations panel, latch the
+// lazy table mount, sort the matching coverage column to the top, and scroll
+// the panel into view. When every favorite is fulfilled the panel is absent
+// and there is nothing to route to — no-op.
+function onFavoriteClick(favorite: string) {
+  const details = recsDetails.value
+  if (!details) return
+
+  const key = favoriteCoverageColumnKey(favorite)
+  if (recommendationTableFields.value.some((f) => f.key === key)) {
+    sortBy.value = [{ key, order: 'desc' }]
+  }
+
+  details.open = true
+  // Setting .open programmatically does not reliably fire the toggle event in
+  // all environments, so latch the lazy table mount explicitly (mirrors
+  // onRecsToggle).
+  hasOpenedRecs.value = true
+
+  const reduceMotion =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (typeof details.scrollIntoView === 'function') {
+    details.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'nearest' })
+  }
+
+  // Land keyboard/screen-reader users in context; mouse users are unaffected.
+  details.querySelector('summary')?.focus()
+}
+
 const filteredTableItems = computed(() =>
   showCraftableOnly.value
     ? activeTableItems.value.filter((row) => row.itemData.isCraftable)
@@ -312,6 +345,11 @@ watchEffect(() => {
         type="button"
         role="checkbox"
         :aria-checked="pinStore.isHousePinned(house.houseId)"
+        :aria-label="
+          pinStore.isHousePinned(house.houseId)
+            ? `Unpin house ${house.houseId}`
+            : `Pin this house (${house.houseId}) so it stays put when re-solving`
+        "
         class="btn btn-link p-0 me-2 pin-icon"
         data-testid="progress-checkbox-house"
         @click="toggleHousePin"
@@ -348,6 +386,7 @@ watchEffect(() => {
         :checked="pinStore.isPokemonPinned(house.houseId, name)"
         :fulfilled-favorites="fulfilledFavorites"
         @toggle="pinStore.togglePokemonPin(house.houseId, name)"
+        @favorite-clicked="onFavoriteClick"
       />
     </BCardGroup>
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
@@ -357,8 +396,8 @@ watchEffect(() => {
         Items in cart
         <span
           class="cart-sync-badge"
-          title="These items appear in the sidebar cart. The 🏠 Placed stamp syncs between here and the cart."
-          >🛒 syncs with sidebar</span
+          title="These items appear in the shopping cart. The Placed stamp syncs between here and the cart."
+          >🛒 syncs with cart</span
         >
       </h6>
       <BTable
@@ -439,6 +478,8 @@ watchEffect(() => {
             size="sm"
             variant="outline-danger"
             data-testid="cart-coverage-remove"
+            :aria-label="`Remove ${(item as any).itemData.name} from house ${house.houseId} cart`"
+            :title="`Remove ${(item as any).itemData.name} from house ${house.houseId} cart`"
             @click="cartStore.removeItem(house.houseId, (item as any).itemData.name)"
             >&times;</BButton
           >
@@ -452,6 +493,7 @@ watchEffect(() => {
 
     <details
       v-if="activeTableItems.length"
+      ref="recsDetails"
       data-testid="recommended-items"
       class="mt-3 house-recommendations"
       @toggle="onRecsToggle"
@@ -484,6 +526,7 @@ watchEffect(() => {
               :class="
                 fulfilledFavorites.has(label as string) ? 'text-success fw-bold' : 'text-danger'
               "
+              :data-testid="`fav-header-${column}`"
             >
               {{ label }} &times;{{ (field as any).count }}
             </span>
@@ -519,6 +562,8 @@ watchEffect(() => {
             variant="outline-success"
             class="cart-add-btn"
             data-testid="add-to-cart"
+            :aria-label="`Add ${(item as any).itemData.name} to cart for house ${house.houseId}`"
+            :title="`Add ${(item as any).itemData.name} to cart for house ${house.houseId}`"
             @click="cartStore.addItem(house.houseId, (item as any).itemData.name)"
             >+</BButton
           >

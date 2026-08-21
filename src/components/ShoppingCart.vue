@@ -1,20 +1,88 @@
 <script setup lang="ts">
 import { assetPath } from '@/assetPath'
 import { useCartStore } from '@/stores/cart'
+import { useHouseStore } from '@/stores/houses'
 import { useProgressStore } from '@/stores/progress'
 import { BBadge, BButton, BListGroup, BListGroupItem, BOffcanvas } from 'bootstrap-vue-next'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const cart = useCartStore()
 const progressStore = useProgressStore()
+const houseStore = useHouseStore()
+
+// Below the lg breakpoint BOffcanvas responsive="lg" hides the sidebar entirely,
+// so a floating toggle reveals it as a slide-over. `showMobileCart` gates only
+// that below-lg overlay: desktop inline display is driven by the component's own
+// breakpoint matchMedia (`isOpenByBreakpoint`), not the model, so forcing `true`
+// at lg+ keeps desktop rendering identical to a model-less BOffcanvas. The
+// update handler fires on close-button / Esc / backdrop interactions.
+const showMobileCart = ref(false)
+
+// Query kept aligned with Bootstrap Vue Next's own smallerOrEqual('lg')
+// (max-width: 992px) to avoid a fractional-pixel boundary disagreement.
+const isBelowLg = ref(false)
+let mediaQuery: MediaQueryList | undefined
+
+function syncBreakpoint(event?: MediaQueryListEvent) {
+  isBelowLg.value = event ? event.matches : (mediaQuery?.matches ?? false)
+}
+
+onMounted(() => {
+  if (typeof window.matchMedia === 'function') {
+    mediaQuery = window.matchMedia('(max-width: 992px)')
+    syncBreakpoint()
+    mediaQuery.addEventListener('change', syncBreakpoint)
+  }
+})
+
+onBeforeUnmount(() => {
+  mediaQuery?.removeEventListener('change', syncBreakpoint)
+})
+
+const offcanvasId = 'shopping-cart-offcanvas'
+
+const cartToggleLabel = computed(
+  () => `Open shopping cart, ${cart.itemList.length} item${cart.itemList.length === 1 ? '' : 's'}`,
+)
+
+// Offcanvas close interactions (X / Esc / backdrop) surface as
+// update:modelValue(false). Per the ARIA dialog dismissal pattern, return
+// keyboard focus to the floating toggle when closing below lg — the toggle is
+// v-show-hidden until after the state flip, so focus on next tick.
+function onCartModelUpdate(open: boolean) {
+  showMobileCart.value = open
+  if (!open && isBelowLg.value) {
+    void nextTick(() => {
+      document.querySelector<HTMLElement>('[data-testid="cart-mobile-toggle"]')?.focus()
+    })
+  }
+}
+
+// Houses removed from the registry (counts reduced, or only present in a
+// restored legacy hash) keep their cart items — annotate rather than
+// auto-delete so user effort is preserved. Removal stays a user action.
+const liveHouseIds = computed(() => new Set(houseStore.registry.keys()))
+
+const ORPHAN_SIZE_LABEL: Record<string, string> = { S: 'small', M: 'medium', L: 'large' }
+
+function orphanNote(houseId: string): string {
+  const size = ORPHAN_SIZE_LABEL[houseId.charAt(0)]
+  return size
+    ? `Items are kept in case you re-add a ${size} house.`
+    : 'Items are kept in case you re-add this house.'
+}
 </script>
 
 <template>
   <BOffcanvas
+    :id="offcanvasId"
     responsive="lg"
     placement="end"
     title="Shopping Cart"
     class="cart-sidebar-panel"
     data-testid="shopping-cart"
+    :model-value="isBelowLg ? showMobileCart : true"
+    @update:model-value="onCartModelUpdate"
   >
     <template v-if="cart.itemList.length === 0">
       <p class="text-muted" data-testid="cart-empty">No items in cart.</p>
@@ -64,9 +132,19 @@ const progressStore = useProgressStore()
           v-for="[houseId, houseItems] in cart.itemsByHouse"
           :key="houseId"
           class="mb-3"
+          :class="{ 'cart-house-group--orphan': !liveHouseIds.has(houseId) }"
           data-testid="cart-house-group"
         >
           <h6 class="cart-house-heading">House {{ houseId }}</h6>
+          <p
+            v-if="!liveHouseIds.has(houseId)"
+            class="cart-orphan-note small mb-1"
+            data-testid="cart-orphan-note"
+            :title="orphanNote(houseId)"
+          >
+            ⚠ House {{ houseId }} no longer exists.
+            <span class="text-muted">{{ orphanNote(houseId) }}</span>
+          </p>
           <BListGroup flush>
             <BListGroupItem
               v-for="item in houseItems"
@@ -103,6 +181,8 @@ const progressStore = useProgressStore()
                       variant="outline-danger"
                       class="flex-shrink-0"
                       data-testid="cart-remove"
+                      :aria-label="`Remove ${item.name} from house ${item.houseId} cart`"
+                      :title="`Remove ${item.name} from house ${item.houseId} cart`"
                       @click="cart.removeItem(item.houseId, item.name)"
                       >&times;</BButton
                     >
@@ -166,4 +246,22 @@ const progressStore = useProgressStore()
       </div>
     </template>
   </BOffcanvas>
+
+  <!-- Floating toggle: only reachable below the lg breakpoint, where the
+       offcanvas sidebar is hidden entirely. Hidden while the overlay is open. -->
+  <BButton
+    v-show="!showMobileCart"
+    class="d-lg-none cart-mobile-toggle"
+    variant="primary"
+    data-testid="cart-mobile-toggle"
+    :aria-expanded="String(showMobileCart)"
+    :aria-controls="offcanvasId"
+    :aria-label="cartToggleLabel"
+    @click="showMobileCart = true"
+  >
+    🛒 Cart
+    <BBadge v-if="cart.itemList.length" variant="light" pill class="ms-1">{{
+      cart.itemList.length
+    }}</BBadge>
+  </BButton>
 </template>

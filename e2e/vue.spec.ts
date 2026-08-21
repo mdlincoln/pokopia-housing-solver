@@ -370,6 +370,106 @@ test.describe('Shopping Cart', () => {
     await expect(page.getByTestId('cart-empty')).toBeVisible({ timeout: 2000 })
     await expect(page.getByTestId('cart-items')).toBeHidden()
   })
+
+  // @lat: [[ui#ShoppingCart#Mobile toggle opens the cart below lg]]
+  test('shopping cart opens via floating toggle on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+
+    const toggle = page.getByTestId('cart-mobile-toggle')
+    await expect(toggle).toBeVisible()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+    // Cart content is unreachable without the toggle below the lg breakpoint
+    await expect(page.getByTestId('cart-empty')).toBeHidden()
+
+    await toggle.click()
+    await expect(page.getByTestId('shopping-cart')).toBeVisible()
+    await expect(page.getByTestId('cart-empty')).toBeVisible({ timeout: 2000 })
+    // Toggle hides while the overlay is open
+    await expect(toggle).toBeHidden()
+
+    // Close via the offcanvas close button — the toggle returns and the page
+    // stays usable
+    await page.getByTestId('shopping-cart').getByRole('button', { name: 'Close' }).click()
+    await expect(page.getByTestId('cart-empty')).toBeHidden()
+    await expect(toggle).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Show a sample island' })).toBeEnabled()
+  })
+
+  // @lat: [[ui#ShoppingCart#Mobile toggle hidden at desktop]]
+  test('mobile toggle is hidden and the sidebar stays inline at desktop width', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1200, height: 800 })
+    await page.goto('/')
+
+    await expect(page.getByTestId('cart-mobile-toggle')).toBeHidden()
+    await expect(page.getByTestId('cart-empty')).toBeVisible()
+  })
+
+  // @lat: [[ui#House#Favorite badge click opens and sorts recommendations]]
+  test('clicking a favorite badge opens and sorts recommendations', async ({ page }) => {
+    test.setTimeout(60_000)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Show a sample island' }).click()
+    await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
+
+    // With an empty cart every favorite is unfulfilled. Click the second danger
+    // badge (when available) so the assertion can't be satisfied by the panel's
+    // default sort column.
+    const houseCard = page.getByTestId('house-card').first()
+    const badges = houseCard.locator('[data-testid="fave-badge"].text-bg-danger')
+    const badgeCount = await badges.count()
+    expect(badgeCount).toBeGreaterThan(0)
+    const badge = badges.nth(Math.min(1, badgeCount - 1))
+    const favorite = (await badge.textContent())!.replace(/^[✗✓]\s*/, '').trim()
+    expect(favorite.length).toBeGreaterThan(0)
+
+    const details = houseCard.getByTestId('recommended-items')
+    await expect(details).toBeVisible()
+    expect(await details.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false)
+
+    await badge.click()
+
+    // Panel opens, table mounts, and the favorite's column sorts descending
+    expect(await details.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(true)
+    const header = houseCard.locator(
+      `th:has([data-testid="fav-header-fav_${favorite}"])`,
+    )
+    await expect(header).toHaveAttribute('aria-sort', 'descending')
+  })
+
+  // @lat: [[ui#ShoppingCart#Annotates cart items whose house no longer exists]]
+  test('cart keeps and annotates items whose house no longer exists', async ({ page }) => {
+    test.setTimeout(40_000)
+    await setupWithRecommendedItems(page)
+
+    // A small house keeps totalHouses > 0 after the medium house is removed —
+    // the solve watcher early-returns at 0 total houses before reconciling the
+    // registry, so an orphan only materializes while at least one house remains.
+    await setSpinbutton(page, 'house-small', 1)
+
+    // Re-solve reruns after the new small house; the medium house's panel stays
+    // open because its HouseRecord is keyed by stable house id.
+    await expect(page.getByTestId('recommended-items-list')).toBeVisible({ timeout: 5000 })
+
+    await page.getByTestId('add-to-cart').first().click()
+    await expect(page.getByTestId('cart-item')).toHaveCount(1, { timeout: 2000 })
+
+    // Remove the medium house — its cart group becomes orphaned
+    const mediumSpin = page.locator('#house-medium')
+    await mediumSpin.click()
+    await mediumSpin.press('ArrowDown')
+
+    await expect(page.getByTestId('cart-orphan-note')).toBeVisible({ timeout: 2000 })
+    await expect(page.getByTestId('cart-orphan-note')).toContainText('no longer exists')
+    await expect(page.getByTestId('cart-house-group')).toHaveClass(/cart-house-group--orphan/)
+
+    // Item controls still work: removing the orphan item restores the empty state
+    await page.getByTestId('cart-remove').first().click()
+    await expect(page.getByTestId('cart-empty')).toBeVisible({ timeout: 2000 })
+  })
 })
 
 test.describe('URL Hash Sharing', () => {

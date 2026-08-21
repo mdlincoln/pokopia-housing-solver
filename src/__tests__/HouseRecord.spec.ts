@@ -779,6 +779,130 @@ describe('HouseRecord', () => {
     const propAfter = wrapper.findComponent(pokemonCardStub).props('fulfilledFavorites')
     expect(propAfter).toBe(propBefore)
   })
+
+  it('house pin button exposes a state-aware accessible name (AC.2)', async () => {
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['AlphaOne'],
+    }
+
+    const wrapper = mount(HouseRecord, {
+      props: { house, pokemonData: testPokemonData },
+    })
+
+    const pin = wrapper.find('[data-testid="progress-checkbox-house"]')
+    expect(pin.attributes('aria-label')).toBe('Pin this house (S1) so it stays put when re-solving')
+    expect(pin.attributes('aria-checked')).toBe('false')
+
+    await pin.trigger('click')
+    expect(pin.attributes('aria-label')).toBe('Unpin house S1')
+    expect(pin.attributes('aria-checked')).toBe('true')
+  })
+
+  it('add-to-cart and cart-coverage-remove buttons expose item + house names (AC.4)', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const itemName = wrapper.find('[data-testid="item-name"]').text()
+    const addButton = wrapper.find('[data-testid="add-to-cart"]')
+    expect(addButton.attributes('aria-label')).toBe(`Add ${itemName} to cart for house S1`)
+
+    await addButton.trigger('click')
+    await flushPromises()
+
+    const removeButton = wrapper.find('[data-testid="cart-coverage-remove"]')
+    expect(removeButton.exists()).toBe(true)
+    expect(removeButton.attributes('aria-label')).toBe(`Remove ${itemName} from house S1 cart`)
+  })
+
+  it('clicking an unfulfilled favorite badge opens the panel sorted by that favorite (AC.3)', async () => {
+    // Equal counts sort alphabetically, so the default column is fav_cleanliness;
+    // clicking the 'exercise' badge must re-sort to fav_exercise.
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['cleanliness', 'exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+
+    const details = wrapper.find('[data-testid="recommended-items"]')
+    expect(details.exists()).toBe(true)
+    expect((details.element as HTMLDetailsElement).open).toBe(false)
+
+    const badges = wrapper.findAll('[data-testid="fave-badge"]')
+    const exerciseBadge = badges.find((b) => b.text().includes('exercise'))
+    expect(exerciseBadge).toBeDefined()
+    await exerciseBadge!.trigger('click')
+    await flushPromises()
+
+    expect((details.element as HTMLDetailsElement).open).toBe(true)
+
+    // The lazily mounted table must now exist
+    const table = wrapper.find('[data-testid="recommended-items-list"]')
+    expect(table.exists()).toBe(true)
+
+    const sortedHeaders = table.findAll('th[aria-sort="descending"]')
+    expect(sortedHeaders.length).toBe(1)
+    expect(sortedHeaders[0]!.find('[data-testid="fav-header-fav_exercise"]').exists()).toBe(true)
+  })
+
+  it('clicking a fulfilled favorite badge is a silent no-op when the panel is gone (AC.3)', async () => {
+    const errors: unknown[] = []
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, {
+      props: { house, pokemonData },
+      global: {
+        config: {
+          errorHandler(err: unknown) {
+            errors.push(err)
+          },
+        },
+      },
+    })
+    await flushPromises()
+
+    // Fulfill the only favorite — the recommendations panel disappears entirely
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', 'Punching Bag')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(false)
+
+    const badge = wrapper.find('[data-testid="fave-badge"]')
+    expect(badge.classes()).toContain('text-bg-success')
+    await badge.trigger('click')
+    await flushPromises()
+
+    expect(errors).toEqual([])
+    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(false)
+  })
 })
 
 describe('sameFavorites', () => {

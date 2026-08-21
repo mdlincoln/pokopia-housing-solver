@@ -141,4 +141,38 @@ describe('PokemonCard', () => {
       expect(badge.classes()).toContain('text-bg-success')
     }
   })
+
+  it('pin button exposes a state-aware accessible name (AC.2)', () => {
+    const unpinned = mount(PokemonCard, {
+      props: { name: 'Bulbasaur', image: 'test.png', favorites: [], checked: false },
+    })
+    const unpinnedPin = unpinned.find('[data-testid="progress-checkbox-pokemon"]')
+    expect(unpinnedPin.attributes('aria-label')).toBe('Pin Bulbasaur to this house')
+    expect(unpinnedPin.attributes('aria-checked')).toBe('false')
+
+    const pinned = mount(PokemonCard, {
+      props: { name: 'Bulbasaur', image: 'test.png', favorites: [], checked: true },
+    })
+    const pinnedPin = pinned.find('[data-testid="progress-checkbox-pokemon"]')
+    expect(pinnedPin.attributes('aria-label')).toBe('Unpin Bulbasaur')
+    expect(pinnedPin.attributes('aria-checked')).toBe('true')
+  })
+
+  it('re-emits favoriteClicked when a favorite badge is clicked (AC.3 wiring)', async () => {
+    const wrapper = mount(PokemonCard, {
+      props: { name: 'Bulbasaur', image: 'test.png', favorites: ['shiny stuff'] },
+    })
+
+    await wrapper.find('[data-testid="fave-badge"]').trigger('click')
+    expect(wrapper.emitted('favoriteClicked')).toEqual([['shiny stuff']])
+  })
+
+  it('re-emits favoriteClicked on keyboard activation of a badge', async () => {
+    const wrapper = mount(PokemonCard, {
+      props: { name: 'Bulbasaur', image: 'test.png', favorites: ['exercise'] },
+    })
+
+    await wrapper.find('[data-testid="fave-badge"]').trigger('keydown.enter')
+    expect(wrapper.emitted('favoriteClicked')).toEqual([['exercise']])
+  })
 })

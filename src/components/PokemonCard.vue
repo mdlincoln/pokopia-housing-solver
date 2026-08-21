@@ -44,6 +44,7 @@ const habitatVariant = computed(() =>
               type="button"
               role="checkbox"
               :aria-checked="checked"
+              :aria-label="checked ? `Unpin ${name}` : `Pin ${name} to this house`"
               class="btn btn-link p-0 me-1 pin-icon"
               data-testid="progress-checkbox-pokemon"
               @click="emit('toggle')"
@@ -64,6 +65,7 @@ const habitatVariant = computed(() =>
               :favorite="fav"
               :fulfilled="fulfilledFavorites?.has(fav) ?? false"
               data-testid="fave-badge"
+              @click="emit('favoriteClicked', fav)"
             />
           </div>
         </BCardBody>
