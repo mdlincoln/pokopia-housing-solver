@@ -559,4 +559,18 @@ describe('HomeView', () => {
     const saved = JSON.parse(call![1] as string)
     expect(saved[0].placedItems).toEqual(['S1:Apple'])
   })
+
+  // @lat: [[ui#HomeView#Saved Queries#Tolerates corrupt localStorage]]
+  it('tolerates corrupt localStorage without throwing and yields no saved queries', async () => {
+    // One-shot corrupt value; subsequent getItem calls fall back to the original
+    // implementation, so the corrupt mock does not leak into other tests.
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValueOnce('not-json{{')
+
+    // Must not throw — loadSavedQueries() catches the JSON.parse error and returns [].
+    const wrapper = await mountHome()
+
+    // With no saved queries the restore dropdown group is absent (no render crash).
+    expect(wrapper.find('#saved-queries-select').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="catalog-loading"]').exists()).toBe(false)
+  })
 })

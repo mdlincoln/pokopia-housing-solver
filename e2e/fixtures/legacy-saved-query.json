@@ -1,0 +1,49 @@
+{
+  "_comment": "Genuine legacy localStorage saved-query captured by driving the c016616 build (sql.js runtime queries against public/pokehousing.sqlite) in a throwaway git worktree. Capture flow: clicked \"Show a sample island\" (1 small / 3 medium / 2 large, 13 randomly-sampled pokemon), opened the L1 house's recommendations panel, added three recommended items (Gravestone, Bonfire, Antique Chest) to the cart, then clicked \"Save query\" with title \"Legacy capture\". `stored` is byte-for-byte what the old build returned from localStorage.getItem('pokehousing_saved_queries'); `decoded` is JSON.parse(stored), re-derived in tests (never trusted blindly). This is a v2 SavedQuery captured BEFORE the sql.js → baked-data migration — not a synthetic v1 legacy shape.",
+  "sourceCommit": "c01661681cb01dc28f47772b8a7791f7ea7a4dc2",
+  "capturedAt": "2026-08-21T02:11:04.413Z",
+  "stored": "[{\"title\":\"Legacy capture\",\"timestamp\":1787278264152,\"version\":2,\"small\":1,\"medium\":3,\"large\":2,\"pokemon\":[\"Jumpluff\",\"Pawmi\",\"Dartrix\",\"Arbok\",\"Aurorus\",\"Azumarill\",\"Dragapult\",\"Electabuzz\",\"Ceruledge\",\"Dusknoir\",\"Abra\",\"Drifloon\",\"Decidueye\"],\"cart\":[{\"houseId\":\"L1\",\"name\":\"Gravestone\"},{\"houseId\":\"L1\",\"name\":\"Bonfire\"},{\"houseId\":\"L1\",\"name\":\"Antique Chest\"}],\"checkedCartItems\":[],\"placedItems\":[],\"pinnedHouses\":[],\"pinnedPokemon\":[],\"houseRegistry\":[{\"id\":\"S1\",\"size\":\"small\"},{\"id\":\"M1\",\"size\":\"medium\"},{\"id\":\"M2\",\"size\":\"medium\"},{\"id\":\"M3\",\"size\":\"medium\"},{\"id\":\"L1\",\"size\":\"large\"},{\"id\":\"L2\",\"size\":\"large\"}],\"houseCounters\":{\"small\":1,\"medium\":3,\"large\":2}}]",
+  "decoded": [
+    {
+      "title": "Legacy capture",
+      "timestamp": 1787278264152,
+      "version": 2,
+      "small": 1,
+      "medium": 3,
+      "large": 2,
+      "pokemon": [
+        "Jumpluff",
+        "Pawmi",
+        "Dartrix",
+        "Arbok",
+        "Aurorus",
+        "Azumarill",
+        "Dragapult",
+        "Electabuzz",
+        "Ceruledge",
+        "Dusknoir",
+        "Abra",
+        "Drifloon",
+        "Decidueye"
+      ],
+      "cart": [
+        { "houseId": "L1", "name": "Gravestone" },
+        { "houseId": "L1", "name": "Bonfire" },
+        { "houseId": "L1", "name": "Antique Chest" }
+      ],
+      "checkedCartItems": [],
+      "placedItems": [],
+      "pinnedHouses": [],
+      "pinnedPokemon": [],
+      "houseRegistry": [
+        { "id": "S1", "size": "small" },
+        { "id": "M1", "size": "medium" },
+        { "id": "M2", "size": "medium" },
+        { "id": "M3", "size": "medium" },
+        { "id": "L1", "size": "large" },
+        { "id": "L2", "size": "large" }
+      ],
+      "houseCounters": { "small": 1, "medium": 3, "large": 2 }
+    }
+  ]
+}
