@@ -30,6 +30,7 @@ import type { BTableSortBy } from 'bootstrap-vue-next'
 import {
   BBadge,
   BButton,
+  BCloseButton,
   BCardGroup,
   BFormCheckbox,
   BListGroupItem,
@@ -158,7 +159,7 @@ function craftabilityText(item: ItemDetails): string {
 const cartTableFields = computed(() => [
   { key: 'col_image', label: '' },
   { key: 'name', label: 'Item', class: 'text-col' },
-  { key: 'col_actions', label: '' },
+  { key: 'col_placed', label: 'Placed' },
   ...(!fulfilledTags.value.has('Toy') ? [{ key: 'col_toy', label: 'Toy', class: 'bool-col' }] : []),
   ...(!fulfilledTags.value.has('Relaxation')
     ? [{ key: 'col_relaxation', label: 'Relaxation', class: 'bool-col' }]
@@ -172,6 +173,7 @@ const cartTableFields = computed(() => [
     class: 'bool-col',
     count: col.count,
   })),
+  { key: 'col_actions', label: '' },
 ])
 
 const activeTableItems = ref<TableItemRow[]>([])
@@ -467,7 +469,7 @@ watchEffect(() => {
           >
         </template>
 
-        <template #cell(col_actions)="{ item }">
+        <template #cell(col_placed)="{ item }">
           <label
             class="progress-action progress-action--placed progress-action--compact me-1"
             title="Mark as placed in this house — also syncs with sidebar cart"
@@ -480,15 +482,16 @@ watchEffect(() => {
             />
             <span>Placed</span>
           </label>
-          <BButton
-            size="sm"
-            variant="outline-danger"
+        </template>
+
+        <template #cell(col_actions)="{ item }">
+          <BCloseButton
+            class="item-remove"
             data-testid="cart-coverage-remove"
             :aria-label="`Remove ${(item as any).itemData.name} from house ${house.houseId} cart`"
             :title="`Remove ${(item as any).itemData.name} from house ${house.houseId} cart`"
             @click="cartStore.removeItem(house.houseId, (item as any).itemData.name)"
-            >&times;</BButton
-          >
+          />
         </template>
 
         <template #cell()="{ field, value }">

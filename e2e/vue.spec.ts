@@ -717,32 +717,57 @@ test.describe('Usability (P2 audit fixes)', () => {
   })
 
   // @lat: [[ui#HomeView#Accessibility#Pin and favorite controls meet 24px tap target]]
-  test('pin toggles and favorite badges meet the 24px minimum tap target', async ({ page }) => {
-    test.setTimeout(60_000)
+  // @lat: [[ui#HomeView#Accessibility#Cart remove controls meet 24px tap target]]
+  test('pin toggles, cart removes and favorite badges meet the 24px minimum tap target', async ({ page }) => {
+    test.setTimeout(90_000)
 
-    async function expectTapTargets(page: import('@playwright/test').Page) {
-      for (const [label, locator] of [
-        ['house pin', page.getByTestId('progress-checkbox-house').first()],
-        ['pokemon pin', page.getByTestId('progress-checkbox-pokemon').first()],
-        ['favorite badge', page.getByTestId('fave-badge').first()],
-      ] as const) {
-        await expect(locator).toBeVisible()
-        const box = await locator.boundingBox()
-        expect(box, `${label} must render`).not.toBeNull()
-        expect(box!.width, `${label} width must be ≥ 24px`).toBeGreaterThanOrEqual(24)
-        expect(box!.height, `${label} height must be ≥ 24px`).toBeGreaterThanOrEqual(24)
-      }
+    async function assertTapTarget(
+      page: import('@playwright/test').Page,
+      label: string,
+      locator: import('@playwright/test').Locator,
+    ) {
+      await expect(locator).toBeVisible()
+      const box = await locator.boundingBox()
+      expect(box, `${label} must render`).not.toBeNull()
+      expect(box!.width, `${label} width must be ≥ 24px`).toBeGreaterThanOrEqual(24)
+      expect(box!.height, `${label} height must be ≥ 24px`).toBeGreaterThanOrEqual(24)
     }
 
     await page.setViewportSize({ width: 1200, height: 800 })
-    await page.goto('/')
-    await page.getByRole('button', { name: 'Show a sample island' }).click()
-    await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
-    await expectTapTargets(page)
 
-    // Mobile width — controls keep their hit area
+    // Deterministic setup: known Bulbasaur+Ivysaur recommendations yield exactly
+    // one cart item and therefore both remove controls exist. Also supplies the
+    // house pin, pokemon pin, and favorite badge targets. (setupWithRecommendedItems
+    // is scoped to the Shopping Cart describe, so inline the same steps here.)
+    await page.goto('/')
+    await setSpinbutton(page, 'house-medium', 1)
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Ivysaur')
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+    const details = page.getByTestId('recommended-items')
+    await expect(details).toBeVisible()
+    await details.locator('summary').click()
+    await expect(page.getByTestId('recommended-items-list')).toBeVisible()
+    await page.getByTestId('add-to-cart').first().click()
+    await expect(page.getByTestId('cart-item')).toHaveCount(1, { timeout: 2000 })
+
+    await assertTapTarget(page, 'house pin', page.getByTestId('progress-checkbox-house').first())
+    await assertTapTarget(page, 'pokemon pin', page.getByTestId('progress-checkbox-pokemon').first())
+    await assertTapTarget(page, 'favorite badge', page.getByTestId('fave-badge').first())
+    // Desktop cart remove controls — also asserts AC.5 (visible at ≥992px)
+    await assertTapTarget(page, 'cart-remove', page.getByTestId('cart-remove').first())
+    await assertTapTarget(page, 'cart-coverage-remove', page.getByTestId('cart-coverage-remove').first())
+
+    // Mobile width — resize, state persists (no re-setup). House cards stay in
+    // main content; the cart sidebar is behind the overlay, so open it first.
     await page.setViewportSize({ width: 390, height: 844 })
-    await expectTapTargets(page)
+    const toggle = page.getByTestId('cart-mobile-toggle')
+    await expect(toggle).toBeVisible()
+    await toggle.click()
+    await expect(page.getByTestId('shopping-cart')).toBeVisible()
+
+    await assertTapTarget(page, 'cart-remove', page.getByTestId('cart-remove').first())
+    await assertTapTarget(page, 'cart-coverage-remove', page.getByTestId('cart-coverage-remove').first())
   })
 
   // @lat: [[ui#HomeView#Accessibility#Layout uses dynamic viewport units]]

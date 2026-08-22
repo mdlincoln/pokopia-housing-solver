@@ -316,6 +316,15 @@ body {
   inset: -0.75em;
 }
 
+/* Chips are the reference quiet-close control: keep them muted at rest, tint
+   the ✕ glyph solid danger on hover/focus for a consistent destructive
+   affordance. The ::after hit-area trick above is left untouched. */
+.favorite-pill .btn-close:hover,
+.favorite-pill .btn-close:focus-visible {
+  opacity: 1;
+  --bs-btn-close-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23ff7f72'%3e%3cpath d='M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414'/%3e%3c/svg%3e");
+}
+
 .pokemon-search {
   min-height: 2.65rem;
 }
@@ -710,6 +719,27 @@ body {
   border-bottom: 1px solid var(--trop-sand-100);
 }
 
+/* Shared quiet close control for removing a single cart item. Matching the
+   pokemon-chip ✕ convention: muted by default (Bootstrap's default opacity),
+   always visible, and the ✕ glyph recolors to solid danger on hover/focus.
+   Meets WCAG 2.5.8 with a real 24×24px bounding box. */
+.item-remove.btn-close {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  background-position: center;
+  flex-shrink: 0;
+}
+
+.item-remove.btn-close:hover,
+.item-remove.btn-close:focus-visible {
+  opacity: 1;
+  /* Override the black glyph SVG with a solid danger one (--trop-coral-500) */
+  --bs-btn-close-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23ff7f72'%3e%3cpath d='M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414'/%3e%3c/svg%3e");
+}
+
 /* At lg+: render inline as a sticky sidebar that fills the full viewport height */
 @media (min-width: 992px) {
   .cart-sidebar-panel.offcanvas-lg {
@@ -738,8 +768,10 @@ body {
     border-bottom: 1px solid var(--trop-ocean-300);
   }
 
-  /* No toggle means no close button is needed */
-  .cart-sidebar-panel.offcanvas-lg .btn-close {
+  /* The lg+ inline sidebar shows no offcanvas header close toggle; narrow the
+     hide rule to the offcanvas header so the cart's own .item-remove ✕ buttons
+     (also .btn-close) stay visible at desktop widths. */
+  .cart-sidebar-panel.offcanvas-lg .offcanvas-header .btn-close {
     display: none;
   }
 

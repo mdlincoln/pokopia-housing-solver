@@ -450,6 +450,39 @@ describe('HouseRecord', () => {
     expect(cartStore.itemsByHouse.get('S1') ?? []).toHaveLength(0)
   })
 
+  it('places the Placed checkbox and remove button in separate coverage cells (AC.2)', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const itemName = wrapper.find('[data-testid="item-name"]').text()
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', itemName)
+    await flushPromises()
+
+    const row = wrapper.find('[data-testid="cart-coverage-remove"]').element.closest('tr')
+    expect(row).not.toBeNull()
+
+    const placedCell = wrapper
+      .find('[data-testid="progress-checkbox-placed-coverage"]')
+      .element.closest('td')
+    const removeCell = wrapper.find('[data-testid="cart-coverage-remove"]').element.closest('td')
+    expect(placedCell).not.toBeNull()
+    expect(removeCell).not.toBeNull()
+    // Non-destructive placed toggles and destructive removal must not share a cell
+    expect(placedCell).not.toBe(removeCell)
+  })
+
   it('cart coverage table shows tag ✓ in the correct column for the item tag', async () => {
     // Punching Bag (exercise) has the Toy tag
     const pokemonData: PokemonData = {

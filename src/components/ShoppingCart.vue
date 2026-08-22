@@ -3,7 +3,14 @@ import { assetPath } from '@/assetPath'
 import { useCartStore } from '@/stores/cart'
 import { useHouseStore } from '@/stores/houses'
 import { useProgressStore } from '@/stores/progress'
-import { BBadge, BButton, BListGroup, BListGroupItem, BOffcanvas } from 'bootstrap-vue-next'
+import {
+  BBadge,
+  BButton,
+  BCloseButton,
+  BListGroup,
+  BListGroupItem,
+  BOffcanvas,
+} from 'bootstrap-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const cart = useCartStore()
@@ -186,16 +193,13 @@ function orphanNote(houseId: string): string {
                       }"
                       >{{ item.name }}</strong
                     >
-                    <BButton
-                      size="sm"
-                      variant="outline-danger"
-                      class="flex-shrink-0"
+                    <BCloseButton
+                      class="item-remove"
                       data-testid="cart-remove"
                       :aria-label="`Remove ${item.name} from house ${item.houseId} cart`"
                       :title="`Remove ${item.name} from house ${item.houseId} cart`"
                       @click="cart.removeItem(item.houseId, item.name)"
-                      >&times;</BButton
-                    >
+                    />
                   </div>
 
                   <div class="d-flex gap-1 flex-wrap mb-2">

@@ -166,3 +166,38 @@ describe('ShoppingCart orphaned house annotation (AC.5)', () => {
     expect(remove.attributes('aria-label')).toBe('Remove Punching Bag from house S2 cart')
   })
 })
+
+describe('ShoppingCart quiet-close class contracts', () => {
+  async function mountWithTwoItems() {
+    const cart = useCartStore()
+    await cart.restoreItems([
+      { houseId: 'L1', name: 'Punching Bag' },
+      { houseId: 'L1', name: 'Berry Pots' },
+    ])
+    await flushPromises()
+    const wrapper = await mountCart()
+    return { wrapper, cart }
+  }
+
+  it('renders cart-remove as a quiet btn-close item-remove button (AC.1)', async () => {
+    const { wrapper } = await mountWithTwoItems()
+    const remove = wrapper.find('[data-testid="cart-remove"]')
+    expect(remove.element.tagName).toBe('BUTTON')
+    expect(remove.classes()).toContain('btn-close')
+    expect(remove.classes()).toContain('item-remove')
+    expect(remove.classes()).not.toContain('btn-outline-danger')
+    expect(remove.classes()).not.toContain('btn-sm')
+    // aria-label is carried through to the rendered button by attr fallthrough
+    expect(remove.attributes('aria-label')).toContain('Remove')
+  })
+
+  it('keeps cart-clear as the sole loud outline-danger control (AC.4)', async () => {
+    const { wrapper } = await mountWithTwoItems()
+    const clear = wrapper.find('[data-testid="cart-clear"]')
+    expect(clear.element.tagName).toBe('BUTTON')
+    expect(clear.classes()).toContain('btn-outline-danger')
+    expect(clear.classes()).not.toContain('btn-close')
+    expect(clear.classes()).not.toContain('item-remove')
+    expect(clear.text()).toContain('Clear all')
+  })
+})
