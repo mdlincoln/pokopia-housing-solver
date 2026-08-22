@@ -24,7 +24,7 @@ import {
   BRow,
   BSpinner,
 } from 'bootstrap-vue-next'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 const cartStore = useCartStore()
 const houseStore = useHouseStore()
@@ -245,7 +245,58 @@ const savedQueries = ref<SavedQuery[]>(loadSavedQueries())
 const selectedTimestamp = ref<number | null>(null)
 const queryTitle = ref('')
 const showSaveModal = ref(false)
+const showManageModal = ref(false)
 const saveSuccess = ref(false)
+
+// Single-slot undo for saved-island deletions. A second deletion while the
+// undo alert is visible replaces the stash — acceptable for low-stakes
+// localStorage data, and deliberately keeps this from growing into a general
+// undo queue.
+const deletedUndo = ref<{ entry: SavedQuery; index: number } | null>(null)
+const UNDO_WINDOW_MS = 8000
+let undoTimer: ReturnType<typeof setTimeout> | undefined
+
+const deletedUndoTitle = computed(() => {
+  const stash = deletedUndo.value
+  if (!stash) return ''
+  return stash.entry.title || new Date(stash.entry.timestamp).toLocaleString()
+})
+
+function persistSavedQueries() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(savedQueries.value))
+}
+
+function deleteSaved(timestamp: number) {
+  const index = savedQueries.value.findIndex((q) => q.timestamp === timestamp)
+  if (index === -1) return
+  const entry = savedQueries.value[index]!
+  savedQueries.value.splice(index, 1)
+  persistSavedQueries()
+  // Restoring from the select is one-shot (selectedTimestamp watch); a deleted
+  // entry must not linger as the selected value or a later re-select of the
+  // same timestamp could trigger a stale restore.
+  if (selectedTimestamp.value === timestamp) {
+    selectedTimestamp.value = null
+  }
+  clearTimeout(undoTimer)
+  deletedUndo.value = { entry, index }
+  undoTimer = setTimeout(() => {
+    deletedUndo.value = null
+  }, UNDO_WINDOW_MS)
+}
+
+function undoDelete() {
+  clearTimeout(undoTimer)
+  const stash = deletedUndo.value
+  if (!stash) return
+  deletedUndo.value = null
+  savedQueries.value.splice(Math.min(stash.index, savedQueries.value.length), 0, stash.entry)
+  persistSavedQueries()
+}
+
+onUnmounted(() => {
+  clearTimeout(undoTimer)
+})
 
 function openSaveModal() {
   queryTitle.value = ''
@@ -267,11 +318,19 @@ function confirmSave() {
     ...houseStore.toSerializable(),
   }
   savedQueries.value = [entry, ...savedQueries.value]
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(savedQueries.value))
+  persistSavedQueries()
   saveSuccess.value = true
   setTimeout(() => {
     saveSuccess.value = false
   }, 3000)
+}
+
+// Enter in the modal title input saves and closes exactly once. The modal's
+// own @ok handler still fires for button clicks; closing explicitly here
+// prevents the modal from also treating Enter as a default action.
+function onSaveEnter() {
+  confirmSave()
+  showSaveModal.value = false
 }
 
 async function restoreState(query: SharedState) {
@@ -466,6 +525,12 @@ defineExpose({
   queryTitle,
   confirmSave,
   selectedTimestamp,
+  savedQueries,
+  showSaveModal,
+  showManageModal,
+  deleteSaved,
+  undoDelete,
+  onSaveEnter,
 })
 </script>
 
@@ -478,7 +543,7 @@ defineExpose({
     aria-live="polite"
   >
     <BSpinner />
-    <p>{{ restoringQuery ? 'Restoring saved query…' : 'Loading catalog…' }}</p>
+    <p>{{ restoringQuery ? 'Restoring saved island…' : 'Loading catalog…' }}</p>
   </div>
 
   <div v-if="!showCatalogLoading" class="home-theme content-stack">
@@ -529,18 +594,36 @@ defineExpose({
         :disabled="pokemonNames.length === 0"
         @click="openSaveModal"
       >
-        Save query
+        Save island
       </BButton>
-      (this is saved in local browser storage. None of the data leaves your computer.)
+      <small class="text-muted">Saved to this browser only — nothing leaves your computer.</small>
     </div>
 
     <BAlert v-if="saveSuccess" variant="success" :model-value="true" class="mb-3 status-alert">
-      Query saved successfully.
+      Island saved.
+    </BAlert>
+
+    <BAlert
+      v-if="deletedUndo"
+      variant="warning"
+      :model-value="true"
+      class="mb-3 status-alert"
+      data-testid="saved-query-deleted"
+    >
+      Deleted "{{ deletedUndoTitle }}".
+      <BButton
+        size="sm"
+        variant="outline-dark"
+        class="ms-2"
+        data-testid="saved-query-undo"
+        @click="undoDelete"
+        >Undo</BButton
+      >
     </BAlert>
 
     <BModal
       v-model="showSaveModal"
-      title="Save query"
+      title="Save island"
       ok-title="Save"
       ok-variant="primary"
       cancel-variant="secondary"
@@ -551,30 +634,73 @@ defineExpose({
           id="query-title-input"
           v-model="queryTitle"
           placeholder="e.g. My island layout"
+          @keydown.enter.prevent="onSaveEnter"
         />
       </BFormGroup>
     </BModal>
 
     <BFormGroup
       v-if="savedQueries.length"
-      label="Restore saved query"
+      label="Saved islands"
       label-for="saved-queries-select"
       class="mb-3"
     >
-      <BFormSelect
-        id="saved-queries-select"
-        v-model="selectedTimestamp"
-        :options="[
-          { value: null, text: 'Select a saved query…' },
-          ...savedQueries.map((q) => ({
-            value: q.timestamp,
-            text: q.title
-              ? `${q.title} (${new Date(q.timestamp).toLocaleString()})`
-              : new Date(q.timestamp).toLocaleString(),
-          })),
-        ]"
-      />
+      <div class="d-flex gap-2 align-items-start flex-wrap">
+        <BFormSelect
+          id="saved-queries-select"
+          v-model="selectedTimestamp"
+          class="flex-grow-1"
+          :options="[
+            { value: null, text: 'Select a saved island…' },
+            ...savedQueries.map((q) => ({
+              value: q.timestamp,
+              text: q.title
+                ? `${q.title} (${new Date(q.timestamp).toLocaleString()})`
+                : new Date(q.timestamp).toLocaleString(),
+            })),
+          ]"
+        />
+        <BButton
+          variant="outline-secondary"
+          data-testid="saved-queries-manage"
+          @click="showManageModal = true"
+        >
+          Manage saved islands
+        </BButton>
+      </div>
     </BFormGroup>
+
+    <BModal
+      v-model="showManageModal"
+      title="Saved islands"
+      data-testid="saved-queries-modal"
+      hide-footer
+    >
+      <p v-if="!savedQueries.length" class="text-muted mb-0">No saved islands.</p>
+      <ul v-else class="list-group">
+        <li
+          v-for="q in savedQueries"
+          :key="q.timestamp"
+          class="list-group-item d-flex justify-content-between align-items-center gap-2"
+        >
+          <span>
+            {{ q.title || new Date(q.timestamp).toLocaleString() }}
+            <span v-if="q.title" class="text-muted"
+              >({{ new Date(q.timestamp).toLocaleString() }})</span
+            >
+          </span>
+          <BButton
+            size="sm"
+            variant="outline-danger"
+            data-testid="saved-query-delete"
+            :aria-label="`Delete saved island ${q.title || new Date(q.timestamp).toLocaleString()}`"
+            @click="deleteSaved(q.timestamp)"
+          >
+            Delete
+          </BButton>
+        </li>
+      </ul>
+    </BModal>
 
     <BSpinner v-if="loading" class="my-3" />
   </div>
@@ -603,7 +729,8 @@ defineExpose({
       data-testid="unhoused"
       class="mt-3"
     >
-      <h5 class="alert-heading">Unhoused</h5>
+      <h5 class="alert-heading">Not enough housing</h5>
+      <p class="mb-1">Add houses above to place these Pokémon:</p>
       <ul class="mb-0">
         <li v-for="name in result!.unhoused" :key="name">{{ name }}</li>
       </ul>

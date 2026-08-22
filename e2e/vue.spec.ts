@@ -122,23 +122,27 @@ test.describe('Homepage', () => {
   })
 
   // @lat: [[ui#HomeView#Saved Queries#Shows success alert after save]]
-  test('shows success alert after saving a query', async ({ page }) => {
+  // @lat: [[ui#HomeView#Saved Queries#Save modal submits on Enter]]
+  test('shows success alert after saving an island by pressing Enter', async ({ page }) => {
     test.setTimeout(8000)
     await page.goto('/')
 
     await setSpinbutton(page, 'house-small', 1)
 
-    await page.getByRole('button', { name: 'Save query' }).click()
-    const modal = page.getByRole('dialog', { name: 'Save query' })
+    await page.getByRole('button', { name: 'Save island' }).click()
+    const modal = page.getByRole('dialog', { name: 'Save island' })
     await expect(modal).toBeVisible({ timeout: 2000 })
 
-    const saveBtn = modal.getByRole('button', { name: 'Save' })
-    await expect(saveBtn).toBeEnabled({ timeout: 2000 })
-    await saveBtn.click()
+    // Enter in the title field saves exactly once and closes the modal.
+    await modal.locator('#query-title-input').press('Enter')
     await expect(modal).toBeHidden({ timeout: 2000 })
 
-    await expect(page.getByText('Query saved successfully.')).toBeVisible({ timeout: 2000 })
-    await expect(page.getByText('Query saved successfully.')).toBeHidden({ timeout: 5000 })
+    await expect(page.getByText('Island saved.')).toBeVisible({ timeout: 2000 })
+    await expect(page.getByText('Island saved.')).toBeHidden({ timeout: 5000 })
+
+    // Exactly one entry was saved — no double fire from Enter + modal OK.
+    const stored = await page.evaluate(() => localStorage.getItem('pokehousing_saved_queries'))
+    expect(JSON.parse(stored!)).toHaveLength(1)
   })
 
   test('displays shared habitat badge on house card', async ({ page }) => {
@@ -213,11 +217,11 @@ test.describe('Homepage', () => {
     await expect(details).toBeVisible()
     await details.locator('summary').click()
 
-    // A craftable item's craftability cell should include "Craftable - {category}"
+    // A craftable item's craftability cell should include "Craftable ({category})"
     const craftableCells = page.getByTestId('item-craftability').filter({ hasText: /^Craftable/ })
     await expect(craftableCells.first()).toBeVisible({ timeout: 5000 })
     const text = await craftableCells.first().textContent()
-    expect(text?.trim()).toMatch(/^Craftable - \S/)
+    expect(text?.trim()).toMatch(/^Craftable \(\S/)
   })
 
   test('page body does not have overflow:hidden on fresh load at desktop width', async ({ page }) => {
@@ -659,5 +663,100 @@ test.describe('Pinning', () => {
     // The small house input should have min=1 now
     const smallInput = page.locator('#house-small')
     await expect(smallInput).toHaveAttribute('aria-valuemin', '1')
+  })
+})
+
+test.describe('Usability (P2 audit fixes)', () => {
+  // @lat: [[ui#HomeView#Saved Queries#Deletes saved island with undo]]
+  test('saved islands can be deleted from the manage modal and undone', async ({ page }) => {
+    test.setTimeout(15_000)
+    await page.goto('/')
+
+    // Save a titled island via the modal
+    await page.getByRole('button', { name: 'Save island' }).click()
+    const saveModal = page.getByRole('dialog', { name: 'Save island' })
+    await expect(saveModal).toBeVisible({ timeout: 2000 })
+    await saveModal.locator('#query-title-input').fill('Undo test island')
+    await saveModal.locator('#query-title-input').press('Enter')
+    await expect(page.getByText('Island saved.')).toBeVisible({ timeout: 2000 })
+
+    // Open the manage modal and delete the entry
+    await page.getByTestId('saved-queries-manage').click()
+    const manageModal = page.getByRole('dialog', { name: 'Saved islands' })
+    await expect(manageModal).toBeVisible({ timeout: 2000 })
+    await expect(manageModal.getByText('Undo test island')).toBeVisible()
+
+    await manageModal.getByTestId('saved-query-delete').click()
+    await expect(manageModal.getByText('No saved islands.')).toBeVisible()
+    const afterDelete = await page.evaluate(() => localStorage.getItem('pokehousing_saved_queries'))
+    expect(JSON.parse(afterDelete!)).toEqual([])
+
+    // Close the manage modal (header ✕) — the undo alert sits behind it
+    await manageModal.getByRole('button', { name: 'Close' }).click()
+    await expect(manageModal).toBeHidden({ timeout: 2000 })
+
+    const deletedAlert = page.getByTestId('saved-query-deleted')
+    await expect(deletedAlert).toBeVisible()
+    await expect(deletedAlert).toContainText('Undo test island')
+
+    // Deleting the only entry hides the restore select
+    await expect(page.locator('#saved-queries-select')).toHaveCount(0)
+
+    // Undo re-inserts the entry and re-persists it
+    await page.getByTestId('saved-query-undo').click()
+    await expect(deletedAlert).toBeHidden()
+    const afterUndo = await page.evaluate(() => localStorage.getItem('pokehousing_saved_queries'))
+    expect(JSON.parse(afterUndo!)).toHaveLength(1)
+    expect(JSON.parse(afterUndo!)[0].title).toBe('Undo test island')
+
+    // The restored entry survives a reload
+    await page.reload()
+    await expect(page.locator('#saved-queries-select')).toContainText('Undo test island', {
+      timeout: 30_000,
+    })
+  })
+
+  // @lat: [[ui#HomeView#Accessibility#Pin and favorite controls meet 24px tap target]]
+  test('pin toggles and favorite badges meet the 24px minimum tap target', async ({ page }) => {
+    test.setTimeout(60_000)
+
+    async function expectTapTargets(page: import('@playwright/test').Page) {
+      for (const [label, locator] of [
+        ['house pin', page.getByTestId('progress-checkbox-house').first()],
+        ['pokemon pin', page.getByTestId('progress-checkbox-pokemon').first()],
+        ['favorite badge', page.getByTestId('fave-badge').first()],
+      ] as const) {
+        await expect(locator).toBeVisible()
+        const box = await locator.boundingBox()
+        expect(box, `${label} must render`).not.toBeNull()
+        expect(box!.width, `${label} width must be ≥ 24px`).toBeGreaterThanOrEqual(24)
+        expect(box!.height, `${label} height must be ≥ 24px`).toBeGreaterThanOrEqual(24)
+      }
+    }
+
+    await page.setViewportSize({ width: 1200, height: 800 })
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Show a sample island' }).click()
+    await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
+    await expectTapTargets(page)
+
+    // Mobile width — controls keep their hit area
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expectTapTargets(page)
+  })
+
+  // @lat: [[ui#HomeView#Accessibility#Layout uses dynamic viewport units]]
+  test('body min-height tracks the dynamic viewport height', async ({ page }) => {
+    test.setTimeout(15_000)
+    await page.goto('/')
+    await expect(page.getByRole('button', { name: 'Clear all' })).toBeVisible({ timeout: 10_000 })
+
+    const { minHeight, viewport } = await page.evaluate(() => ({
+      minHeight: parseFloat(getComputedStyle(document.body).minHeight),
+      viewport: window.innerHeight,
+    }))
+    // 100dvh resolves to the dynamic viewport height in Chromium; allow
+    // sub-pixel/scrollbar slack.
+    expect(minHeight).toBeGreaterThanOrEqual(0.9 * viewport)
   })
 })

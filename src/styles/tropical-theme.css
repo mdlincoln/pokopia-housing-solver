@@ -48,6 +48,9 @@
 
 body {
   min-height: 100vh;
+  /* Dynamic viewport height: keeps min-height stable as mobile browser chrome
+     shows/hides. Declared after 100vh so dvh-capable browsers override. */
+  min-height: 100dvh;
   font-family: var(--trop-body-font);
   font-size: 1rem;
   line-height: 1.45;
@@ -272,6 +275,11 @@ body {
 }
 
 .favorite-pill {
+  /* WCAG 2.5.8 minimum tap target: 24×24 CSS px */
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  min-height: 24px;
   background: linear-gradient(135deg, rgb(124 216 232 / 24%) 0%, rgb(255 179 168 / 30%) 100%);
   color: #20596c;
   border: 1px solid rgb(43 169 190 / 32%);
@@ -292,10 +300,20 @@ body {
 }
 
 .favorite-pill .btn-close {
+  position: relative;
   width: 0.6em;
   height: 0.6em;
   border-radius: 999px;
   box-shadow: inset 0 0 0 1px rgb(42 108 129 / 24%);
+}
+
+/* WCAG 2.5.8: the select-chip ✕ glyph is ~10px; expand its hit area to
+   ≥24×24 CSS px (0.6em glyph + 2×0.75em) without any visual change — the
+   ::after box is hit-testable as part of the button. */
+.favorite-pill .btn-close::after {
+  content: '';
+  position: absolute;
+  inset: -0.75em;
 }
 
 .pokemon-search {
@@ -698,7 +716,9 @@ body {
     --bs-offcanvas-width: 300px;
     position: sticky !important;
     top: 0;
+    /* 100vh fallback for older browsers; dvh follows dynamic browser chrome */
     height: 100vh;
+    height: 100dvh;
     flex-shrink: 0;
     /* Column layout so header stays fixed and body scrolls */
     display: flex !important;
@@ -771,6 +791,12 @@ body {
 }
 
 .pin-icon {
+  /* WCAG 2.5.8 minimum tap target: 24×24 CSS px, centered around the icon */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
   color: inherit;
   text-decoration: none;
 }

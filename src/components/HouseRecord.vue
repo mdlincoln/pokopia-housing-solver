@@ -152,7 +152,7 @@ const recommendationTableFields = computed(() => [
 ])
 
 function craftabilityText(item: ItemDetails): string {
-  return item.isCraftable ? `Craftable - ${item.category ?? ''}`.trimEnd() : 'Buy'
+  return item.isCraftable ? (item.category ? `Craftable (${item.category})` : 'Craftable') : 'Buy'
 }
 
 const cartTableFields = computed(() => [
@@ -433,6 +433,12 @@ watchEffect(() => {
               {{ label }}
             </span>
           </template>
+          <template v-else-if="column === 'col_image'"
+            ><span class="visually-hidden">Item image</span></template
+          >
+          <template v-else-if="column === 'col_actions'"
+            ><span class="visually-hidden">Actions</span></template
+          >
           <template v-else
             ><span>{{ label }}</span></template
           >
@@ -542,6 +548,12 @@ watchEffect(() => {
               {{ label }}
             </span>
           </template>
+          <template v-else-if="column === 'col_image'"
+            ><span class="visually-hidden">Item image</span></template
+          >
+          <template v-else-if="column === 'col_actions'"
+            ><span class="visually-hidden">Actions</span></template
+          >
           <template v-else
             ><span>{{ label }}</span></template
           >

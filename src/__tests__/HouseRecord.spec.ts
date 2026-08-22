@@ -343,7 +343,39 @@ describe('HouseRecord', () => {
     await openRecommendations(wrapper)
 
     // Punching Bag's craftability text includes its category.
-    expect(craftabilityOf(wrapper, 'Punching Bag')).toContain('Outdoor')
+    expect(craftabilityOf(wrapper, 'Punching Bag')).toBe('Craftable (Outdoor)')
+  })
+
+  it('exposes screen-reader names for the visually empty image/actions columns in both tables', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['exercise'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const recsHeaders = wrapper.findAll(
+      '[data-testid="recommended-items-list"] th span.visually-hidden',
+    )
+    expect(recsHeaders.map((h) => h.text()).sort()).toEqual(['Actions', 'Item image'])
+
+    const itemName = wrapper.find('[data-testid="item-name"]').text()
+    const cartStore = useCartStore()
+
+    await cartStore.addItem('S1', itemName)
+    await flushPromises()
+
+    const coverageHeaders = wrapper.findAll(
+      '[data-testid="cart-coverage-table"] th span.visually-hidden',
+    )
+    expect(coverageHeaders.map((h) => h.text()).sort()).toEqual(['Actions', 'Item image'])
   })
 
   it('cart coverage table is hidden when cart is empty', async () => {

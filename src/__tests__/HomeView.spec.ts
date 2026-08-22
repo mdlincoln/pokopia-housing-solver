@@ -189,7 +189,7 @@ describe('HomeView', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="catalog-loading"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Restoring saved query…')
+    expect(wrapper.text()).toContain('Restoring saved island…')
 
     resolveHydrate({ AlphaOne: testPokemonData.AlphaOne })
     await flushPromises()
@@ -572,5 +572,170 @@ describe('HomeView', () => {
     // With no saved queries the restore dropdown group is absent (no render crash).
     expect(wrapper.find('#saved-queries-select').exists()).toBe(false)
     expect(wrapper.find('[data-testid="catalog-loading"]').exists()).toBe(false)
+  })
+
+  it('explains why pokemon are unhoused and what to do about it', async () => {
+    const solverResult: SolverResult = {
+      houses: [{ houseId: 'S1', size: 'small', capacity: 1, pokemon: ['AlphaOne'] }],
+      unhoused: ['AlphaTwo', 'BetaOne'],
+    }
+    mockSolve.mockResolvedValueOnce(solverResult)
+
+    const wrapper = await mountHome()
+    wrapper.vm.small = 1
+    wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo', 'BetaOne']
+    await flushPromises()
+
+    const banner = wrapper.find('[data-testid="unhoused"]')
+    expect(banner.exists()).toBe(true)
+    expect(banner.text()).toContain('Not enough housing')
+    expect(banner.text()).toContain('Add houses above')
+    expect(banner.findAll('li')).toHaveLength(2)
+  })
+
+  it('uses island vocabulary for the save/restore UI', async () => {
+    const entry = {
+      title: 'Vocab',
+      timestamp: 1700000000021,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['AlphaOne'],
+    }
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([entry]))
+
+    const wrapper = await mountHome()
+
+    const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save island')
+    expect(saveButton).toBeDefined()
+    expect(wrapper.find('[data-testid="saved-queries-manage"]').exists()).toBe(true)
+    const select = wrapper.find('#saved-queries-select')
+    expect(select.html()).toContain('Select a saved island…')
+    // The storage notice is sentence-case muted text, not a bare parenthetical.
+    const notice = wrapper.find('.action-row small.text-muted')
+    expect(notice.exists()).toBe(true)
+    expect(notice.text()).toBe('Saved to this browser only — nothing leaves your computer.')
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#Deletes saved island with undo]]
+  it('deletes a saved island and undo re-inserts it at the original index', async () => {
+    const older = {
+      title: 'First',
+      timestamp: 1700000000022,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['AlphaOne'],
+    }
+    const newer = {
+      title: 'Second',
+      timestamp: 1700000000023,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['AlphaTwo'],
+    }
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([newer, older]))
+    const setItem = vi.spyOn(Storage.prototype, 'setItem')
+
+    const wrapper = await mountHome()
+    wrapper.vm.deleteSaved(older.timestamp)
+    await nextTick()
+
+    expect(wrapper.vm.savedQueries.map((q) => q.timestamp)).toEqual([newer.timestamp])
+    const deletedAlert = wrapper.find('[data-testid="saved-query-deleted"]')
+    expect(deletedAlert.exists()).toBe(true)
+    expect(deletedAlert.text()).toContain('First')
+
+    const writes = () => setItem.mock.calls.filter(([key]) => key === 'pokehousing_saved_queries')
+
+    let lastWrite = writes()[writes().length - 1]![1] as string
+    expect(JSON.parse(lastWrite).map((q: { timestamp: number }) => q.timestamp)).toEqual([
+      newer.timestamp,
+    ])
+
+    wrapper.vm.undoDelete()
+    await nextTick()
+
+    expect(wrapper.vm.savedQueries.map((q) => q.timestamp)).toEqual([
+      newer.timestamp,
+      older.timestamp,
+    ])
+    expect(wrapper.find('[data-testid="saved-query-deleted"]').exists()).toBe(false)
+
+    lastWrite = writes()[writes().length - 1]![1] as string
+    expect(JSON.parse(lastWrite).map((q: { timestamp: number }) => q.timestamp)).toEqual([
+      newer.timestamp,
+      older.timestamp,
+    ])
+  })
+
+  it('hides the saved-islands select when the last entry is deleted', async () => {
+    const entry = {
+      title: 'Last one',
+      timestamp: 1700000000024,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['AlphaOne'],
+    }
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([entry]))
+
+    const wrapper = await mountHome()
+    expect(wrapper.find('#saved-queries-select').exists()).toBe(true)
+
+    wrapper.vm.deleteSaved(entry.timestamp)
+    await nextTick()
+
+    expect(wrapper.find('#saved-queries-select').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="saved-queries-manage"]').exists()).toBe(false)
+  })
+
+  it('closes the undo window after 8 seconds', async () => {
+    const entry = {
+      title: 'Expiring',
+      timestamp: 1700000000025,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['AlphaOne'],
+    }
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([entry]))
+    const setItem = vi.spyOn(Storage.prototype, 'setItem')
+
+    const wrapper = await mountHome()
+    vi.useFakeTimers()
+    try {
+      wrapper.vm.deleteSaved(entry.timestamp)
+      await nextTick()
+      expect(wrapper.find('[data-testid="saved-query-deleted"]').exists()).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(8000)
+
+      expect(wrapper.find('[data-testid="saved-query-deleted"]').exists()).toBe(false)
+      expect(wrapper.vm.savedQueries).toEqual([])
+      // The deletion was persisted at delete time; the lapsed undo window is
+      // only about the on-screen affordance.
+      const lastWrites = setItem.mock.calls.filter(([key]) => key === 'pokehousing_saved_queries')
+      const lastWrite = lastWrites[lastWrites.length - 1]![1] as string
+      expect(JSON.parse(lastWrite)).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // @lat: [[ui#HomeView#Saved Queries#Save modal submits on Enter]]
+  it('pressing Enter in the save modal saves exactly once and closes the modal', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue('[]')
+
+    const wrapper = await mountHome()
+    wrapper.vm.queryTitle = 'Enter save'
+    wrapper.vm.showSaveModal = true
+    wrapper.vm.onSaveEnter()
+    await nextTick()
+
+    expect(wrapper.vm.savedQueries).toHaveLength(1)
+    expect(wrapper.vm.savedQueries[0]).toMatchObject({ title: 'Enter save' })
+    expect(wrapper.vm.showSaveModal).toBe(false)
   })
 })
