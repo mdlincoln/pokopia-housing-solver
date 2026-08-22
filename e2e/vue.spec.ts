@@ -219,6 +219,39 @@ test.describe('Homepage', () => {
     const text = await craftableCells.first().textContent()
     expect(text?.trim()).toMatch(/^Craftable - \S/)
   })
+
+  test('page body does not have overflow:hidden on fresh load at desktop width', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 800 })
+    await page.goto('/')
+    await expect(page.getByRole('button', { name: 'Clear all' })).toBeVisible({ timeout: 10_000 })
+    const bodyOverflow = await page.evaluate(() => document.body.style.overflow)
+    expect(bodyOverflow).not.toBe('hidden')
+  })
+
+  test('page is scrollable after loading a sample island at desktop width', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 800 })
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Show a sample island' }).click()
+    await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
+
+    // The page must be tall enough to need scrolling
+    const { scrollHeight, innerHeight } = await page.evaluate(() => ({
+      scrollHeight: document.body.scrollHeight,
+      innerHeight: window.innerHeight,
+    }))
+    expect(scrollHeight).toBeGreaterThan(innerHeight)
+
+    // body must NOT have overflow:hidden
+    const bodyOverflow = await page.evaluate(() => document.body.style.overflow)
+    expect(bodyOverflow).not.toBe('hidden')
+
+    // The page must actually scroll — use mouse.wheel which reliably
+    // triggers native scrolling regardless of focus state
+    await page.mouse.wheel(0, 100)
+    await page.waitForTimeout(200)
+    const scrollY = await page.evaluate(() => window.scrollY)
+    expect(scrollY).toBeGreaterThan(0)
+  })
 })
 
 test.describe('Progress Tracking', () => {
@@ -389,12 +422,20 @@ test.describe('Shopping Cart', () => {
     // Toggle hides while the overlay is open
     await expect(toggle).toBeHidden()
 
+    // Body scroll is locked while the overlay is open
+    const overflowWhileOpen = await page.evaluate(() => document.body.style.overflow)
+    expect(overflowWhileOpen).toBe('hidden')
+
     // Close via the offcanvas close button — the toggle returns and the page
     // stays usable
     await page.getByTestId('shopping-cart').getByRole('button', { name: 'Close' }).click()
     await expect(page.getByTestId('cart-empty')).toBeHidden()
     await expect(toggle).toBeVisible()
     await expect(page.getByRole('button', { name: 'Show a sample island' })).toBeEnabled()
+
+    // Body scroll is restored after closing
+    const overflowAfterClose = await page.evaluate(() => document.body.style.overflow)
+    expect(overflowAfterClose).not.toBe('hidden')
   })
 
   // @lat: [[ui#ShoppingCart#Mobile toggle hidden at desktop]]

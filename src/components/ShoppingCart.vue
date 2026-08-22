@@ -16,6 +16,15 @@ const houseStore = useHouseStore()
 // breakpoint matchMedia (`isOpenByBreakpoint`), not the model, so forcing `true`
 // at lg+ keeps desktop rendering identical to a model-less BOffcanvas. The
 // update handler fires on close-button / Esc / backdrop interactions.
+//
+// `body-scrolling="!isBelowLg"` prevents BOffcanvas's useSafeScrollLock from
+// locking body scroll at desktop, where the cart renders inline (not as an
+// overlay). Without this, a setup-time race locks body overflow:hidden
+// permanently: useSafeScrollLock applies its initial lock as a one-shot during
+// setup while isOpenByBreakpoint is still false, and nothing subsequently
+// clears it (the registry-based restore path only resets when a lock is set by
+// the registry, not by this initial call). At mobile, body-scrolling is false
+// so the overlay correctly locks scroll while open.
 const showMobileCart = ref(false)
 
 // Query kept aligned with Bootstrap Vue Next's own smallerOrEqual('lg')
@@ -81,6 +90,7 @@ function orphanNote(houseId: string): string {
     title="Shopping Cart"
     class="cart-sidebar-panel"
     data-testid="shopping-cart"
+    :body-scrolling="!isBelowLg"
     :model-value="isBelowLg ? showMobileCart : true"
     @update:model-value="onCartModelUpdate"
   >
