@@ -8,6 +8,7 @@ import {
   getItemPicturePath,
   getRecipeForItem,
   recommendedItemsForHouse,
+  recommendedItemsForHouseAllNeeds,
 } from '../queries'
 // The baked item-graph payload the query layer hydrates from. No mock needed:
 // the baked JSON is the real committed output of scripts/build_data.mjs.
@@ -104,6 +105,62 @@ describe('recommendedItemsForHouse', () => {
   it('returns an empty array when no favorites match tagged items', async () => {
     const result = await recommendedItemsForHouse(['not a real favorite'])
     expect(result).toHaveLength(0)
+  })
+})
+
+describe('recommendedItemsForHouseAllNeeds', () => {
+  // Fixtures key on 'cleanliness', whose baked items span all three recommendation
+  // tags: Shower / Cleaning Supplies / Bathtime Set are Toy, Water Basin / Bathtub /
+  // Bouncy Blue Bathtub are Decoration, and Waterproof Seat is Relaxation.
+  it('fixture precondition: cleanliness items span Toy and Decoration axes', async () => {
+    expect((await getItemMetadata('Shower')).tag).toBe('Toy')
+    expect((await getItemMetadata('Water Basin')).tag).toBe('Decoration')
+  })
+
+  it('scopes retention to favorite-relevant items, never the whole tagged catalog', async () => {
+    const result = await recommendedItemsForHouseAllNeeds(['cleanliness'], [], ['Decoration'])
+    expect(result.length).toBeGreaterThan(0)
+    const names = result.map((r) => r.name)
+    // Every retained item overlaps the house favorite; an unrelated Decoration
+    // item with no cleanliness coverage must not appear.
+    for (const item of result) {
+      expect(await favoritesForItem(item.name)).toContain('cleanliness')
+    }
+    expect(names).not.toContain('Wooden Crate')
+  })
+
+  it('retains an item whose favorites are all fulfilled but whose tag is still unmet', async () => {
+    // Water Basin's only house-relevant favorite (cleanliness) is fulfilled, yet
+    // its Decoration tag is unmet — the tag pass alone retains it.
+    const result = await recommendedItemsForHouseAllNeeds(['cleanliness'], [], ['Decoration'])
+    expect(result.map((r) => r.name)).toContain('Water Basin')
+  })
+
+  it('hides an item only when both favorite coverage and tag are satisfied', async () => {
+    // Toy is already fulfilled (cart contains a Toy item), Decoration still unmet.
+    const result = await recommendedItemsForHouseAllNeeds(['cleanliness'], [], ['Decoration'])
+    const names = result.map((r) => r.name)
+    // Cleaning Supplies: Toy — its one house-relevant favorite AND its Toy tag are
+    // both satisfied, so it dedupes away (unlike Water Basin's tag-still-unmet case).
+    expect(names).not.toContain('Cleaning Supplies')
+    // Water Basin: Decoration — favorite satisfied but tag unmet, so it stays.
+    expect(names).toContain('Water Basin')
+  })
+
+  it('orders an item covering an unmet favorite AND unmet tag above one covering only the favorite', async () => {
+    const result = await recommendedItemsForHouseAllNeeds(
+      ['cleanliness'],
+      ['cleanliness'],
+      ['Decoration'],
+    )
+    const waterBasinIndex = result.findIndex((r) => r.name === 'Water Basin')
+    const showerIndex = result.findIndex((r) => r.name === 'Shower')
+
+    expect(waterBasinIndex).toBeGreaterThanOrEqual(0)
+    expect(showerIndex).toBeGreaterThanOrEqual(0)
+    // Water Basin (Decoration): favorite score 1 + tag score 1 = 2 ranks before
+    // Shower (Toy): favorite score 1, no tag bonus = 1.
+    expect(waterBasinIndex).toBeLessThan(showerIndex)
   })
 })
 

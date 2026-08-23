@@ -1221,6 +1221,88 @@ describe('HouseRecord', () => {
     expect(names.some((n) => n === 'Water Basin')).toBe(true)
   })
 
+  it('unadded item with fulfilled favorite but unmet tag remains', async () => {
+    // House favorite is only 'cleanliness'. Shower (Toy) covers it, so adding
+    // Shower fulfills both the favorite and the Toy tag — Decoration stays unmet.
+    const pokemonData: PokemonData = {
+      CleanOne: { image: '', favorites: ['cleanliness'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['CleanOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', 'Shower')
+    await flushPromises()
+
+    const names = wrapper.findAll('[data-testid="item-name"]').map((c) => c.text())
+    // Water Basin (Decoration) has its favorite fulfilled but its tag is still
+    // unmet, so the unadded row must remain.
+    expect(names.some((n) => n === 'Water Basin')).toBe(true)
+  })
+
+  it('unadded item with fulfilled favorite and fulfilled tag leaves the list', async () => {
+    const pokemonData: PokemonData = {
+      CleanOne: { image: '', favorites: ['cleanliness'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['CleanOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', 'Shower')
+    await flushPromises()
+
+    const names = wrapper.findAll('[data-testid="item-name"]').map((c) => c.text())
+    // Cleaning Supplies (Toy) covers the same now-fulfilled 'cleanliness'
+    // favorite and the same now-fulfilled Toy tag: both dimensions are
+    // satisfied, so it leaves the list. The added Shower row stays (its
+    // item-name cell text includes the "Added" badge, so match by prefix).
+    expect(names.some((n) => n === 'Cleaning Supplies')).toBe(false)
+    expect(names.some((n) => n.startsWith('Shower'))).toBe(true)
+  })
+
+  it('retains the recommendations panel and the Decoration candidate after its favorite and Toy tag are fulfilled', async () => {
+    const pokemonData: PokemonData = {
+      CleanOne: { image: '', favorites: ['cleanliness'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['CleanOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', 'Shower')
+    await flushPromises()
+
+    // The merged list still has rows, so the panel stays mounted, and the
+    // Decoration candidate the component retains end-to-end stays visible.
+    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
+    expect(
+      wrapper.findAll('[data-testid="item-name"]').some((c) => c.text() === 'Water Basin'),
+    ).toBe(true)
+  })
+
   it('grays out redundant coverage of an already-fulfilled favorite in unadded rows', async () => {
     const pokemonData: PokemonData = {
       Solo: { image: '', favorites: ['metal stuff', 'stone stuff'] },
@@ -1288,6 +1370,12 @@ describe('HouseRecord', () => {
     // Tag columns persist even when fulfilled.
     const headers = wrapper.findAll('[data-testid="recommended-items-list"] th')
     expect(headers.some((h) => h.text().includes('Toy'))).toBe(true)
+
+    // With tag-inclusive retention the metal/stone candidate universe now spans
+    // >50 rows, so the first page may not include a stone Toy row; expand one
+    // page so the grayed-tag-cell behavior below stays observable.
+    await wrapper.find('[data-testid="recommendations-more"]').trigger('click')
+    await flushPromises()
 
     const rows = wrapper.findAll('[data-testid="recommended-items-list"] tbody tr')
     const unaddedRows = rows.filter(

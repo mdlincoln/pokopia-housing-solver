@@ -19,7 +19,8 @@ import { iconForFavorite } from '@/favoriteIcons'
 import {
   favoriteCoverageColumnKey,
   favoritesForItems,
-  recommendedItemsForHouse,
+  RECOMMENDED_ITEM_TAGS,
+  recommendedItemsForHouseAllNeeds,
   type ItemDetails,
 } from '@/queries'
 import { type HouseAssignment, type PokemonData } from '@/solver'
@@ -218,9 +219,16 @@ watch(
       (favorite) => !fulfilledFavoriteSet.has(favorite),
     )
 
-    const recommendations = unfulfilledFavorites.length
-      ? await recommendedItemsForHouse(unfulfilledFavorites)
-      : []
+    const unfulfilledTags = RECOMMENDED_ITEM_TAGS.filter((t) => !fulfilledTags.value.has(t))
+
+    const recommendations =
+      unfulfilledFavorites.length || unfulfilledTags.length
+        ? await recommendedItemsForHouseAllNeeds(
+            allFavorites,
+            unfulfilledFavorites,
+            unfulfilledTags,
+          )
+        : []
     if (run !== recommendationRun) return
 
     const allCandidateNames = [...new Set([...recommendations.map((r) => r.name), ...cartNames])]

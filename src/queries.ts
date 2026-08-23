@@ -33,7 +33,13 @@ export interface ItemGraph {
   itemsByFavorite: Map<string, ItemDetails[]> // shared ItemDetails refs
   favoritesByItem: Map<string, string[]>
   recipeByItem: Map<string, RecipeIngredient[]>
+  itemsByTag: Map<string, ItemDetails[]> // shared ItemDetails refs, keyed by item tag
 }
+
+// The three Pokopia item tags the recommendation surface shows. Used by the
+// tag-aware retention/ordering query below; the original SQL tag filter in
+// `recommendedItemsForHouse` remains untouched (only documented here).
+export const RECOMMENDED_ITEM_TAGS = ['Relaxation', 'Decoration', 'Toy'] as const
 
 // Codepoint comparison, matching SQLite's BINARY collation (NOT localeCompare,
 // which is locale-dependent and would subtly change sort order vs the old SQL).
@@ -79,7 +85,15 @@ export function loadItemGraph(): Promise<ItemGraph> {
       recipeByItem.set(itemName, recipe)
     }
 
-    return { itemDetailsByName, itemsByFavorite, favoritesByItem, recipeByItem }
+    const itemsByTag = new Map<string, ItemDetails[]>()
+    for (const detail of itemDetailsByName.values()) {
+      if (!detail.tag) continue
+      const list = itemsByTag.get(detail.tag)
+      if (list) list.push(detail)
+      else itemsByTag.set(detail.tag, [detail])
+    }
+
+    return { itemDetailsByName, itemsByFavorite, favoritesByItem, recipeByItem, itemsByTag }
   })()
   return _itemGraphPromise
 }
@@ -177,6 +191,107 @@ export async function recommendedItemsForHouse(
   })
 
   // Matches SQL ORDER BY score DESC, covered_count DESC, i.name ASC (BINARY).
+  results.sort(
+    (a, b) =>
+      b.score - a.score || b.covered - a.covered || compareCodepoints(a.item.name, b.item.name),
+  )
+  return results.map((result) => result.item)
+}
+
+/**
+ * Tag-aware recommendation query: retains and re-ranks favorite-relevant items
+ * by **remaining** house needs, where "needs" = unfulfilled favorites plus
+ * unfulfilled item tags (Toy / Relaxation / Decoration).
+ *
+ * Contract:
+ * - Candidate universe is still scoped to items overlapping ≥1 house favorite
+ *   (houseFavorites). It never promotes the whole tagged catalog, so an item
+ *   with zero house-favorite overlap never appears (empty-cart behavior is
+ *   ordering-identical to `recommendedItemsForHouse` — see invariant below).
+ * - An item is hidden only when BOTH its favorite coverage and its item tag are
+ *   already satisfied (mirrors `recommendedItemsForHouse`'s dedupe of fully
+ *   satisfied items). An item whose favorites are all fulfilled but whose tag is
+ *   still unmet stays visible.
+ * - Ordering: score DESC (unfulfilled favorite multiplicity + one unit per
+ *   matched unfulfilled tag), then covered DESC (distinct matched needs), then
+ *   name via BINARY codepoint comparison.
+ *
+ * Invariant: when `unfulfilledTags` is empty the tag pass contributes nothing,
+ * so the result reduces exactly to `recommendedItemsForHouse(unfulfilledFavorites)`
+ * (same candidates, scores, covered counts, and sort). When every candidate's
+ * tag is unfulfilled (the empty-cart case) each candidate gains a uniform `+1`
+ * to score and covered, which preserves `recommendedItemsForHouse`'s ordering
+ * for equal favorite inputs.
+ *
+ * @param houseFavorites    all house favorites (candidate universe), with multiplicity
+ * @param unfulfilledFavorites remaining favorite needs, with multiplicity
+ * @param unfulfilledTags   remaining tag needs (subset of RECOMMENDED_ITEM_TAGS)
+ */
+export async function recommendedItemsForHouseAllNeeds(
+  houseFavorites: string[],
+  unfulfilledFavorites: string[],
+  unfulfilledTags: string[],
+): Promise<RecommendedHouseItem[]> {
+  const graph = await loadItemGraph()
+  const tagGate = new Set<string>(RECOMMENDED_ITEM_TAGS)
+
+  const scored = new Map<
+    string,
+    { detail: ItemDetails; score: number; matchedFavorites: Set<string>; matchedTags: Set<string> }
+  >()
+
+  // Candidate pass: only items overlapping ≥1 house favorite are eligible.
+  for (const favorite of houseFavorites) {
+    for (const detail of graph.itemsByFavorite.get(favorite) ?? []) {
+      if (!detail.tag || !tagGate.has(detail.tag)) continue
+      if (!scored.has(detail.name)) {
+        scored.set(detail.name, {
+          detail,
+          score: 0,
+          matchedFavorites: new Set(),
+          matchedTags: new Set(),
+        })
+      }
+    }
+  }
+
+  // Favorite-need pass: weight by still-unfulfilled favorite multiplicity.
+  for (const favorite of unfulfilledFavorites) {
+    for (const detail of graph.itemsByFavorite.get(favorite) ?? []) {
+      const entry = scored.get(detail.name)
+      if (!entry) continue
+      entry.score += 1
+      entry.matchedFavorites.add(favorite)
+    }
+  }
+
+  // Tag-need pass: one need-unit per unfulfilled tag an eligible item matches.
+  for (const tag of unfulfilledTags) {
+    for (const detail of graph.itemsByTag.get(tag) ?? []) {
+      const entry = scored.get(detail.name)
+      if (!entry || entry.matchedTags.has(tag)) continue
+      entry.score += 1
+      entry.matchedTags.add(tag)
+    }
+  }
+
+  // Retention filter: hide only when favorite coverage AND item type are both
+  // already satisfied.
+  const results = Array.from(scored.values())
+    .filter((entry) => entry.matchedFavorites.size > 0 || entry.matchedTags.size > 0)
+    .map((entry) => ({
+      item: {
+        name: entry.detail.name,
+        category: entry.detail.category,
+        flavorText: entry.detail.flavorText,
+        picturePath: entry.detail.picturePath,
+        tag: entry.detail.tag,
+        isCraftable: entry.detail.isCraftable,
+      } as RecommendedHouseItem,
+      score: entry.score,
+      covered: entry.matchedFavorites.size + entry.matchedTags.size,
+    }))
+
   results.sort(
     (a, b) =>
       b.score - a.score || b.covered - a.covered || compareCodepoints(a.item.name, b.item.name),
