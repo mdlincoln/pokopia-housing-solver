@@ -547,79 +547,131 @@ defineExpose({
   </div>
 
   <div v-if="!showCatalogLoading" class="home-theme content-stack">
-    <BCard class="mb-3 shell-card config-card">
-      <BCardBody class="p-3 p-md-4">
-        <h5 class="section-heading">Houses</h5>
-        <BRow class="g-3">
-          <BCol sm="4">
-            <BFormGroup label="Small (1 slot)" label-for="house-small">
-              <BFormSpinbutton id="house-small" v-model="small" :min="minSmall" />
-            </BFormGroup>
-          </BCol>
-          <BCol sm="4">
-            <BFormGroup label="Medium (2 slots)" label-for="house-medium">
-              <BFormSpinbutton id="house-medium" v-model="medium" :min="minMedium" />
-            </BFormGroup>
-          </BCol>
-          <BCol sm="4">
-            <BFormGroup label="Large (4 slots)" label-for="house-large">
-              <BFormSpinbutton id="house-large" v-model="large" :min="minLarge" />
-            </BFormGroup>
-          </BCol>
-        </BRow>
-        <h5 class="section-heading">Pokémon</h5>
-        <BRow class="mt-1">
-          <PokemonSelect
-            v-model="selectedPokemon"
-            :pokemon-names="pokemonNames"
-            :pinned-names="pinStore.allPinnedPokemonNames"
-          />
-        </BRow>
-      </BCardBody>
-    </BCard>
+    <BRow class="g-3 g-md-4">
+      <BCol cols="12" xl="7">
+        <BCard class="shell-card config-card h-100" data-testid="config-card">
+          <BCardBody class="p-3 p-md-4">
+            <h5 class="section-heading">Houses</h5>
+            <BRow class="g-3">
+              <BCol sm="4">
+                <BFormGroup label="Small (1 slot)" label-for="house-small">
+                  <BFormSpinbutton id="house-small" v-model="small" :min="minSmall" />
+                </BFormGroup>
+              </BCol>
+              <BCol sm="4">
+                <BFormGroup label="Medium (2 slots)" label-for="house-medium">
+                  <BFormSpinbutton id="house-medium" v-model="medium" :min="minMedium" />
+                </BFormGroup>
+              </BCol>
+              <BCol sm="4">
+                <BFormGroup label="Large (4 slots)" label-for="house-large">
+                  <BFormSpinbutton id="house-large" v-model="large" :min="minLarge" />
+                </BFormGroup>
+              </BCol>
+            </BRow>
+            <h5 class="section-heading">Pokémon</h5>
+            <BRow class="mt-1">
+              <PokemonSelect
+                v-model="selectedPokemon"
+                :pokemon-names="pokemonNames"
+                :pinned-names="pinStore.allPinnedPokemonNames"
+              />
+            </BRow>
+            <div class="d-flex gap-2 align-items-center flex-wrap mt-3 config-actions">
+              <BButton variant="outline-danger" class="beach-button" @click="clearAll">
+                Clear all
+              </BButton>
+              <BButton
+                variant="outline-secondary"
+                class="beach-button"
+                :disabled="pokemonNames.length === 0"
+                @click="loadSample"
+              >
+                Show a sample island
+              </BButton>
+            </div>
+          </BCardBody>
+        </BCard>
+      </BCol>
+      <BCol cols="12" xl="5">
+        <BCard class="shell-card islands-card h-100" data-testid="islands-card">
+          <BCardBody class="p-3 p-md-4">
+            <h5 class="section-heading">Saved islands</h5>
+            <div class="d-flex gap-2 align-items-center flex-wrap action-row">
+              <BButton
+                variant="outline-primary"
+                class="beach-button"
+                :disabled="pokemonNames.length === 0"
+                @click="openSaveModal"
+              >
+                Save island
+              </BButton>
+              <small class="text-muted"
+                >Saved to this browser only — nothing leaves your computer.</small
+              >
+            </div>
 
-    <div class="d-flex gap-2 align-items-start flex-wrap mb-3 action-row">
-      <BButton variant="outline-danger" class="beach-button" @click="clearAll"> Clear all </BButton>
-      <BButton
-        variant="outline-secondary"
-        class="beach-button"
-        :disabled="pokemonNames.length === 0"
-        @click="loadSample"
-      >
-        Show a sample island
-      </BButton>
-      <BButton
-        variant="outline-primary"
-        class="beach-button"
-        :disabled="pokemonNames.length === 0"
-        @click="openSaveModal"
-      >
-        Save island
-      </BButton>
-      <small class="text-muted">Saved to this browser only — nothing leaves your computer.</small>
-    </div>
+            <BAlert
+              v-if="saveSuccess"
+              variant="success"
+              :model-value="true"
+              class="mb-3 status-alert"
+            >
+              Island saved.
+            </BAlert>
 
-    <BAlert v-if="saveSuccess" variant="success" :model-value="true" class="mb-3 status-alert">
-      Island saved.
-    </BAlert>
+            <BAlert
+              v-if="deletedUndo"
+              variant="warning"
+              :model-value="true"
+              class="mb-3 status-alert"
+              data-testid="saved-query-deleted"
+            >
+              Deleted "{{ deletedUndoTitle }}".
+              <BButton
+                size="sm"
+                variant="outline-dark"
+                class="ms-2"
+                data-testid="saved-query-undo"
+                @click="undoDelete"
+                >Undo</BButton
+              >
+            </BAlert>
 
-    <BAlert
-      v-if="deletedUndo"
-      variant="warning"
-      :model-value="true"
-      class="mb-3 status-alert"
-      data-testid="saved-query-deleted"
-    >
-      Deleted "{{ deletedUndoTitle }}".
-      <BButton
-        size="sm"
-        variant="outline-dark"
-        class="ms-2"
-        data-testid="saved-query-undo"
-        @click="undoDelete"
-        >Undo</BButton
-      >
-    </BAlert>
+            <BFormGroup
+              v-if="savedQueries.length"
+              label="Restore a saved island"
+              label-for="saved-queries-select"
+              class="mt-3 mb-0"
+            >
+              <div class="d-flex gap-2 align-items-start flex-wrap">
+                <BFormSelect
+                  id="saved-queries-select"
+                  v-model="selectedTimestamp"
+                  class="flex-grow-1"
+                  :options="[
+                    { value: null, text: 'Select a saved island…' },
+                    ...savedQueries.map((q) => ({
+                      value: q.timestamp,
+                      text: q.title
+                        ? `${q.title} (${new Date(q.timestamp).toLocaleString()})`
+                        : new Date(q.timestamp).toLocaleString(),
+                    })),
+                  ]"
+                />
+                <BButton
+                  variant="outline-secondary"
+                  data-testid="saved-queries-manage"
+                  @click="showManageModal = true"
+                >
+                  Manage saved islands
+                </BButton>
+              </div>
+            </BFormGroup>
+          </BCardBody>
+        </BCard>
+      </BCol>
+    </BRow>
 
     <BModal
       v-model="showSaveModal"
@@ -638,37 +690,6 @@ defineExpose({
         />
       </BFormGroup>
     </BModal>
-
-    <BFormGroup
-      v-if="savedQueries.length"
-      label="Saved islands"
-      label-for="saved-queries-select"
-      class="mb-3"
-    >
-      <div class="d-flex gap-2 align-items-start flex-wrap">
-        <BFormSelect
-          id="saved-queries-select"
-          v-model="selectedTimestamp"
-          class="flex-grow-1"
-          :options="[
-            { value: null, text: 'Select a saved island…' },
-            ...savedQueries.map((q) => ({
-              value: q.timestamp,
-              text: q.title
-                ? `${q.title} (${new Date(q.timestamp).toLocaleString()})`
-                : new Date(q.timestamp).toLocaleString(),
-            })),
-          ]"
-        />
-        <BButton
-          variant="outline-secondary"
-          data-testid="saved-queries-manage"
-          @click="showManageModal = true"
-        >
-          Manage saved islands
-        </BButton>
-      </div>
-    </BFormGroup>
 
     <BModal
       v-model="showManageModal"

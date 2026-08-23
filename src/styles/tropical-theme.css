@@ -72,10 +72,6 @@ body {
     );
 }
 
-.app-shell {
-  max-width: 980px;
-}
-
 .page-main {
   display: grid;
   gap: var(--space-2);
@@ -746,7 +742,10 @@ body {
    background over it, hiding the tint entirely. Make the non-coverage cells
    transparent so the mint shows through, while keeping the coverage cells'
    success/secondary variant backgrounds intact. */
-.recommended-items-table tbody tr.recommendation-added-row > td:not(.table-success):not(.table-secondary) {
+.recommended-items-table
+  tbody
+  tr.recommendation-added-row
+  > td:not(.table-success):not(.table-secondary) {
   background-color: transparent;
 }
 
