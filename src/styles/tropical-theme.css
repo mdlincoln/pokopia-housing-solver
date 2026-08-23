@@ -567,14 +567,6 @@ body {
   opacity: 0.88;
 }
 
-.house-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1);
-  margin-bottom: var(--space-2);
-}
-
 /* Shared collapsed-section affordance: bold summary text, no triangle, and a
    +/- glyph that flips when open. HouseRecord keeps its positional selector;
    other disclosures (e.g. the hero details) opt in via `.details-summary`. */
@@ -603,21 +595,14 @@ details[open] > .details-summary::before,
   content: '-';
 }
 
+.craftable-only-toggle {
+  margin: var(--space-3) var(--space-2) var(--space-2);
+}
+
 .pokemon-card .card-title {
   font-family: var(--trop-heading-font);
   color: #2b6e88;
   margin-bottom: var(--space-1);
-}
-
-.pokemon-card {
-  transition:
-    transform 160ms ease,
-    box-shadow 160ms ease;
-}
-
-.pokemon-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--trop-shadow-mid);
 }
 
 .pokemon-card-header {

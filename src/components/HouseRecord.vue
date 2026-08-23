@@ -14,7 +14,6 @@ export function sameFavorites(a: Set<string>, b: Set<string>): boolean {
 <script setup lang="ts">
 import { assetPath } from '@/assetPath'
 import PokemonCard from '@/components/PokemonCard.vue'
-import { HABITAT_VARIANT } from '@/habitats'
 import {
   favoriteCoverageColumnKey,
   favoritesForItems,
@@ -48,24 +47,6 @@ const progressStore = useProgressStore()
 function toggleHousePin() {
   pinStore.toggleHousePin(props.house.houseId, props.house.pokemon)
 }
-
-const sharedHabitats = computed(() => {
-  if (props.house.pokemon.length < 1) return []
-  const habitatCounts = new Map<string, number>()
-  for (const name of props.house.pokemon) {
-    const habitat = props.pokemonData[name]?.habitat
-    if (habitat) {
-      habitatCounts.set(habitat, (habitatCounts.get(habitat) ?? 0) + 1)
-    }
-  }
-  return Array.from(habitatCounts.entries())
-    .filter(([, count]) => count >= 1)
-    .map(([habitat, count]) => ({
-      habitat,
-      count,
-      variant: HABITAT_VARIANT[habitat] ?? 'light',
-    }))
-})
 
 const houseCartItems = computed(() => cartStore.itemsByHouse.get(props.house.houseId) ?? [])
 
@@ -443,20 +424,6 @@ watchEffect(() => {
       </button>
       {{ house.size }} house {{ house.houseId }}
     </h5>
-    <p v-if="sharedHabitats.length" class="text-muted house-meta">
-      <span data-testid="shared-habitats">
-        <BBadge
-          v-for="item in sharedHabitats"
-          :key="item.habitat"
-          :variant="item.variant"
-          pill
-          class="me-1"
-          data-testid="shared-habitat-badge"
-        >
-          {{ item.habitat }} &times;{{ item.count }}
-        </BBadge>
-      </span>
-    </p>
 
     <div v-if="house.pokemon.length > 0" class="pokemon-grid">
       <PokemonCard
@@ -481,17 +448,16 @@ watchEffect(() => {
       class="mt-2 house-recommendations"
       @toggle="onRecsToggle"
     >
-      <summary>
-        House items
+      <summary>House items</summary>
+      <div v-if="hasOpenedRecs" class="craftable-only-toggle" data-testid="craftable-only-toggle">
         <BFormCheckbox
           v-model="showCraftableOnly"
           switch
           size="sm"
-          class="d-inline-block ms-3 align-middle"
-          @click.stop
+          class="d-inline-block align-middle"
           >Craftable only</BFormCheckbox
         >
-      </summary>
+      </div>
       <BTable
         v-if="hasOpenedRecs"
         primary-key="name"

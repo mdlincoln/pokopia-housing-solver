@@ -45,49 +45,6 @@ describe('HouseRecord', () => {
     setActivePinia(createPinia())
   })
 
-  it('shows shared habitats badge when 2+ pokemon share the same habitat', () => {
-    const house: HouseAssignment = {
-      houseId: 'S1',
-      size: 'medium',
-      capacity: 2,
-      pokemon: ['AlphaOne', 'AlphaTwo'],
-    }
-
-    const wrapper = mount(HouseRecord, {
-      props: {
-        house,
-        pokemonData: testPokemonData,
-      },
-    })
-
-    const sharedHabitats = wrapper.find('[data-testid="shared-habitats"]')
-    expect(sharedHabitats.exists()).toBe(true)
-
-    const badge = wrapper.find('[data-testid="shared-habitat-badge"]')
-    expect(badge.exists()).toBe(true)
-    expect(badge.text()).toContain('Dark')
-    expect(badge.text()).toContain('2')
-  })
-
-  it('shows shared habitats section for single occupant', () => {
-    const house: HouseAssignment = {
-      houseId: 'S1',
-      size: 'small',
-      capacity: 1,
-      pokemon: ['AlphaOne'],
-    }
-
-    const wrapper = mount(HouseRecord, {
-      props: {
-        house,
-        pokemonData: testPokemonData,
-      },
-    })
-
-    const sharedHabitats = wrapper.find('[data-testid="shared-habitats"]')
-    expect(sharedHabitats.exists()).toBe(true)
-  })
-
   it('passes habitat prop to each pokemon card', () => {
     const house: HouseAssignment = {
       houseId: 'S1',
@@ -108,33 +65,6 @@ describe('HouseRecord', () => {
     habitatBadges.forEach((badge) => {
       expect(badge.text()).toBe('Dark')
     })
-  })
-
-  it('shows shared habitats for multiple pairs (e.g., 3 pokemon with 2 habitats)', () => {
-    const house: HouseAssignment = {
-      houseId: 'S1',
-      size: 'large',
-      capacity: 4,
-      pokemon: ['AlphaOne', 'AlphaTwo', 'GammaOne'],
-    }
-
-    const wrapper = mount(HouseRecord, {
-      props: {
-        house,
-        pokemonData: testPokemonData,
-      },
-    })
-
-    const sharedHabitats = wrapper.find('[data-testid="shared-habitats"]')
-    expect(sharedHabitats.exists()).toBe(true)
-
-    // Should show only Dark (×2), since Cool only has 1 pokemon
-    const badges = wrapper.findAll('[data-testid="shared-habitat-badge"]')
-    expect(badges).toHaveLength(2)
-    expect(badges[0]!.text()).toContain('Dark')
-    expect(badges[0]!.text()).toContain('2')
-    expect(badges[1]!.text()).toContain('Cool')
-    expect(badges[1]!.text()).toContain('1')
   })
 
   it('renders with correct data-testid on house card', () => {
@@ -1130,7 +1060,7 @@ describe('HouseRecord', () => {
     await cartStore.addItem('S1', buyName!)
     await flushPromises()
 
-    const toggle = wrapper.find('[data-testid="recommended-items"] summary input[type="checkbox"]')
+    const toggle = wrapper.find('[data-testid="craftable-only-toggle"] input[type="checkbox"]')
     expect(toggle.exists()).toBe(true)
     await toggle.setValue(true)
     await flushPromises()
@@ -1228,7 +1158,7 @@ describe('HouseRecord', () => {
     await flushPromises()
     await openRecommendations(wrapper)
 
-    const toggleSelector = '[data-testid="recommended-items"] summary input[type="checkbox"]'
+    const toggleSelector = '[data-testid="craftable-only-toggle"] input[type="checkbox"]'
     const toggle = wrapper.find(toggleSelector)
     expect(toggle.exists()).toBe(true)
     await toggle.setValue(true)

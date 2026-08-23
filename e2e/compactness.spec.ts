@@ -58,14 +58,7 @@ test.describe('Compact density', () => {
 
     // (c) One house's recommendations panel opened — the lazily-mounted table
     // is the widest surface, so the overflow probe must run with it rendered.
-    // Click near the summary's leading edge: at 390px the inline "Craftable
-    // only" switch extends past the summary center and swallows center clicks
-    // (@click.stop, so the details would never open).
-    await page
-      .getByTestId('recommended-items')
-      .first()
-      .locator('summary')
-      .click({ position: { x: 8, y: 8 } })
+    await page.getByTestId('recommended-items').first().locator('summary').click()
     await expect(page.getByTestId('recommended-items-list').first()).toBeVisible({
       timeout: 10_000,
     })
