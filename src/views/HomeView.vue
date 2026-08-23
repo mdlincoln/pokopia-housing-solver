@@ -488,7 +488,11 @@ watch(
     () => pinStore.pinnedHouses,
   ],
   () => {
-    if (!adjacencyData.value || totalHouses.value === 0 || !hydratedPokemonReady.value) {
+    if (
+      !adjacencyData.value ||
+      !hydratedPokemonReady.value ||
+      (totalHouses.value === 0 && selectedPokemon.value.length === 0)
+    ) {
       debouncedSolve.cancel()
       result.value = null
       solving.value = false

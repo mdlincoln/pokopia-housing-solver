@@ -265,6 +265,23 @@ describe('HomeView', () => {
     expect(unhoused.text()).toContain('BetaOne')
   })
 
+  it('displays the unhoused warning when pokemon are present with zero houses', async () => {
+    const solverResult: SolverResult = {
+      houses: [],
+      unhoused: ['AlphaOne', 'AlphaTwo'],
+    }
+    mockSolve.mockResolvedValueOnce(solverResult)
+
+    const wrapper = await mountHome()
+    wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo']
+    await flushPromises()
+
+    const unhoused = wrapper.find('[data-testid="unhoused"]')
+    expect(unhoused.exists()).toBe(true)
+    expect(unhoused.text()).toContain('AlphaOne')
+    expect(unhoused.text()).toContain('AlphaTwo')
+  })
+
   it('displays empty houses', async () => {
     const solverResult: SolverResult = {
       houses: [
