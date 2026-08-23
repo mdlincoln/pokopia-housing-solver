@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 async function selectPokemon(page: import('@playwright/test').Page, name: string) {
-  const input = page.getByPlaceholder('Search pokemon...')
+  const input = page.getByPlaceholder('Add pokemon to your island...')
   await expect(input).toBeVisible({ timeout: 10_000 })
   await input.fill(name)
   const option = page.locator('.tropical-dropdown').getByRole('option', { name, exact: true })

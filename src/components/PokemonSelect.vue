@@ -94,23 +94,11 @@ function onBlur() {
 
 <template>
   <div class="pokemon-select">
-    <div v-if="modelValue.length" class="d-flex flex-wrap gap-1 mb-3">
-      <BBadge
-        v-for="name in modelValue"
-        :key="name"
-        variant="primary"
-        pill
-        class="d-inline-flex align-items-center gap-1 pe-1 favorite-pill"
-      >
-        {{ name }}
-        <BCloseButton class="ms-1" :disabled="props.pinnedNames?.has(name)" @click="remove(name)" />
-      </BBadge>
-    </div>
     <div class="position-relative pokemon-select-wrap">
       <BFormInput
         v-model="query"
         class="pokemon-search"
-        placeholder="Search pokemon..."
+        placeholder="Add pokemon to your island..."
         autocomplete="off"
         aria-label="Search Pokémon to add"
         role="combobox"
@@ -145,6 +133,18 @@ function onBlur() {
           {{ name }}
         </BListGroupItem>
       </BListGroup>
+    </div>
+    <div v-if="modelValue.length" class="d-flex flex-wrap gap-1 mt-3">
+      <BBadge
+        v-for="name in modelValue"
+        :key="name"
+        variant="primary"
+        pill
+        class="d-inline-flex align-items-center gap-1 pe-1 favorite-pill"
+      >
+        {{ name }}
+        <BCloseButton class="ms-1" :disabled="props.pinnedNames?.has(name)" @click="remove(name)" />
+      </BBadge>
     </div>
   </div>
 </template>
