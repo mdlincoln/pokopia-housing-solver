@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   favoriteCoverageColumnKey,
   favoritesForItem,
+  favoritesForItems,
   getAggregatedIngredients,
   getItemMetadata,
   getItemPicturePath,
@@ -42,6 +43,27 @@ describe('favoritesForItem', () => {
   it('returns empty list for unknown item', async () => {
     const result = await favoritesForItem('Not A Real Item')
     expect(result).toEqual([])
+  })
+})
+
+describe('favoritesForItems', () => {
+  it('returns [] for unknown items and lists for known items', async () => {
+    const result = await favoritesForItems(['Gaming Bed', 'Not A Real Item'])
+    expect(result.get('Not A Real Item')).toEqual([])
+    const gamingBed = result.get('Gaming Bed')!
+    expect(gamingBed).toContain('colorful stuff')
+    expect(gamingBed).toContain('shiny stuff')
+  })
+
+  it('dedupes repeated input names (single map entry per name)', async () => {
+    const result = await favoritesForItems(['Gaming Bed', 'Gaming Bed'])
+    expect(result.size).toBe(1)
+    expect(result.get('Gaming Bed')).toBeDefined()
+  })
+
+  it('returns an empty map for empty input', async () => {
+    const result = await favoritesForItems([])
+    expect(result.size).toBe(0)
   })
 })
 

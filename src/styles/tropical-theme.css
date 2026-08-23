@@ -725,6 +725,24 @@ body {
   color: #fff;
 }
 
+/* Redundant coverage — an unadded item covering an already-fulfilled favorite
+   is grayed to signal it is lower value than coverage of still-unfulfilled needs.
+   Bootstrap's table-secondary supplies the muted background; mute the check too
+   so it doesn't read as a green success. */
+.recommended-items-table td.bool-col.table-secondary .bool-check {
+  color: var(--bs-secondary-color, #6c757d);
+}
+.recommended-items-table td.bool-col.table-secondary {
+  opacity: 0.7;
+}
+
+/* In-cart (added) recommendation rows get a subtle tint behind the non-coverage
+   cells so the "added" state reads at a glance, distinct from the green
+   coverage cells. */
+.recommended-items-table tbody tr.recommendation-added-row {
+  background-color: color-mix(in srgb, var(--trop-mint-300, #9ee8c9) 22%, transparent);
+}
+
 .cart-thumbnail-sm {
   width: 20px;
   height: 20px;
@@ -948,6 +966,13 @@ body {
 .progress-action--compact input[type='checkbox'] {
   width: 13px;
   height: 13px;
+}
+
+/* Inline Placed control in the merged recommendations table keeps a 24×24px
+   hit area (WCAG 2.5.8) so the e2e tap-target probe covers the checkbox. */
+.recommended-items-table .progress-action {
+  min-width: 24px;
+  min-height: 24px;
 }
 
 /* One-line legend explaining the two checkboxes */

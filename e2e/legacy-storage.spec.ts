@@ -70,7 +70,7 @@ test.describe('Legacy saved-query loading (sql.js → baked-data)', () => {
 
     // Cart restores: correct count and every expected item name present, scoped
     // to the cart-items panel (a bare `item-name` locator would also match the
-    // unrelated `item-name` testid inside HouseRecord.vue's cart-coverage table).
+    // unrelated `item-name` testid inside HouseRecord.vue's recommendations table).
     const cartItems = page.getByTestId('cart-item')
     await expect(cartItems).toHaveCount(fixture.decoded[0].cart.length, { timeout: 5000 })
     const expectedNames = new Set(fixture.decoded[0].cart.map((entry) => entry.name))

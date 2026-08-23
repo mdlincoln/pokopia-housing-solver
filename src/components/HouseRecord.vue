@@ -17,13 +17,12 @@ import PokemonCard from '@/components/PokemonCard.vue'
 import { HABITAT_VARIANT } from '@/habitats'
 import {
   favoriteCoverageColumnKey,
-  favoritesForItem,
+  favoritesForItems,
   recommendedItemsForHouse,
   type ItemDetails,
-  type RecommendedHouseItem,
 } from '@/queries'
 import { type HouseAssignment, type PokemonData } from '@/solver'
-import { useCartStore, type CartItem } from '@/stores/cart'
+import { useCartStore } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
 import { useProgressStore } from '@/stores/progress'
 import type { BTableSortBy } from 'bootstrap-vue-next'
@@ -89,23 +88,18 @@ function onRecsToggle(event: Event) {
   }
 }
 
-interface TableItemRow extends Record<string, unknown> {
+const RECOMMENDATIONS_PAGE_SIZE = 50
+
+interface RecommendationRow extends Record<string, unknown> {
   itemData: ItemDetails
   name: string
   craftability: string
+  added: boolean
+  recOrder: number
   col_toy: boolean
   col_relaxation: boolean
   col_decoration: boolean
-  _cellVariants?: Record<string, 'success'>
-}
-
-interface CartTableItemRow extends Record<string, unknown> {
-  itemData: CartItem
-  name: string
-  col_toy: boolean
-  col_relaxation: boolean
-  col_decoration: boolean
-  _cellVariants?: Record<string, 'success'>
+  _cellVariants?: Record<string, 'success' | 'secondary'>
 }
 
 const houseFavoriteColumns = computed(() => {
@@ -132,7 +126,6 @@ const allFulfilled = computed(
 const recommendationTableFields = computed(() => [
   { key: 'name', label: 'Item', sortable: true },
   { key: 'col_image', label: '', sortable: false },
-  { key: 'col_actions', label: '', sortable: false },
   { key: 'craftability', label: 'Craftability', sortable: true },
   ...(!fulfilledTags.value.has('Toy')
     ? [{ key: 'col_toy', label: 'Toy', sortable: true, class: 'bool-col' }]
@@ -143,88 +136,62 @@ const recommendationTableFields = computed(() => [
   ...(!fulfilledTags.value.has('Decoration')
     ? [{ key: 'col_decoration', label: 'Decoration', sortable: true, class: 'bool-col' }]
     : []),
-  ...unfulfilledFavoriteColumns.value.map((col) => ({
+  // All house-favorite columns are always shown now (the merged table is the
+  // only place coverage is shown, and added rows can cover fulfilled favorites).
+  // Fulfilled favorites render with the green header style, never removed.
+  ...houseFavoriteColumns.value.map((col) => ({
     key: favoriteCoverageColumnKey(col.favorite),
     label: col.favorite,
     sortable: true,
     class: 'bool-col',
     count: col.count,
   })),
+  { key: 'col_placed', label: 'Placed', sortable: false },
+  { key: 'col_actions', label: '', sortable: false },
 ])
 
 function craftabilityText(item: ItemDetails): string {
   return item.isCraftable ? (item.category ? `Craftable (${item.category})` : 'Craftable') : 'Buy'
 }
 
-const cartTableFields = computed(() => [
-  { key: 'col_image', label: '' },
-  { key: 'name', label: 'Item', class: 'text-col' },
-  { key: 'col_placed', label: 'Placed' },
-  ...(!fulfilledTags.value.has('Toy') ? [{ key: 'col_toy', label: 'Toy', class: 'bool-col' }] : []),
-  ...(!fulfilledTags.value.has('Relaxation')
-    ? [{ key: 'col_relaxation', label: 'Relaxation', class: 'bool-col' }]
-    : []),
-  ...(!fulfilledTags.value.has('Decoration')
-    ? [{ key: 'col_decoration', label: 'Decoration', class: 'bool-col' }]
-    : []),
-  ...houseFavoriteColumns.value.map((col) => ({
-    key: favoriteCoverageColumnKey(col.favorite),
-    label: col.favorite,
-    class: 'bool-col',
-    count: col.count,
-  })),
-  { key: 'col_actions', label: '' },
-])
+const activeTableItems = ref<RecommendationRow[]>([])
+const visibleCount = ref(RECOMMENDATIONS_PAGE_SIZE)
 
-const activeTableItems = ref<TableItemRow[]>([])
-const cartTableItems = ref<CartTableItemRow[]>([])
-
-function buildTableRow(item: RecommendedHouseItem): TableItemRow {
-  const row: TableItemRow = {
-    itemData: item,
-    name: item.name,
-    craftability: craftabilityText(item),
-    col_toy: item.tag === 'Toy',
-    col_relaxation: item.tag === 'Relaxation',
-    col_decoration: item.tag === 'Decoration',
+function buildRecommendationRow(
+  itemData: ItemDetails,
+  added: boolean,
+  recOrder: number,
+  itemFavs: string[],
+  fulfilledSet: Set<string>,
+): RecommendationRow {
+  const row: RecommendationRow = {
+    itemData,
+    name: itemData.name,
+    craftability: craftabilityText(itemData),
+    added,
+    recOrder,
+    col_toy: itemData.tag === 'Toy',
+    col_relaxation: itemData.tag === 'Relaxation',
+    col_decoration: itemData.tag === 'Decoration',
   }
-  const cellVariants: Record<string, 'success'> = {}
+  const cellVariants: Record<string, 'success' | 'secondary'> = {}
   if (row.col_toy) cellVariants['col_toy'] = 'success'
   if (row.col_relaxation) cellVariants['col_relaxation'] = 'success'
   if (row.col_decoration) cellVariants['col_decoration'] = 'success'
-  for (const col of houseFavoriteColumns.value) {
-    const cellKey = favoriteCoverageColumnKey(col.favorite)
-    const isCovered = item[cellKey] === true
-    row[cellKey] = isCovered
-    if (isCovered) {
-      cellVariants[cellKey] = 'success'
-    }
-  }
-  if (Object.keys(cellVariants).length > 0) {
-    row._cellVariants = cellVariants
-  }
-  return row
-}
-
-function buildCartRow(item: CartItem, itemFavs: string[]): CartTableItemRow {
   const favSet = new Set(itemFavs)
-  const row: CartTableItemRow = {
-    itemData: item,
-    name: item.name,
-    col_toy: item.tag === 'Toy',
-    col_relaxation: item.tag === 'Relaxation',
-    col_decoration: item.tag === 'Decoration',
-  }
-  const cellVariants: Record<string, 'success'> = {}
-  if (row.col_toy) cellVariants['col_toy'] = 'success'
-  if (row.col_relaxation) cellVariants['col_relaxation'] = 'success'
-  if (row.col_decoration) cellVariants['col_decoration'] = 'success'
   for (const col of houseFavoriteColumns.value) {
     const cellKey = favoriteCoverageColumnKey(col.favorite)
     const isCovered = favSet.has(col.favorite)
     row[cellKey] = isCovered
     if (isCovered) {
-      cellVariants[cellKey] = 'success'
+      // A non-placed (unadded) row covering an already-fulfilled favorite is
+      // redundant — gray out that coverage cell instead of the success highlight
+      // to signal it is lower value than coverage of still-unfulfilled needs.
+      if (!added && fulfilledSet.has(col.favorite)) {
+        cellVariants[cellKey] = 'secondary'
+      } else {
+        cellVariants[cellKey] = 'success'
+      }
     }
   }
   if (Object.keys(cellVariants).length > 0) {
@@ -240,36 +207,58 @@ watch(
   async ([pokemon, items]) => {
     const run = ++recommendationRun
 
-    // Fetch favorites for all cart items in one pass — used for both the
-    // aggregate fulfilled set and the per-row cart coverage table.
-    const allFavsPerItem =
-      items.length > 0 ? await Promise.all(items.map((item) => favoritesForItem(item.name))) : []
+    const cartNames = items.map((item) => item.name)
+    const allFavorites = pokemon.flatMap((name) => props.pokemonData[name]?.favorites ?? [])
 
+    // One graph pass over cart items yields the union of fulfilled favorites.
+    const cartFavs = await favoritesForItems(cartNames)
     if (run !== recommendationRun) return
 
-    const fulfilledFavoriteSet = new Set(allFavsPerItem.flat())
+    const fulfilledFavoriteSet = new Set(Array.from(cartFavs.values()).flat())
     // Only swap the Set identity when contents actually changed so PokemonCards
     // don't re-render on every no-op watch run.
     if (!sameFavorites(fulfilledFavorites.value, fulfilledFavoriteSet)) {
       fulfilledFavorites.value = fulfilledFavoriteSet
     }
-    cartTableItems.value = items.map((item, i) => buildCartRow(item, allFavsPerItem[i]!))
 
-    const allFavorites = pokemon.flatMap((name) => props.pokemonData[name]?.favorites ?? [])
     const unfulfilledFavorites = allFavorites.filter(
       (favorite) => !fulfilledFavoriteSet.has(favorite),
     )
 
-    if (unfulfilledFavorites.length === 0) {
-      activeTableItems.value = []
-      return
-    }
-
-    const recommendations = await recommendedItemsForHouse(unfulfilledFavorites)
-
+    const recommendations = unfulfilledFavorites.length
+      ? await recommendedItemsForHouse(unfulfilledFavorites)
+      : []
     if (run !== recommendationRun) return
 
-    activeTableItems.value = recommendations.map((r) => buildTableRow(r))
+    const allCandidateNames = [...new Set([...recommendations.map((r) => r.name), ...cartNames])]
+    const favByItem = await favoritesForItems(allCandidateNames)
+    if (run !== recommendationRun) return
+
+    const cartNameSet = new Set(cartNames)
+    const baseNames = new Set(recommendations.map((r) => r.name))
+
+    const baseRows = recommendations.map((rec, index) =>
+      buildRecommendationRow(
+        rec,
+        cartNameSet.has(rec.name),
+        index,
+        favByItem.get(rec.name) ?? [],
+        fulfilledFavoriteSet,
+      ),
+    )
+
+    // Cart items not already present as a base row become added-only rows so
+    // every cart item appears exactly once (base row wins on name dedupe).
+    let order = recommendations.length
+    const addedOnlyRows: RecommendationRow[] = []
+    for (const item of items) {
+      if (baseNames.has(item.name)) continue
+      addedOnlyRows.push(
+        buildRecommendationRow(item, true, order++, favByItem.get(item.name) ?? [], fulfilledFavoriteSet),
+      )
+    }
+
+    activeTableItems.value = [...baseRows, ...addedOnlyRows]
   },
   { deep: true, immediate: true },
 )
@@ -282,8 +271,8 @@ const recsDetails = ref<HTMLDetailsElement | null>(null)
 // Favorite-badge clicks (re-emitted by PokemonCard) route the user to the
 // items that fulfill that favorite: open the recommendations panel, latch the
 // lazy table mount, sort the matching coverage column to the top, and scroll
-// the panel into view. When every favorite is fulfilled the panel is absent
-// and there is nothing to route to — no-op.
+// the panel into view. All favorite columns are always present, so a
+// fulfilled-favorite click still resolves to a column and opens the panel.
 function onFavoriteClick(favorite: string) {
   const details = recsDetails.value
   if (!details) return
@@ -310,11 +299,74 @@ function onFavoriteClick(favorite: string) {
   details.querySelector('summary')?.focus()
 }
 
-const filteredTableItems = computed(() =>
-  showCraftableOnly.value
-    ? activeTableItems.value.filter((row) => row.itemData.isCraftable)
-    : activeTableItems.value,
+// Added rows are exempt from the craftable-only filter so an in-cart
+// non-craftable item never leaves the (now sole) table — the old coverage
+// table never filtered cart items by craftability either.
+const filteredRows = computed(() =>
+  activeTableItems.value.filter(
+    (row) => row.added || !showCraftableOnly.value || row.itemData.isCraftable,
+  ),
 )
+
+// Mirrors BTable's default comparator (string coercion + numeric-aware
+// localeCompare, inverted on desc), with `added` as the leading key so
+// added rows always sort above unadded ones and `recOrder` as the final
+// tie-break preserving recommendation relevance.
+function compareRows(a: RecommendationRow, b: RecommendationRow): number {
+  if (a.added !== b.added) return a.added ? -1 : 1
+  for (const { key, order } of sortBy.value) {
+    const c = String(a[key] ?? '').localeCompare(String(b[key] ?? ''), undefined, {
+      numeric: true,
+    })
+    if (c !== 0) return order === 'desc' ? -c : c
+  }
+  return a.recOrder - b.recOrder
+}
+
+// Hover tooltip for a favorite-coverage ✓ cell. "Placed" here means the item is
+// in this house's cart (committed to this house): an in-cart item is actively
+// fulfilling the need, an unadded item could fulfill it, and an unadded item
+// covering an already-fulfilled need is redundant (grayed) — the same states
+// the cell backgrounds communicate.
+function favoriteCellTitle(item: RecommendationRow, fieldKey: string): string | undefined {
+  if (!fieldKey.startsWith('fav_')) return undefined
+  const favorite = fieldKey.slice('fav_'.length)
+  if (item.added) {
+    return `${item.name} is fulfilling ${favorite}`
+  }
+  if (fulfilledFavorites.value.has(favorite)) {
+    return `${item.name} would fulfill ${favorite}, but it is fulfilled by other items already placed in this house.`
+  }
+  return `${item.name} could fulfill ${favorite} if it were placed in this house`
+}
+
+// BTable row class: give in-cart (added) rows a subtle background so they stand
+// out beyond the "Added" badge alone. Applied via `tbody-tr-class` to each row.
+function addedRowClass(item: unknown): string {
+  return (item as RecommendationRow | null)?.added ? 'recommendation-added-row' : ''
+}
+
+const sortedRows = computed(() => [...filteredRows.value].sort(compareRows))
+
+const visibleRows = computed(() => sortedRows.value.slice(0, visibleCount.value))
+
+const hasMore = computed(() => visibleCount.value < sortedRows.value.length)
+
+const remainingCount = computed(() => sortedRows.value.length - visibleCount.value)
+
+// Reset the expanded window on a new pokemon set and on the craftable-only
+// toggle. Cart add/remove reorders the same list, so user expansion persists.
+watch(
+  () => props.house.pokemon,
+  () => {
+    visibleCount.value = RECOMMENDATIONS_PAGE_SIZE
+  },
+  { deep: true },
+)
+
+watch(showCraftableOnly, () => {
+  visibleCount.value = RECOMMENDATIONS_PAGE_SIZE
+})
 
 watchEffect(() => {
   const cols = unfulfilledFavoriteColumns.value
@@ -330,6 +382,20 @@ watchEffect(() => {
 
   if (sortBy.value.length > 0 && !validKeys.has(sortBy.value[0]!.key)) {
     sortBy.value = firstKey ? [{ key: firstKey, order: 'desc' }] : []
+    return
+  }
+
+  // Rank item impact only by needs yet to be fulfilled: if the active sort
+  // column is a favorite that has become fulfilled, re-rank to the first
+  // remaining unfulfilled favorite column.
+  if (sortBy.value.length > 0 && firstKey) {
+    const active = sortBy.value[0]!
+    if (active.key.startsWith('fav_')) {
+      const favorite = active.key.slice('fav_'.length)
+      if (fulfilledFavorites.value.has(favorite) && active.key !== firstKey) {
+        sortBy.value = [{ key: firstKey, order: 'desc' }]
+      }
+    }
   }
 })
 </script>
@@ -393,113 +459,6 @@ watchEffect(() => {
     </BCardGroup>
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
 
-    <div v-if="cartTableItems.length" class="mt-3" data-testid="cart-items-coverage">
-      <h6 class="cart-section-heading">
-        Items in cart
-        <span
-          class="cart-sync-badge"
-          title="These items appear in the shopping cart. The Placed stamp syncs between here and the cart."
-          >🛒 syncs with cart</span
-        >
-      </h6>
-      <BTable
-        no-border-collapse
-        small
-        responsive
-        class="recommended-items-table"
-        :fields="cartTableFields"
-        :items="cartTableItems"
-        data-testid="cart-coverage-table"
-      >
-        <template #head()="{ column, label, field }">
-          <template v-if="(column as string).startsWith('fav_')">
-            <span
-              v-if="label"
-              :class="
-                fulfilledFavorites.has(label as string) ? 'text-success fw-bold' : 'text-danger'
-              "
-              :data-testid="`fav-header-${column}`"
-            >
-              {{ label }} &times;{{ (field as any).count }}
-            </span>
-          </template>
-          <template
-            v-else-if="
-              column === 'col_toy' || column === 'col_relaxation' || column === 'col_decoration'
-            "
-          >
-            <span
-              v-if="label"
-              :class="fulfilledTags.has(label as string) ? 'text-success fw-bold' : 'text-danger'"
-            >
-              {{ label }}
-            </span>
-          </template>
-          <template v-else-if="column === 'col_image'"
-            ><span class="visually-hidden">Item image</span></template
-          >
-          <template v-else-if="column === 'col_actions'"
-            ><span class="visually-hidden">Actions</span></template
-          >
-          <template v-else
-            ><span>{{ label }}</span></template
-          >
-        </template>
-
-        <template #cell(col_image)="{ item }">
-          <img
-            v-if="(item as any).itemData.picturePath"
-            :src="assetPath((item as any).itemData.picturePath)"
-            :alt="(item as any).itemData.name"
-            class="item-thumbnail"
-          />
-        </template>
-
-        <template #cell(name)="{ item }">
-          <span
-            :title="(item as any).itemData.flavorText ?? undefined"
-            :class="{
-              'text-decoration-line-through': progressStore.isItemPlaced(
-                house.houseId,
-                (item as any).itemData.name,
-              ),
-            }"
-            data-testid="item-name"
-            >{{ (item as any).itemData.name }}</span
-          >
-        </template>
-
-        <template #cell(col_placed)="{ item }">
-          <label
-            class="progress-action progress-action--placed progress-action--compact me-1"
-            title="Mark as placed in this house — also syncs with sidebar cart"
-          >
-            <input
-              type="checkbox"
-              :checked="progressStore.isItemPlaced(house.houseId, (item as any).itemData.name)"
-              data-testid="progress-checkbox-placed-coverage"
-              @change="progressStore.togglePlacedItem(house.houseId, (item as any).itemData.name)"
-            />
-            <span>Placed</span>
-          </label>
-        </template>
-
-        <template #cell(col_actions)="{ item }">
-          <BCloseButton
-            class="item-remove"
-            data-testid="cart-coverage-remove"
-            :aria-label="`Remove ${(item as any).itemData.name} from house ${house.houseId} cart`"
-            :title="`Remove ${(item as any).itemData.name} from house ${house.houseId} cart`"
-            @click="cartStore.removeItem(house.houseId, (item as any).itemData.name)"
-          />
-        </template>
-
-        <template #cell()="{ field, value }">
-          <span v-if="(field as any).class === 'bool-col' && value" class="bool-check">✓</span>
-        </template>
-      </BTable>
-    </div>
-
     <details
       v-if="activeTableItems.length"
       ref="recsDetails"
@@ -520,13 +479,16 @@ watchEffect(() => {
       </summary>
       <BTable
         v-if="hasOpenedRecs"
+        primary-key="name"
+        no-local-sorting
         no-border-collapse
         small
         responsive
         class="recommended-items-table"
         :fields="recommendationTableFields"
-        :items="filteredTableItems"
+        :items="visibleRows"
         v-model:sort-by="sortBy"
+        :tbody-tr-class="addedRowClass"
         data-testid="recommended-items-list"
       >
         <template #head()="{ column, label, field }">
@@ -571,31 +533,96 @@ watchEffect(() => {
           />
         </template>
 
+        <template #cell(col_placed)="{ item }">
+          <label
+            v-if="(item as any).added"
+            class="progress-action progress-action--placed progress-action--compact"
+            title="Mark as placed in this house — also syncs with sidebar cart"
+          >
+            <input
+              type="checkbox"
+              :checked="progressStore.isItemPlaced(house.houseId, (item as any).name)"
+              data-testid="recommendation-placed"
+              @change="progressStore.togglePlacedItem(house.houseId, (item as any).name)"
+            />
+            <span>Placed</span>
+          </label>
+        </template>
+
         <template #cell(col_actions)="{ item }">
+          <BCloseButton
+            v-if="(item as any).added"
+            class="item-remove"
+            data-testid="recommendation-remove"
+            :aria-label="`Remove ${(item as any).name} from house ${house.houseId} cart`"
+            :title="`Remove ${(item as any).name} from house ${house.houseId} cart`"
+            @click="cartStore.removeItem(house.houseId, (item as any).name)"
+          />
           <BButton
+            v-else
             size="sm"
             variant="outline-success"
             class="cart-add-btn"
             data-testid="add-to-cart"
-            :aria-label="`Add ${(item as any).itemData.name} to cart for house ${house.houseId}`"
-            :title="`Add ${(item as any).itemData.name} to cart for house ${house.houseId}`"
-            @click="cartStore.addItem(house.houseId, (item as any).itemData.name)"
+            :aria-label="`Add ${(item as any).name} to cart for house ${house.houseId}`"
+            :title="`Add ${(item as any).name} to cart for house ${house.houseId}`"
+            @click="cartStore.addItem(house.houseId, (item as any).name)"
             >+</BButton
           >
         </template>
 
         <template #cell(name)="{ item }">
-          <span :title="(item as any).itemData.flavorText ?? undefined" data-testid="item-name">{{
-            (item as any).itemData.name
-          }}</span>
+          <span
+            :title="(item as any).itemData.flavorText ?? undefined"
+            :class="{
+              'text-decoration-line-through': progressStore.isItemPlaced(
+                house.houseId,
+                (item as any).name,
+              ),
+            }"
+            data-testid="item-name"
+          >
+            {{ (item as any).name }}
+            <BBadge
+              v-if="(item as any).added"
+              pill
+              variant="success"
+              class="ms-1"
+              data-testid="recommendation-added-badge"
+              >Added</BBadge
+            >
+          </span>
         </template>
 
         <template #cell(craftability)="{ item }">
           <span data-testid="item-craftability">{{ (item as any).craftability }}</span>
         </template>
 
-        <template #cell()="{ field, value }">
-          <span v-if="(field as any).class === 'bool-col' && value" class="bool-check">✓</span>
+        <template #cell()="{ field, value, item }">
+          <span
+            v-if="(field as any).class === 'bool-col' && value"
+            class="bool-check"
+            :title="favoriteCellTitle(item as any, (field as any).key)"
+            >✓</span
+          >
+        </template>
+
+        <template #custom-foot="{ fields }">
+          <tr v-if="hasMore" class="recommendations-more-row">
+            <td :colspan="fields.length">
+              <BButton
+                size="sm"
+                variant="link"
+                class="recommendations-more-btn"
+                data-testid="recommendations-more"
+                :aria-label="
+                  `Show ${Math.min(RECOMMENDATIONS_PAGE_SIZE, remainingCount)} more recommended items`
+                "
+                @click="visibleCount += RECOMMENDATIONS_PAGE_SIZE"
+                >Show 50 more</BButton
+              >
+            </td>
+          </tr>
         </template>
       </BTable>
     </details>

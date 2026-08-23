@@ -105,6 +105,17 @@ export async function favoritesForItem(item: string): Promise<string[]> {
   return (await loadItemGraph()).favoritesByItem.get(item) ?? []
 }
 
+// Batch favorite lookup for a set of item names in one graph pass. Unknown
+// names map to [] (mirrors favoritesForItem). Input names are deduped first.
+export async function favoritesForItems(names: string[]): Promise<Map<string, string[]>> {
+  const graph = await loadItemGraph()
+  const result = new Map<string, string[]>()
+  for (const name of new Set(names)) {
+    result.set(name, graph.favoritesByItem.get(name) ?? [])
+  }
+  return result
+}
+
 export interface RecommendedHouseItem extends ItemDetails {
   [key: string]: string | boolean | null
 }

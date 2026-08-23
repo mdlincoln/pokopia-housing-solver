@@ -1,6 +1,8 @@
 import HouseRecord, { sameFavorites } from '@/components/HouseRecord.vue'
+import { favoriteCoverageColumnKey, recommendedItemsForHouse } from '@/queries'
 import type { HouseAssignment, PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
+import { useProgressStore } from '@/stores/progress'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -346,7 +348,7 @@ describe('HouseRecord', () => {
     expect(craftabilityOf(wrapper, 'Punching Bag')).toBe('Craftable (Outdoor)')
   })
 
-  it('exposes screen-reader names for the visually empty image/actions columns in both tables', async () => {
+  it('exposes screen-reader names for the visually empty image/actions columns in the merged table', async () => {
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['exercise'] },
     }
@@ -372,29 +374,14 @@ describe('HouseRecord', () => {
     await cartStore.addItem('S1', itemName)
     await flushPromises()
 
-    const coverageHeaders = wrapper.findAll(
-      '[data-testid="cart-coverage-table"] th span.visually-hidden',
+    // The single merged table keeps the same visually-hidden headers.
+    const mergedHeaders = wrapper.findAll(
+      '[data-testid="recommended-items-list"] th span.visually-hidden',
     )
-    expect(coverageHeaders.map((h) => h.text()).sort()).toEqual(['Actions', 'Item image'])
+    expect(mergedHeaders.map((h) => h.text()).sort()).toEqual(['Actions', 'Item image'])
   })
 
-  it('cart coverage table is hidden when cart is empty', async () => {
-    const house: HouseAssignment = {
-      houseId: 'S1',
-      size: 'small',
-      capacity: 1,
-      pokemon: ['AlphaOne'],
-    }
-
-    const wrapper = mount(HouseRecord, {
-      props: { house, pokemonData: testPokemonData },
-    })
-    await flushPromises()
-
-    expect(wrapper.find('[data-testid="cart-items-coverage"]').exists()).toBe(false)
-  })
-
-  it('cart coverage table appears with correct rows after adding cart items', async () => {
+  it('shows an added cart item inline with the Added marker', async () => {
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['exercise'] },
     }
@@ -414,14 +401,15 @@ describe('HouseRecord', () => {
     await cartStore.addItem('S1', itemName)
     await flushPromises()
 
-    const coverage = wrapper.find('[data-testid="cart-items-coverage"]')
-    expect(coverage.exists()).toBe(true)
-    const nameCell = coverage.find('[data-testid="item-name"]')
-    expect(nameCell.exists()).toBe(true)
-    expect(nameCell.text()).toBe(itemName)
+    const addedBadge = wrapper.find('[data-testid="recommendation-added-badge"]')
+    expect(addedBadge.exists()).toBe(true)
+
+    const nameCell = addedBadge.element.closest('[data-testid="item-name"]')
+    expect(nameCell).not.toBeNull()
+    expect(nameCell!.textContent).toContain(itemName)
   })
 
-  it('cart coverage remove button deletes item from cart and hides table', async () => {
+  it('recommendation remove button deletes the item from cart and drops the Added marker', async () => {
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['exercise'] },
     }
@@ -441,16 +429,16 @@ describe('HouseRecord', () => {
     await cartStore.addItem('S1', itemName)
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="cart-items-coverage"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="recommendation-added-badge"]').exists()).toBe(true)
 
-    await wrapper.find('[data-testid="cart-coverage-remove"]').trigger('click')
+    await wrapper.find('[data-testid="recommendation-remove"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="cart-items-coverage"]').exists()).toBe(false)
     expect(cartStore.itemsByHouse.get('S1') ?? []).toHaveLength(0)
+    expect(wrapper.find('[data-testid="recommendation-added-badge"]').exists()).toBe(false)
   })
 
-  it('places the Placed checkbox and remove button in separate coverage cells (AC.2)', async () => {
+  it('places the Placed checkbox and remove button in separate cells (AC.2)', async () => {
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['exercise'] },
     }
@@ -470,20 +458,18 @@ describe('HouseRecord', () => {
     await cartStore.addItem('S1', itemName)
     await flushPromises()
 
-    const row = wrapper.find('[data-testid="cart-coverage-remove"]').element.closest('tr')
+    const row = wrapper.find('[data-testid="recommendation-remove"]').element.closest('tr')
     expect(row).not.toBeNull()
 
-    const placedCell = wrapper
-      .find('[data-testid="progress-checkbox-placed-coverage"]')
-      .element.closest('td')
-    const removeCell = wrapper.find('[data-testid="cart-coverage-remove"]').element.closest('td')
+    const placedCell = wrapper.find('[data-testid="recommendation-placed"]').element.closest('td')
+    const removeCell = wrapper.find('[data-testid="recommendation-remove"]').element.closest('td')
     expect(placedCell).not.toBeNull()
     expect(removeCell).not.toBeNull()
     // Non-destructive placed toggles and destructive removal must not share a cell
     expect(placedCell).not.toBe(removeCell)
   })
 
-  it('cart coverage table shows tag ✓ in the correct column for the item tag', async () => {
+  it('shows tag ✓ in the correct merged-table column for the item tag', async () => {
     // Punching Bag (exercise) has the Toy tag
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['exercise'] },
@@ -505,14 +491,14 @@ describe('HouseRecord', () => {
     await flushPromises()
 
     // Toy column should be hidden once fulfilled by an item in cart; others still present
-    const coverageTable = wrapper.find('[data-testid="cart-coverage-table"]')
-    const headers = coverageTable.findAll('th')
+    const table = wrapper.find('[data-testid="recommended-items-list"]')
+    const headers = table.findAll('th')
     expect(headers.some((h) => h.text().includes('Toy'))).toBe(false)
     expect(headers.some((h) => h.text().includes('Relaxation'))).toBe(true)
     expect(headers.some((h) => h.text().includes('Decoration'))).toBe(true)
   })
 
-  it('cart coverage fav column header turns success when favorite is fulfilled', async () => {
+  it('fav column header turns success when favorite is fulfilled in the merged table', async () => {
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['exercise'] },
     }
@@ -538,7 +524,7 @@ describe('HouseRecord', () => {
     expect(favHeader.classes()).toContain('text-success')
   })
 
-  it('cart coverage fav cell shows success background for covered favorite', async () => {
+  it('favorite coverage cell shows success background for a covered favorite', async () => {
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['exercise'] },
     }
@@ -558,7 +544,7 @@ describe('HouseRecord', () => {
     await cartStore.addItem('S1', itemName)
     await flushPromises()
 
-    const table = wrapper.find('[data-testid="cart-coverage-table"]')
+    const table = wrapper.find('[data-testid="recommended-items-list"]')
     const successCells = table.findAll('tbody td.table-success')
     expect(successCells.length).toBeGreaterThan(0)
   })
@@ -622,7 +608,7 @@ describe('HouseRecord', () => {
     }
   })
 
-  it('hides a fulfilled pokemon favorite column from active recommendations', async () => {
+  it('keeps a fulfilled pokemon favorite column visible with a success header', async () => {
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['exercise', 'cleanliness'] },
     }
@@ -651,16 +637,19 @@ describe('HouseRecord', () => {
     await cartStore.addItem('S1', 'Punching Bag')
     await flushPromises()
 
-    const headerTextsAfter = recommendationTable
-      .findAll('thead th')
-      .map((node) => node.text().toLowerCase().trim())
-      .filter(Boolean)
-    expect(headerTextsAfter.some((text) => text.includes('exercise'))).toBe(false)
-    expect(headerTextsAfter.some((text) => text.includes('cleanliness'))).toBe(true)
+    // The exercise column stays (all favorite columns are always shown); its
+    // header now reads success (fulfilled) while cleanliness stays danger.
+    const exerciseHeader = wrapper.find('[data-testid="fav-header-fav_exercise"]')
+    expect(exerciseHeader.exists()).toBe(true)
+    expect(exerciseHeader.classes()).toContain('text-success')
+
+    const cleanlinessHeader = wrapper.find('[data-testid="fav-header-fav_cleanliness"]')
+    expect(cleanlinessHeader.exists()).toBe(true)
+    expect(cleanlinessHeader.classes()).toContain('text-danger')
   })
 
   // @lat: [[ui#House#Item Metadata Display#Hides recommendations when every favorite is fulfilled]]
-  it('hides recommendations entirely when every favorite is fulfilled', async () => {
+  it('keeps the panel showing added rows when every favorite is fulfilled', async () => {
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['exercise'] },
     }
@@ -676,11 +665,15 @@ describe('HouseRecord', () => {
 
     expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
 
+    await openRecommendations(wrapper)
     const cartStore = useCartStore()
     await cartStore.addItem('S1', 'Punching Bag')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(false)
+    // Panel stays mounted showing the added row; allFulfilled class applies.
+    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="recommendation-added-badge"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="house-card"]').classes()).toContain('fully-fulfilled')
   })
 
   it('fulfilled favorites do not bleed across houses', async () => {
@@ -872,7 +865,7 @@ describe('HouseRecord', () => {
     expect(pin.attributes('aria-checked')).toBe('true')
   })
 
-  it('add-to-cart and cart-coverage-remove buttons expose item + house names (AC.4)', async () => {
+  it('add-to-cart and recommendation-remove buttons expose item + house names (AC.4)', async () => {
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['exercise'] },
     }
@@ -894,7 +887,7 @@ describe('HouseRecord', () => {
     await addButton.trigger('click')
     await flushPromises()
 
-    const removeButton = wrapper.find('[data-testid="cart-coverage-remove"]')
+    const removeButton = wrapper.find('[data-testid="recommendation-remove"]')
     expect(removeButton.exists()).toBe(true)
     expect(removeButton.attributes('aria-label')).toBe(`Remove ${itemName} from house S1 cart`)
   })
@@ -936,7 +929,7 @@ describe('HouseRecord', () => {
     expect(sortedHeaders[0]!.find('[data-testid="fav-header-fav_exercise"]').exists()).toBe(true)
   })
 
-  it('clicking a fulfilled favorite badge is a silent no-op when the panel is gone (AC.3)', async () => {
+  it('clicking a fulfilled favorite badge still routes safely when the panel shows only added rows (AC.3)', async () => {
     const errors: unknown[] = []
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['exercise'] },
@@ -960,11 +953,14 @@ describe('HouseRecord', () => {
     })
     await flushPromises()
 
-    // Fulfill the only favorite — the recommendations panel disappears entirely
+    await openRecommendations(wrapper)
+
+    // Fulfill the only favorite — the panel stays mounted showing only the
+    // added row (the merged table is the single coverage surface).
     const cartStore = useCartStore()
     await cartStore.addItem('S1', 'Punching Bag')
     await flushPromises()
-    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
 
     const badge = wrapper.find('[data-testid="fave-badge"]')
     expect(badge.element.closest('tr')!.querySelector('span.bool-check')).not.toBeNull()
@@ -972,7 +968,439 @@ describe('HouseRecord', () => {
     await flushPromises()
 
     expect(errors).toEqual([])
-    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
+  })
+
+  it('renders at most 50 rows and shows more-footer', async () => {
+    const pokemonData: PokemonData = { Solo: { image: '', favorites: ['metal stuff'] } }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Solo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const table = wrapper.find('[data-testid="recommended-items-list"]')
+    expect(table.findAll('tbody tr').length).toBeLessThanOrEqual(50)
+    expect(wrapper.find('[data-testid="recommendations-more"]').exists()).toBe(true)
+  })
+
+  it('more-footer appends the next 50 rows and hides at end', async () => {
+    const total = (await recommendedItemsForHouse(['metal stuff'])).length
+    expect(total).toBeGreaterThan(50)
+
+    const pokemonData: PokemonData = { Solo: { image: '', favorites: ['metal stuff'] } }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Solo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const rows = () => wrapper.find('[data-testid="recommended-items-list"]').findAll('tbody tr')
+    expect(rows().length).toBe(50)
+
+    await wrapper.find('[data-testid="recommendations-more"]').trigger('click')
+    await flushPromises()
+    expect(rows().length).toBe(Math.min(total, 100))
+
+    while (wrapper.find('[data-testid="recommendations-more"]').exists()) {
+      await wrapper.find('[data-testid="recommendations-more"]').trigger('click')
+      await flushPromises()
+    }
+    expect(rows().length).toBe(total)
+    expect(wrapper.find('[data-testid="recommendations-more"]').exists()).toBe(false)
+  })
+
+  it('sort-before-paginate: sorting applies to the full list within the unadded group', async () => {
+    const recs = await recommendedItemsForHouse(['metal stuff', 'stone stuff'])
+    const stoneKey = favoriteCoverageColumnKey('stone stuff')
+    const metalKey = favoriteCoverageColumnKey('metal stuff')
+
+    // Pick a stone-stuff-only item whose raw (relevance) index lies beyond the
+    // first 50. Sorting by the stone column must surface it into the window.
+    const targetIdx = recs.findIndex(
+      (r, i) => i > 50 && r[stoneKey] === true && r[metalKey] === false,
+    )
+    expect(targetIdx).toBeGreaterThan(50)
+    const targetName = recs[targetIdx]!.name
+
+    const pokemonData: PokemonData = {
+      Solo: { image: '', favorites: ['metal stuff', 'stone stuff'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Solo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const stoneBadge = wrapper
+      .findAll('[data-testid="fave-badge"]')
+      .find((b) => b.text().includes('stone stuff'))
+    expect(stoneBadge).toBeDefined()
+    await stoneBadge!.trigger('click')
+    await flushPromises()
+
+    const visibleNames = wrapper.findAll('[data-testid="item-name"]').map((c) => c.text())
+    const sortedIndex = visibleNames.indexOf(targetName)
+    expect(sortedIndex).toBeGreaterThanOrEqual(0)
+    expect(sortedIndex).toBeLessThan(50)
+  })
+
+  it('added item sorts to top with Added marker, remove and placed controls', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['exercise', 'cleanliness'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const cartStore = useCartStore()
+    // Punching Bag covers only 'exercise'; 'cleanliness' stays unfulfilled so
+    // unadded rows remain beneath the added row.
+    await cartStore.addItem('S1', 'Punching Bag')
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="recommended-items-list"] tbody tr')
+    expect(rows.length).toBeGreaterThan(1)
+
+    const firstRow = rows[0]!
+    expect(firstRow.text()).toContain('Punching Bag')
+    expect(firstRow.find('[data-testid="recommendation-added-badge"]').exists()).toBe(true)
+    expect(firstRow.find('[data-testid="add-to-cart"]').exists()).toBe(false)
+    // In-cart rows carry the added-row styling class; unadded rows do not.
+    expect(firstRow.classes()).toContain('recommendation-added-row')
+    expect(rows[1]!.classes()).not.toContain('recommendation-added-row')
+    expect(rows[1]!.find('[data-testid="recommendation-added-badge"]').exists()).toBe(false)
+
+    const placed = firstRow.find('[data-testid="recommendation-placed"]')
+    const remove = firstRow.find('[data-testid="recommendation-remove"]')
+    expect(placed.exists()).toBe(true)
+    expect(remove.exists()).toBe(true)
+    expect(placed.element.closest('td')).not.toBe(remove.element.closest('td'))
+  })
+
+  it('added non-craftable item survives craftable-only filter', async () => {
+    const pokemonData: PokemonData = { ShinyOne: { image: '', favorites: ['shiny stuff'] } }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['ShinyOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    // Locate a Buy (non-craftable) row and add it to the cart.
+    const buyRows = wrapper
+      .findAll('[data-testid="item-craftability"]')
+      .filter((c) => c.text() === 'Buy')
+    expect(buyRows.length).toBeGreaterThan(0)
+    const buyName = buyRows[0]!.element
+      .closest('tr')!
+      .querySelector('[data-testid="item-name"]')!
+      .textContent
+
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', buyName!)
+    await flushPromises()
+
+    const toggle = wrapper.find(
+      '[data-testid="recommended-items"] summary input[type="checkbox"]',
+    )
+    expect(toggle.exists()).toBe(true)
+    await toggle.setValue(true)
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="recommended-items-list"] tbody tr')
+    const addedRow = rows.find((r) => r.find('[data-testid="recommendation-added-badge"]').exists())
+    expect(addedRow).toBeDefined()
+    expect(addedRow!.find('[data-testid="item-craftability"]').text()).toBe('Buy')
+
+    // Every unadded row is craftable — non-craftable unadded rows were filtered.
+    for (const row of rows) {
+      if (row.find('[data-testid="recommendation-added-badge"]').exists()) continue
+      expect(row.find('[data-testid="item-craftability"]').text()).toMatch(/^Craftable/)
+    }
+  })
+
+  it('overlapping added items both remain visible', async () => {
+    const pokemonData: PokemonData = { FitOne: { image: '', favorites: ['exercise'] } }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const names = wrapper.findAll('[data-testid="item-name"]').map((c) => c.text())
+    expect(names.length).toBeGreaterThanOrEqual(2)
+
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', names[0]!)
+    await cartStore.addItem('S1', names[1]!)
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid="recommendation-added-badge"]').length).toBe(2)
+    const visibleNames = wrapper.findAll('[data-testid="item-name"]').map((c) => c.text())
+    expect(visibleNames.some((n) => n.startsWith(names[0]!))).toBe(true)
+    expect(visibleNames.some((n) => n.startsWith(names[1]!))).toBe(true)
+  })
+
+  it('coverage table is gone and inline controls sync', async () => {
+    const pokemonData: PokemonData = { FitOne: { image: '', favorites: ['exercise'] } }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    expect(wrapper.find('[data-testid="cart-items-coverage"]').exists()).toBe(false)
+
+    const itemName = wrapper.find('[data-testid="item-name"]').text()
+    const cartStore = useCartStore()
+    const progressStore = useProgressStore()
+    await cartStore.addItem('S1', itemName)
+    await flushPromises()
+
+    const placed = wrapper.find('[data-testid="recommendation-placed"]')
+    expect(placed.exists()).toBe(true)
+
+    await placed.setValue(true)
+    await flushPromises()
+    expect(progressStore.isItemPlaced('S1', itemName)).toBe(true)
+    expect(wrapper.find('[data-testid="item-name"]').classes()).toContain(
+      'text-decoration-line-through',
+    )
+
+    await wrapper.find('[data-testid="recommendation-remove"]').trigger('click')
+    await flushPromises()
+
+    expect(cartStore.itemsByHouse.get('S1') ?? []).toHaveLength(0)
+    expect(wrapper.find('[data-testid="recommendation-remove"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="recommendation-placed"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="recommendation-added-badge"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid="add-to-cart"]').length).toBeGreaterThan(0)
+  })
+
+  it('craftable-only toggle keeps the panel mounted even when the visible list shrinks', async () => {
+    const pokemonData: PokemonData = { Solo: { image: '', favorites: ['metal stuff'] } }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Solo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const toggleSelector = '[data-testid="recommended-items"] summary input[type="checkbox"]'
+    const toggle = wrapper.find(toggleSelector)
+    expect(toggle.exists()).toBe(true)
+    await toggle.setValue(true)
+    await flushPromises()
+
+    // The summary/checkbox never unmounts even after filtering.
+    expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(true)
+    expect(wrapper.find(toggleSelector).exists()).toBe(true)
+  })
+
+  it('unadded item covering only an already-fulfilled favorite leaves the merged list', async () => {
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['exercise', 'cleanliness'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['FitOne'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const cartStore = useCartStore()
+    // Punching Bag covers only 'exercise' (not 'cleanliness').
+    await cartStore.addItem('S1', 'Punching Bag')
+    await flushPromises()
+
+    const names = wrapper.findAll('[data-testid="item-name"]').map((c) => c.text())
+
+    // A different exercise-only item (not in the cart) must be absent now that
+    // 'exercise' is fulfilled; a cleanliness item should remain.
+    const exerciseOnly = (await recommendedItemsForHouse(['exercise'])).find(
+      (r) => r.name !== 'Punching Bag',
+    )
+    expect(exerciseOnly).toBeDefined()
+    expect(names.some((n) => n === exerciseOnly!.name)).toBe(false)
+    expect(names.some((n) => n === 'Water Basin')).toBe(true)
+  })
+
+  it('grays out redundant coverage of an already-fulfilled favorite in unadded rows', async () => {
+    const pokemonData: PokemonData = {
+      Solo: { image: '', favorites: ['metal stuff', 'stone stuff'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Solo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    // Shower covers 'metal stuff' but not 'stone stuff', so adding it fulfills
+    // 'metal stuff' while leaving 'stone stuff' unfulfilled. Some of those stone
+    // recommendations also cover the now-fulfilled metal stuff.
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', 'Shower')
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="recommended-items-list"] tbody tr')
+    const grayCells = wrapper.findAll('[data-testid="recommended-items-list"] td.table-secondary')
+    // Redundant coverage (unadded row covering an already-fulfilled favorite)
+    // is grayed out.
+    expect(grayCells.length).toBeGreaterThan(0)
+    for (const cell of grayCells) {
+      const row = cell.element.closest('tr')!
+      expect(row.querySelector('[data-testid="recommendation-added-badge"]')).toBeNull()
+    }
+
+    // An added row's coverage is never grayed — it keeps success.
+    const addedRows = rows.filter((r) =>
+      r.find('[data-testid="recommendation-added-badge"]').exists(),
+    )
+    expect(addedRows.length).toBeGreaterThan(0)
+    for (const row of addedRows) {
+      expect(row.findAll('td.table-secondary').length).toBe(0)
+    }
+  })
+
+  it('exposes hover tooltips on favorite-coverage cells describing fulfillment', async () => {
+    const pokemonData: PokemonData = {
+      Solo: { image: '', favorites: ['metal stuff', 'stone stuff'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Solo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const titles = () =>
+      wrapper
+        .findAll('[data-testid="recommended-items-list"] span.bool-check')
+        .map((s) => s.attributes('title'))
+        .filter((t): t is string => !!t)
+
+    // Before anything is placed, unadded recommendations covering a
+    // still-unfulfilled need hint that placing them would fulfill it (case 2).
+    expect(
+      titles().some((t) => t.includes('could fulfill') && t.endsWith(' if it were placed in this house')),
+    ).toBe(true)
+
+    // Add Shower → fulfills 'metal stuff', leaving 'stone stuff' unfulfilled.
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', 'Shower')
+    await flushPromises()
+
+    // Case 1: the placed (in-cart) Shower is actively fulfilling 'metal stuff'.
+    expect(titles().some((t) => t === 'Shower is fulfilling metal stuff')).toBe(true)
+
+    // Case 3: an unadded item covering the now-already-fulfilled 'metal stuff'
+    // (the grayed out cell) flags that it is redundant.
+    const grayTitle = wrapper.find(
+      '[data-testid="recommended-items-list"] td.table-secondary span.bool-check',
+    )
+    expect(grayTitle.exists()).toBe(true)
+    expect(grayTitle.attributes('title')).toMatch(
+      / would fulfill .+ but it is fulfilled by other items already placed in this house\.$/,
+    )
+
+    // Case 2 still applies to coverage of the still-unfulfilled 'stone stuff'.
+    expect(
+      titles().some((t) =>
+        t.endsWith(' could fulfill stone stuff if it were placed in this house'),
+      ),
+    ).toBe(true)
+  })
+
+  it('re-ranks to the first unfulfilled favorite when the active favorite becomes fulfilled', async () => {
+    const pokemonData: PokemonData = {
+      Solo: { image: '', favorites: ['metal stuff', 'stone stuff'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Solo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const descHeaders = () =>
+      wrapper.findAll('[data-testid="recommended-items-list"] th[aria-sort="descending"]')
+
+    // Before adding anything, the default sort targets the first unfulfilled
+    // favorite — 'metal stuff' (alphabetically before 'stone stuff').
+    expect(descHeaders().length).toBe(1)
+    expect(
+      descHeaders()[0]!.find('[data-testid="fav-header-fav_metal stuff"]').exists(),
+    ).toBe(true)
+
+    // Adding Shower fulfills 'metal stuff'; the table must re-rank to the only
+    // remaining unfulfilled favorite, 'stone stuff' — not stay on the fulfilled
+    // 'metal stuff' column.
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', 'Shower')
+    await flushPromises()
+
+    expect(descHeaders().length).toBe(1)
+    expect(
+      descHeaders()[0]!.find('[data-testid="fav-header-fav_stone stuff"]').exists(),
+    ).toBe(true)
   })
 })
 

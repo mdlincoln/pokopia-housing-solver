@@ -349,6 +349,48 @@ test.describe('Shopping Cart', () => {
     await expect(page.getByTestId('cart-empty')).toBeVisible({ timeout: 2000 })
   })
 
+  // @lat: [[ui#House#Recommended items#Paginates at 50 rows]]
+  test('recommendations paginate at 50 rows and appends without recreating rows', async ({ page }) => {
+    test.setTimeout(40_000)
+    await page.goto('/')
+
+    // Abra carries the 'metal stuff' favorite, so its recommendation list is
+    // far larger than the 50-row page.
+    await setSpinbutton(page, 'house-small', 1)
+    await selectPokemon(page, 'Abra')
+    await expect(page.getByTestId('results')).toContainText('Abra', { timeout: 30_000 })
+
+    const details = page.getByTestId('recommended-items')
+    await expect(details).toBeVisible()
+    await details.locator('summary').click()
+
+    const list = page.getByTestId('recommended-items-list')
+    await expect(list).toBeVisible()
+
+    const tbodyRows = list.locator('tbody tr')
+    const initialCount = await tbodyRows.count()
+    expect(initialCount).toBeLessThanOrEqual(50)
+    await expect(page.getByTestId('recommendations-more')).toBeVisible()
+
+    // Stamp the first data row so we can prove it is reused, not recreated.
+    const firstRow = tbodyRows.first()
+    await firstRow.evaluate((el) => {
+      ;(el as HTMLElement).dataset.sentinel = 'keep-me'
+    })
+
+    await page.getByTestId('recommendations-more').click()
+    await expect(tbodyRows).toHaveCount(initialCount + 50)
+
+    // The originally stamped node is still connected and keeps its sentinel:
+    // rows are appended under primary-key, not recreated.
+    const probe = await firstRow.evaluate((el) => ({
+      connected: el.isConnected,
+      sentinel: (el as HTMLElement).dataset.sentinel,
+    }))
+    expect(probe.connected).toBe(true)
+    expect(probe.sentinel).toBe('keep-me')
+  })
+
   // @lat: [[ui#ShoppingCart#Progress Store#Placed state clears on cart remove]]
   test('placed state is cleared when item is removed and re-added to cart', async ({ page }) => {
     test.setTimeout(40_000)
@@ -364,31 +406,40 @@ test.describe('Shopping Cart', () => {
     await details.locator('summary').click()
 
     const recommendedList = page.getByTestId('recommended-items-list')
-    const pinwheelsRow = recommendedList.locator('tr').filter({ hasText: 'Pinwheels' })
-    await expect(pinwheelsRow).toBeVisible({ timeout: 5_000 })
+    await expect(recommendedList).toBeVisible()
 
-    // 1. Add Pinwheels to the house
-    await pinwheelsRow.getByTestId('add-to-cart').click()
+    // 1. Add the first recommended item (deterministically in the first window,
+    //    unlike a hard-coded name that could sit beyond the 50-row page).
+    const firstAdd = recommendedList.getByTestId('add-to-cart').first()
+    await expect(firstAdd).toBeVisible()
+    await firstAdd.click()
+
+    const addedRow = recommendedList
+      .locator('tr')
+      .filter({ has: page.getByTestId('recommendation-added-badge') })
+      .first()
+    await expect(addedRow).toBeVisible({ timeout: 2_000 })
 
     // 2. Mark it as placed
-    const coverageSection = page.getByTestId('cart-items-coverage')
-    const pinwheelsCoverageRow = coverageSection.locator('tr').filter({ hasText: 'Pinwheels' })
-    await expect(pinwheelsCoverageRow).toBeVisible({ timeout: 2_000 })
-    const placedCheckbox = pinwheelsCoverageRow.getByTestId('progress-checkbox-placed-coverage')
+    const placedCheckbox = addedRow.getByTestId('recommendation-placed')
     await placedCheckbox.check()
     await expect(placedCheckbox).toBeChecked()
 
     // 3. Remove it from the house
-    await pinwheelsCoverageRow.getByTestId('cart-coverage-remove').click()
-    await expect(pinwheelsCoverageRow).toBeHidden({ timeout: 2_000 })
+    await addedRow.getByTestId('recommendation-remove').click()
+    await expect(page.getByTestId('recommendation-added-badge')).toHaveCount(0, { timeout: 2_000 })
 
-    // 4. Add Pinwheels again (it reappears in recommended items once removed)
-    await expect(pinwheelsRow).toBeVisible({ timeout: 5_000 })
-    await pinwheelsRow.getByTestId('add-to-cart').click()
+    // 4. Add the item again (it reappears as an unadded recommendation)
+    await expect(recommendedList.getByTestId('add-to-cart').first()).toBeVisible()
+    await recommendedList.getByTestId('add-to-cart').first().click()
 
     // 5. Assert it is NOT placed
-    await expect(pinwheelsCoverageRow).toBeVisible({ timeout: 2_000 })
-    await expect(pinwheelsCoverageRow.getByTestId('progress-checkbox-placed-coverage')).not.toBeChecked()
+    const reAddedRow = recommendedList
+      .locator('tr')
+      .filter({ has: page.getByTestId('recommendation-added-badge') })
+      .first()
+    await expect(reAddedRow).toBeVisible({ timeout: 2_000 })
+    await expect(reAddedRow.getByTestId('recommendation-placed')).not.toBeChecked()
   })
 
   // @lat: [[ui#ShoppingCart#Clear all empties the cart]]
@@ -781,7 +832,12 @@ test.describe('Usability (P2 audit fixes)', () => {
     await assertTapTarget(page, 'favorite badge', page.getByTestId('fave-badge').first())
     // Desktop cart remove controls — also asserts AC.5 (visible at ≥992px)
     await assertTapTarget(page, 'cart-remove', page.getByTestId('cart-remove').first())
-    await assertTapTarget(page, 'cart-coverage-remove', page.getByTestId('cart-coverage-remove').first())
+    await assertTapTarget(page, 'recommendation-remove', page.getByTestId('recommendation-remove').first())
+    await assertTapTarget(
+      page,
+      'recommendation-placed',
+      page.locator('.recommended-items-table .progress-action--placed').first(),
+    )
 
     // Mobile width — resize, state persists (no re-setup). House cards stay in
     // main content; the cart sidebar is behind the overlay, so open it first.
@@ -792,7 +848,12 @@ test.describe('Usability (P2 audit fixes)', () => {
     await expect(page.getByTestId('shopping-cart')).toBeVisible()
 
     await assertTapTarget(page, 'cart-remove', page.getByTestId('cart-remove').first())
-    await assertTapTarget(page, 'cart-coverage-remove', page.getByTestId('cart-coverage-remove').first())
+    await assertTapTarget(page, 'recommendation-remove', page.getByTestId('recommendation-remove').first())
+    await assertTapTarget(
+      page,
+      'recommendation-placed',
+      page.locator('.recommended-items-table .progress-action--placed').first(),
+    )
   })
 
   // @lat: [[ui#HomeView#Accessibility#Layout uses dynamic viewport units]]
