@@ -461,12 +461,54 @@ body {
   box-shadow: var(--trop-shadow-mid);
 }
 
-.pokemon-card-body {
-  padding: var(--space-2) var(--space-3);
+.pokemon-card-header {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+}
+
+.pokemon-name-col {
+  min-width: 0; /* let a long name shrink/wrap instead of pushing the pin off the row */
+}
+
+.pokemon-name {
+  overflow-wrap: break-word; /* safety: break very long names rather than overflow */
+  /* Reserve two name-line boxes so every card's top row matches the height of
+     the cards whose names wrap onto two lines (keeps card heights uniform). */
+  min-height: 2.4em; /* fallback: 2 × 1.2em — Bootstrap heading line-height */
+  min-height: 2lh; /* exact two line boxes where the lh unit is supported */
 }
 
 .pokemon-avatar {
   border-radius: 0.7rem;
+}
+
+.pokemon-favorites-table {
+  margin: 0; /* flush with the enclosing card: no extra padding or margins */
+}
+
+.pokemon-favorites-table td.bool-col {
+  width: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  text-align: center;
+  border-left: 1px solid var(--bs-border-color);
+}
+
+.pokemon-favorites-table th {
+  padding: 0; /* header is visually hidden; don't add vertical space */
+  border: 0;
+}
+
+.favorite-need {
+  /* WCAG 2.5.8 minimum tap target: 24×24 CSS px (matches .favorite-pill pin-icon convention) */
+  min-width: 24px;
+  min-height: 24px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  /* Match the sibling `.pin-icon` (.btn.btn-link.p-0) convention: inherit the
+     card's text color instead of Bootstrap link blue — the control is a name,
+     not a hyperlink */
+  color: inherit;
+  text-decoration: none;
 }
 
 .house-card .card-group {
@@ -612,7 +654,7 @@ body {
     padding: var(--space-2);
   }
 
-  .pokemon-card-body {
+  .pokemon-card-header {
     padding: var(--space-2);
   }
 }

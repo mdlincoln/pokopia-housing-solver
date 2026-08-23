@@ -460,22 +460,24 @@ test.describe('Shopping Cart', () => {
     await page.getByRole('button', { name: 'Show a sample island' }).click()
     await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
 
-    // With an empty cart every favorite is unfulfilled. Click the second danger
-    // badge (when available) so the assertion can't be satisfied by the panel's
-    // default sort column.
+    // With an empty cart every favorite is unfulfilled. Click the second
+    // unfulfilled favorite control (when available) so the assertion can't be
+    // satisfied by the panel's default sort column.
     const houseCard = page.getByTestId('house-card').first()
-    const badges = houseCard.locator('[data-testid="fave-badge"].text-bg-danger')
-    const badgeCount = await badges.count()
+    const favoriteButtons = houseCard
+      .locator('tr', { hasNot: page.locator('span.bool-check') })
+      .locator('[data-testid="fave-badge"]')
+    const badgeCount = await favoriteButtons.count()
     expect(badgeCount).toBeGreaterThan(0)
-    const badge = badges.nth(Math.min(1, badgeCount - 1))
-    const favorite = (await badge.textContent())!.replace(/^[✗✓]\s*/, '').trim()
+    const favoriteButton = favoriteButtons.nth(Math.min(1, badgeCount - 1))
+    const favorite = (await favoriteButton.textContent())!.trim()
     expect(favorite.length).toBeGreaterThan(0)
 
     const details = houseCard.getByTestId('recommended-items')
     await expect(details).toBeVisible()
     expect(await details.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false)
 
-    await badge.click()
+    await favoriteButton.click()
 
     // Panel opens, table mounts, and the favorite's column sorts descending
     expect(await details.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(true)
@@ -483,6 +485,29 @@ test.describe('Shopping Cart', () => {
       `th:has([data-testid="fav-header-fav_${favorite}"])`,
     )
     await expect(header).toHaveAttribute('aria-sort', 'descending')
+  })
+
+  // @lat: [[ui#House#Favorite control keyboard activation opens recommendations]]
+  test('pressing Enter on a focused favorite control opens recommendations', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Show a sample island' }).click()
+    await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
+
+    // The favorite control is a native <button>, so keyboard activation is
+    // browser behavior; this is a real-browser guard for the AC.6 contract.
+    const houseCard = page.getByTestId('house-card').first()
+    const favoriteControl = houseCard.getByTestId('fave-badge').first()
+    const details = houseCard.getByTestId('recommended-items')
+    await expect(details).toBeVisible()
+    expect(await details.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false)
+
+    await favoriteControl.focus()
+    await page.keyboard.press('Enter')
+
+    expect(await details.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(true)
   })
 
   // @lat: [[ui#ShoppingCart#Annotates cart items whose house no longer exists]]

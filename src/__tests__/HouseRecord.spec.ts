@@ -563,7 +563,7 @@ describe('HouseRecord', () => {
     expect(successCells.length).toBeGreaterThan(0)
   })
 
-  it('fulfilled favorite badges turn success after adding a covering cart item', async () => {
+  it('fulfilled favorite rows show ✓ after adding a covering cart item', async () => {
     const pokemonData: PokemonData = {
       FitOne: { image: '', favorites: ['exercise'] },
     }
@@ -577,11 +577,14 @@ describe('HouseRecord', () => {
     const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
     await flushPromises()
 
-    // Before adding any cart items, the exercise badge should be danger (unfulfilled)
-    const favBadge = wrapper.find('[data-testid="fave-badge"]')
-    expect(favBadge.text()).toContain('exercise')
-    expect(favBadge.classes()).toContain('text-bg-danger')
-    expect(favBadge.classes()).not.toContain('text-bg-success')
+    const exerciseRow = () =>
+      wrapper
+        .findAll('[data-testid="fave-badge"]')
+        .find((b) => b.text().includes('exercise'))!
+        .element.closest('tr')!
+
+    // Before adding any cart items, the exercise row shows no checkmark
+    expect(exerciseRow().querySelector('span.bool-check')).toBeNull()
 
     // Add an Exercise item to the cart
     await openRecommendations(wrapper)
@@ -590,7 +593,10 @@ describe('HouseRecord', () => {
     await cartStore.addItem('S1', itemName)
     await flushPromises()
 
-    expect(favBadge.classes()).toContain('text-bg-success')
+    // Re-find from the live wrapper; the exercise row now shows the ✓
+    const check = exerciseRow().querySelector('span.bool-check')
+    expect(check).not.toBeNull()
+    expect(check!.textContent).toBe('✓')
   })
 
   it('favorite coverage cells use success background and show a checkmark', async () => {
@@ -709,8 +715,8 @@ describe('HouseRecord', () => {
     const badgeA = wrapperA.find('[data-testid="fave-badge"]')
     const badgeB = wrapperB.find('[data-testid="fave-badge"]')
 
-    expect(badgeA.classes()).toContain('text-bg-success')
-    expect(badgeB.classes()).not.toContain('text-bg-success')
+    expect(badgeA.element.closest('tr')!.querySelector('span.bool-check')).not.toBeNull()
+    expect(badgeB.element.closest('tr')!.querySelector('span.bool-check')).toBeNull()
   })
 
   it('shows flavor text as title attribute on item name', async () => {
@@ -961,7 +967,7 @@ describe('HouseRecord', () => {
     expect(wrapper.find('[data-testid="recommended-items"]').exists()).toBe(false)
 
     const badge = wrapper.find('[data-testid="fave-badge"]')
-    expect(badge.classes()).toContain('text-bg-success')
+    expect(badge.element.closest('tr')!.querySelector('span.bool-check')).not.toBeNull()
     await badge.trigger('click')
     await flushPromises()
 

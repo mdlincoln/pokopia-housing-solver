@@ -75,7 +75,7 @@ describe('PokemonCard', () => {
     expect(badge.classes()).toContain('rounded-pill')
   })
 
-  it('favorite badges are danger when fulfilledFavorites is not provided', () => {
+  it('renders one row per favorite with no checkmarks when fulfilledFavorites is not provided', () => {
     const wrapper = mount(PokemonCard, {
       props: {
         name: 'TestMon',
@@ -86,13 +86,11 @@ describe('PokemonCard', () => {
 
     const badges = wrapper.findAll('[data-testid="fave-badge"]')
     expect(badges).toHaveLength(2)
-    for (const badge of badges) {
-      expect(badge.classes()).toContain('text-bg-danger')
-      expect(badge.classes()).not.toContain('text-bg-success')
-    }
+    expect(badges.map((b) => b.text())).toEqual(['Exercise', 'Cleanliness'])
+    expect(wrapper.findAll('span.bool-check')).toHaveLength(0)
   })
 
-  it('fulfilled favorite badge turns success; unfulfilled badge stays danger', () => {
+  it('shows a bool-check only on fulfilled favorite rows', () => {
     const wrapper = mount(PokemonCard, {
       props: {
         name: 'TestMon',
@@ -104,15 +102,18 @@ describe('PokemonCard', () => {
 
     const badges = wrapper.findAll('[data-testid="fave-badge"]')
     expect(badges).toHaveLength(2)
-    const exerciseBadge = badges.find((b) => b.text().includes('exercise'))!
-    const cleanlinessBadge = badges.find((b) => b.text().includes('cleanliness'))!
-    expect(exerciseBadge.classes()).toContain('text-bg-success')
-    expect(cleanlinessBadge.classes()).toContain('text-bg-danger')
-    expect(cleanlinessBadge.classes()).not.toContain('text-bg-success')
+    const exerciseRow = badges.find((b) => b.text().includes('exercise'))!.element.closest('tr')!
+    const cleanlinessRow = badges
+      .find((b) => b.text().includes('cleanliness'))!
+      .element.closest('tr')!
+    const exerciseCheck = exerciseRow.querySelector('span.bool-check')
+    expect(exerciseCheck).not.toBeNull()
+    expect(exerciseCheck!.textContent).toBe('✓')
+    expect(cleanlinessRow.querySelector('span.bool-check')).toBeNull()
   })
 
   it('fulfilled favorites matching is case-sensitive', () => {
-    const wrapper = mount(PokemonCard, {
+    const exact = mount(PokemonCard, {
       props: {
         name: 'TestMon',
         image: 'test.png',
@@ -120,12 +121,20 @@ describe('PokemonCard', () => {
         fulfilledFavorites: new Set(['shiny stuff']),
       },
     })
+    expect(exact.find('span.bool-check').exists()).toBe(true)
 
-    const badge = wrapper.find('[data-testid="fave-badge"]')
-    expect(badge.classes()).toContain('text-bg-success')
+    const mismatched = mount(PokemonCard, {
+      props: {
+        name: 'TestMon',
+        image: 'test.png',
+        favorites: ['shiny stuff'],
+        fulfilledFavorites: new Set(['Shiny Stuff']),
+      },
+    })
+    expect(mismatched.find('span.bool-check').exists()).toBe(false)
   })
 
-  it('all favorite badges turn success when all are fulfilled', () => {
+  it('shows a bool-check on every row when all favorites are fulfilled', () => {
     const wrapper = mount(PokemonCard, {
       props: {
         name: 'TestMon',
@@ -138,7 +147,7 @@ describe('PokemonCard', () => {
     const badges = wrapper.findAll('[data-testid="fave-badge"]')
     expect(badges).toHaveLength(3)
     for (const badge of badges) {
-      expect(badge.classes()).toContain('text-bg-success')
+      expect(badge.element.closest('tr')!.querySelector('span.bool-check')).not.toBeNull()
     }
   })
 
@@ -167,12 +176,33 @@ describe('PokemonCard', () => {
     expect(wrapper.emitted('favoriteClicked')).toEqual([['shiny stuff']])
   })
 
-  it('re-emits favoriteClicked on keyboard activation of a badge', async () => {
+  it('renders the favorite control as a native button (native Enter/Space activation)', () => {
+    // Enter/Space activation is browser behavior for <button type="button"> and
+    // can't be synthesized by trigger('keydown.enter') under jsdom; the click
+    // path itself is covered by the preceding test and real-browser e2e.
     const wrapper = mount(PokemonCard, {
       props: { name: 'Bulbasaur', image: 'test.png', favorites: ['exercise'] },
     })
 
-    await wrapper.find('[data-testid="fave-badge"]').trigger('keydown.enter')
-    expect(wrapper.emitted('favoriteClicked')).toEqual([['exercise']])
+    const control = wrapper.find('[data-testid="fave-badge"]')
+    expect(control.element.tagName).toBe('BUTTON')
+    expect(control.attributes('type')).toBe('button')
+    expect(control.attributes('title')).toBe('Click to view items that fulfill this favorite')
+    expect(control.text()).toBe('exercise')
+  })
+
+  it('favorites table is flush with the card (direct child, outside the padded body)', () => {
+    const wrapper = mount(PokemonCard, {
+      props: { name: 'Bulbasaur', image: 'test.png', favorites: ['exercise'] },
+    })
+
+    const table = wrapper.find('table.pokemon-favorites-table')
+    expect(table.exists()).toBe(true)
+    expect(table.classes()).toContain('mb-0')
+    expect(table.classes()).toContain('table-sm')
+    // Sibling of the image/body row — a direct child of the card root, not
+    // nested inside the padded .pokemon-card-body
+    expect(wrapper.find('.pokemon-card-body table.pokemon-favorites-table').exists()).toBe(false)
+    expect(table.element.parentElement!.classList.contains('card')).toBe(true)
   })
 })
