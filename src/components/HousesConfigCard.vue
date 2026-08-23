@@ -21,7 +21,7 @@ defineEmits<{
 <template>
   <BCard class="shell-card top-gradient-card h-100 config-card" data-testid="houses-card">
     <BCardHeader class="config-card-header">
-      <h5 class="section-heading mb-0">Houses</h5>
+      <h2 class="section-heading mb-0">Houses</h2>
       <BButton
         variant="outline-danger"
         class="beach-button beach-button--sm"

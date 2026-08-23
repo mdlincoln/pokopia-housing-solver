@@ -280,6 +280,8 @@ describe('HomeView', () => {
     expect(unhoused.exists()).toBe(true)
     expect(unhoused.text()).toContain('AlphaOne')
     expect(unhoused.text()).toContain('AlphaTwo')
+    // Outline: h2 Results → h3 alert heading (no skipped levels)
+    expect(unhoused.find('h3.alert-heading').text()).toBe('Not enough housing')
   })
 
   it('displays empty houses', async () => {
@@ -754,5 +756,33 @@ describe('HomeView', () => {
     expect(wrapper.vm.savedQueries).toHaveLength(1)
     expect(wrapper.vm.savedQueries[0]).toMatchObject({ title: 'Enter save' })
     expect(wrapper.vm.showSaveModal).toBe(false)
+  })
+
+  it('renders the three config-card titles as h2 (h1 hero → h2 section titles)', async () => {
+    const wrapper = await mountHome()
+
+    const h2Texts = wrapper.findAll('h2.section-heading').map((h2) => h2.text())
+    expect(h2Texts).toContain('Houses')
+    expect(h2Texts).toContain('Pokémon')
+    expect(h2Texts).toContain('Saved islands')
+    // No h5 headings remain anywhere in the outline (previously card titles).
+    expect(wrapper.findAll('h5')).toHaveLength(0)
+  })
+
+  it('renders both modal titles as h2', async () => {
+    const wrapper = await mountHome()
+    wrapper.vm.showSaveModal = true
+    await flushPromises()
+    // BModal teleports to document.body outside the wrapper element.
+    expect(document.querySelector('.modal-title')?.tagName).toBe('H2')
+
+    wrapper.vm.showSaveModal = false
+    wrapper.vm.showManageModal = true
+    await flushPromises()
+    const titles = [...document.querySelectorAll('.modal-title')]
+    expect(titles.every((t) => t.tagName === 'H2')).toBe(true)
+
+    wrapper.vm.showManageModal = false
+    await flushPromises()
   })
 })

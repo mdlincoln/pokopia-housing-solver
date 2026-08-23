@@ -430,7 +430,7 @@ watchEffect(() => {
       { 'checked-off': pinStore.isHousePinned(house.houseId), 'fully-fulfilled': allFulfilled },
     ]"
   >
-    <h5 class="mb-1 house-title">
+    <h3 class="mb-1 house-title">
       <button
         type="button"
         role="checkbox"
@@ -448,7 +448,7 @@ watchEffect(() => {
         <i :class="pinStore.isHousePinned(house.houseId) ? 'bi bi-lock-fill' : 'bi bi-unlock'"></i>
       </button>
       {{ house.size }} house {{ house.houseId }}
-    </h5>
+    </h3>
 
     <div v-if="house.pokemon.length > 0" class="pokemon-grid">
       <PokemonCard

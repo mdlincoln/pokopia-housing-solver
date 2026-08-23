@@ -174,7 +174,7 @@ test.describe('Homepage', () => {
     await expect(page.getByTestId('results')).toBeVisible({ timeout: 30_000 })
 
     const mediumHouse = page.getByTestId('house-card').filter({
-      has: page.locator('h5', { hasText: /medium house M\d/ }),
+      has: page.locator('.house-title', { hasText: /medium house M\d/ }),
     })
     await expect(mediumHouse).toHaveCount(1)
 
@@ -694,7 +694,7 @@ test.describe('Pinning', () => {
 
     // Find the house that contains Bulbasaur and pin it
     const bulbasaurCard = page.getByTestId('house-card').filter({ hasText: 'Bulbasaur' })
-    const houseHeading = await bulbasaurCard.locator('h5').first().textContent()
+    const houseHeading = await bulbasaurCard.locator('.house-title').first().textContent()
     await bulbasaurCard.getByTestId('progress-checkbox-pokemon').first().check()
 
     // Add a third pokemon — should trigger re-solve
@@ -703,7 +703,7 @@ test.describe('Pinning', () => {
 
     // Bulbasaur should still be in the same house
     const bulbasaurHouseAfter = page.getByTestId('house-card').filter({ hasText: 'Bulbasaur' })
-    const headingAfter = bulbasaurHouseAfter.locator('h5').first()
+    const headingAfter = bulbasaurHouseAfter.locator('.house-title').first()
     await expect(headingAfter).toHaveText(houseHeading)
   })
 
@@ -837,6 +837,13 @@ test.describe('Usability (P2 audit fixes)', () => {
     await assertTapTarget(page, 'add-to-cart', page.getByTestId('add-to-cart').first())
     // Desktop cart remove controls — also asserts AC.5 (visible at ≥992px)
     await assertTapTarget(page, 'cart-remove', page.getByTestId('cart-remove').first())
+    // Cart Crafted/Placed rows in the sidebar meet the 24px floor via the base
+    // .progress-action rule (not only the recommended-items-table cell variant).
+    await assertTapTarget(
+      page,
+      'cart progress row',
+      page.locator('[data-testid="cart-items"] .progress-action').first(),
+    )
     await assertTapTarget(page, 'recommendation-remove', page.getByTestId('recommendation-remove').first())
     await assertTapTarget(
       page,
@@ -854,6 +861,11 @@ test.describe('Usability (P2 audit fixes)', () => {
 
     await assertTapTarget(page, 'cart-remove', page.getByTestId('cart-remove').first())
     await assertTapTarget(page, 'recommendation-remove', page.getByTestId('recommendation-remove').first())
+    await assertTapTarget(
+      page,
+      'cart progress row',
+      page.locator('[data-testid="cart-items"] .progress-action').first(),
+    )
     await assertTapTarget(
       page,
       'recommendation-placed',
@@ -879,5 +891,58 @@ test.describe('Usability (P2 audit fixes)', () => {
     // 100dvh resolves to the dynamic viewport height in Chromium; allow
     // sub-pixel/scrollbar slack.
     expect(minHeight).toBeGreaterThanOrEqual(0.9 * viewport)
+  })
+
+  // House cards keep their FLIP/opacity transitions for standard-motion users
+  // but drop them entirely under prefers-reduced-motion.
+  test('no house-card transition under reduced-motion', async ({ page }) => {
+    test.setTimeout(60_000)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Show a sample island' }).click()
+    await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
+
+    // Baseline: standard-motion users keep the transition.
+    const baseline = await page.evaluate(
+      () => getComputedStyle(document.querySelector('.house-card')!).transitionDuration,
+    )
+    expect(baseline).not.toBe('0s')
+
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    const reduced = await page.evaluate(
+      () => getComputedStyle(document.querySelector('.house-card')!).transitionDuration,
+    )
+    expect(reduced).toBe('0s')
+  })
+
+  // Decorative pseudo-glyphs ('*' on .section-heading, ' ~' on .house-title)
+  // still paint, but the CSS alt-text syntax keeps them out of accessible names.
+  test('decorative heading glyphs are hidden from accessible names', async ({ page }) => {
+    test.setTimeout(60_000)
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Show a sample island' }).click()
+    await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
+
+    // Results heading: accessible name is exactly "Results" at level 2 —
+    // no '*' — while the glyph still paints via ::before.
+    const resultsHeading = page.getByRole('heading', { name: 'Results', level: 2, exact: true })
+    await expect(resultsHeading).toBeVisible()
+    const beforeContent = await resultsHeading.evaluate(
+      (el) => getComputedStyle(el, '::before').content,
+    )
+    expect(beforeContent).toContain('*')
+
+    // House title: accessible name excludes the trailing '~' (level 3 h3).
+    // The heading embeds the pin checkbox (whose aria-label leads the name),
+    // so anchor only the tail: if the '~' glyph leaked into the accessible
+    // name it would follow the house id and this regex would not match.
+    const houseTitle = page.getByRole('heading', {
+      name: /(small|medium|large) house [SML]\d+$/,
+      level: 3,
+    })
+    await expect(houseTitle.first()).toBeVisible()
+    const afterContent = await houseTitle.first().evaluate(
+      (el) => getComputedStyle(el, '::after').content,
+    )
+    expect(afterContent).toContain('~')
   })
 })

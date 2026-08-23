@@ -310,7 +310,8 @@ body {
 }
 
 .section-heading::before {
-  content: '*';
+  /* Decorative glyph suppressed from accessible names (alt-text syntax) */
+  content: '*' / '';
   font-size: 0.82em;
   color: #36a1b9;
   transform: translateY(-0.04em);
@@ -562,7 +563,8 @@ body {
 }
 
 .house-title::after {
-  content: ' ~';
+  /* Decorative glyph suppressed from accessible names (alt-text syntax) */
+  content: ' ~' / '';
   font-size: 0.78em;
   opacity: 0.88;
 }
@@ -766,7 +768,9 @@ details[open] > .details-summary::before,
 
 @media (prefers-reduced-motion: reduce) {
   :is(.beach-button, .modal-footer .btn),
-  .favorite-pill {
+  .favorite-pill,
+  .house-move,
+  .house-card {
     transition: none;
   }
 }
@@ -1042,7 +1046,7 @@ details[open] > .details-summary::before,
 
 /* Progress tracking */
 .checked-off {
-  opacity: 0.45;
+  opacity: 0.8;
   filter: grayscale(0.4);
 }
 
@@ -1090,6 +1094,9 @@ details[open] > .details-summary::before,
   user-select: none;
   -webkit-user-select: none;
   transition: opacity 120ms ease;
+  /* WCAG 2.5.8 minimum tap target — the table-cell variant below already
+     carries this; the base rule covers the cart sidebar rows. */
+  min-height: 24px;
 }
 
 .progress-action:hover {
@@ -1178,7 +1185,9 @@ details[open] > .details-summary::before,
   gap: 0.22rem;
   font-size: 0.7rem;
   font-weight: 600;
-  color: #3288a0;
+  /* ≥4.5:1 over the sand-composited sky chip (#1f7892 was ≈4.30:1 there);
+     pinned by scripts/theme_a11y.test.js. */
+  color: #1d7089;
   background: rgb(124 216 232 / 22%);
   border: 1px solid rgb(124 216 232 / 48%);
   border-radius: 999px;

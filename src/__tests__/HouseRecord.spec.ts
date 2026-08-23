@@ -86,6 +86,26 @@ describe('HouseRecord', () => {
     expect(card.exists()).toBe(true)
   })
 
+  it('renders the house title as an h3 (h2 Results → h3 house titles outline)', () => {
+    const house: HouseAssignment = {
+      houseId: 'L1',
+      size: 'large',
+      capacity: 4,
+      pokemon: [],
+    }
+
+    const wrapper = mount(HouseRecord, {
+      props: {
+        house,
+        pokemonData: testPokemonData,
+      },
+    })
+
+    const title = wrapper.find('h3.house-title')
+    expect(title.exists()).toBe(true)
+    expect(title.text()).toContain('large house L1')
+  })
+
   it('shows recommended items as one row per item', async () => {
     // Both pokemon share 'exercise' and 'cleanliness' — real catalog favorites
     const pokemonData: PokemonData = {
@@ -1409,25 +1429,19 @@ describe('HouseRecord', () => {
       wrapper.findAll('[data-testid="recommended-items-list"] th[aria-sort="descending"]')
 
     // Initially the default sort targets the first unfulfilled favorite.
-    expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_metal stuff"]').exists()).toBe(
-      true,
-    )
+    expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_metal stuff"]').exists()).toBe(true)
 
     // Adding Shower fulfills 'metal stuff' and re-ranks to 'stone stuff'.
     const cartStore = useCartStore()
     await cartStore.addItem('S1', 'Shower')
     await flushPromises()
-    expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_stone stuff"]').exists()).toBe(
-      true,
-    )
+    expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_stone stuff"]').exists()).toBe(true)
 
     // Removing it unfulfills 'metal stuff' again — the table must restore the
     // original sort order (back to 'metal stuff'), not stay on 'stone stuff'.
     await cartStore.removeItem('S1', 'Shower')
     await flushPromises()
-    expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_metal stuff"]').exists()).toBe(
-      true,
-    )
+    expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_metal stuff"]').exists()).toBe(true)
   })
 })
 

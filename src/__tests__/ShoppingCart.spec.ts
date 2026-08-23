@@ -167,6 +167,30 @@ describe('ShoppingCart orphaned house annotation (AC.5)', () => {
   })
 })
 
+describe('ShoppingCart heading outline', () => {
+  it('renders the offcanvas title as h2 and cart sections as h3', async () => {
+    const cart = useCartStore()
+    await cart.restoreItems([{ houseId: 'L1', name: 'Punching Bag' }])
+    await flushPromises()
+
+    const wrapper = await mountCart()
+
+    const title = wrapper.find('h2.offcanvas-title')
+    expect(title.exists()).toBe(true)
+    expect(title.text()).toBe('Shopping Cart')
+
+    const houseHeading = wrapper.find('h3.cart-house-heading')
+    expect(houseHeading.exists()).toBe(true)
+    expect(houseHeading.text()).toBe('House L1')
+
+    const totals = wrapper.findAll('h3').find((h3) => h3.text().includes('Total materials'))
+    expect(totals).toBeDefined()
+
+    // No h5/h6 leftovers inside the cart — the dialog outline is h2 → h3.
+    expect(wrapper.findAll('h5, h6')).toHaveLength(0)
+  })
+})
+
 describe('ShoppingCart quiet-close class contracts', () => {
   async function mountWithTwoItems() {
     const cart = useCartStore()

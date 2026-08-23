@@ -102,13 +102,19 @@ function orphanNote(houseId: string): string {
     :id="offcanvasId"
     responsive="lg"
     placement="end"
-    title="Shopping Cart"
     class="cart-sidebar-panel"
     data-testid="shopping-cart"
     :body-scrolling="!isBelowLg"
     :model-value="isBelowLg ? showMobileCart : true"
     @update:model-value="onCartModelUpdate"
   >
+    <!-- BOffcanvas wraps the #title slot in a hardcoded h5.offcanvas-title, so
+         override the whole header to render the dialog title as h2 — keeping
+         the aria-labelledby target id and the themed close button semantics. -->
+    <template #header>
+      <h2 :id="`${offcanvasId}-offcanvas-label`" class="offcanvas-title">Shopping Cart</h2>
+      <BCloseButton aria-label="Close" @click="onCartModelUpdate(false)" />
+    </template>
     <template v-if="cart.itemList.length === 0">
       <p class="text-muted" data-testid="cart-empty">No items in cart.</p>
     </template>
@@ -125,10 +131,10 @@ function orphanNote(houseId: string): string {
         </BButton>
       </div>
 
-      <h6>
+      <h3>
         Total materials
         <BBadge variant="secondary" pill>{{ cart.aggregated.length }}</BBadge>
-      </h6>
+      </h3>
       <BListGroup flush data-testid="cart-aggregated">
         <BListGroupItem
           v-for="mat in cart.aggregated"
@@ -160,7 +166,7 @@ function orphanNote(houseId: string): string {
           :class="{ 'cart-house-group--orphan': !liveHouseIds.has(houseId) }"
           data-testid="cart-house-group"
         >
-          <h6 class="cart-house-heading">House {{ houseId }}</h6>
+          <h3 class="cart-house-heading">House {{ houseId }}</h3>
           <p
             v-if="!liveHouseIds.has(houseId)"
             class="cart-orphan-note small mb-1"

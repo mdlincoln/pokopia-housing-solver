@@ -597,6 +597,7 @@ defineExpose({
     <BModal
       v-model="showSaveModal"
       title="Save island"
+      title-tag="h2"
       ok-title="Save"
       ok-variant="primary"
       cancel-variant="secondary"
@@ -615,6 +616,7 @@ defineExpose({
     <BModal
       v-model="showManageModal"
       title="Saved islands"
+      title-tag="h2"
       data-testid="saved-queries-modal"
       hide-footer
     >
@@ -671,7 +673,7 @@ defineExpose({
       data-testid="unhoused"
       class="mt-3"
     >
-      <h5 class="alert-heading">Not enough housing</h5>
+      <h3 class="alert-heading">Not enough housing</h3>
       <p class="mb-1">Add houses above to place these Pokémon:</p>
       <ul class="mb-0">
         <li v-for="name in result!.unhoused" :key="name">{{ name }}</li>

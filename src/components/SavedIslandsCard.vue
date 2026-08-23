@@ -47,7 +47,7 @@ function optionText(q: SavedQuery): string {
 <template>
   <BCard class="shell-card islands-card h-100 config-card" data-testid="islands-card">
     <BCardHeader class="config-card-header">
-      <h5 class="section-heading mb-0">Saved islands</h5>
+      <h2 class="section-heading mb-0">Saved islands</h2>
       <BButton
         variant="outline-primary"
         class="beach-button beach-button--sm"
@@ -58,10 +58,6 @@ function optionText(q: SavedQuery): string {
       </BButton>
     </BCardHeader>
     <BCardBody class="shell-card-body">
-      <BAlert v-if="saveSuccess" variant="success" :model-value="true" class="mb-2 status-alert">
-        Island saved.
-      </BAlert>
-
       <BAlert
         v-if="deletedUndoTitle"
         variant="warning"
@@ -79,12 +75,7 @@ function optionText(q: SavedQuery): string {
         >
       </BAlert>
 
-      <BFormGroup
-        v-if="savedQueries.length"
-        label="Restore a saved island"
-        label-for="saved-queries-select"
-        class="mt-2 mb-0"
-      >
+      <BFormGroup v-if="savedQueries.length" class="mt-2 mb-0">
         <BInputGroup>
           <BFormSelect
             id="saved-queries-select"
@@ -110,6 +101,15 @@ function optionText(q: SavedQuery): string {
           </template>
         </BInputGroup>
       </BFormGroup>
+
+      <BAlert
+        v-if="saveSuccess"
+        variant="success"
+        :model-value="true"
+        class="mb-0 status-alert mt-2"
+      >
+        Island saved.
+      </BAlert>
     </BCardBody>
     <BCardFooter class="small text-muted">
       Saved to this browser only — nothing leaves your computer.

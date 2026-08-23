@@ -9,6 +9,10 @@ import { describe, expect, it } from 'vitest'
 describe('index.html static splash', () => {
   const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf-8')
 
+  it('declares a document language', () => {
+    expect(html).toContain('lang="en"')
+  })
+
   it('contains a splash spinner inside #app with a pure-CSS keyframe animation', () => {
     const appIndex = html.indexOf('id="app"')
     const splashIndex = html.indexOf('class="app-splash"')
