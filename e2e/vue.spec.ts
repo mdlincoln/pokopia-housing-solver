@@ -563,6 +563,56 @@ test.describe('Shopping Cart', () => {
     expect(await details.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(true)
   })
 
+  // @lat: [[ui#House#Habitat badge and favorite rows render decorative SVG glyphs]]
+  test('pokemon card renders decorative inline svg glyphs (habitat + favorites + headers)', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000)
+    await page.goto('/')
+    await setSpinbutton(page, 'house-medium', 1)
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Ivysaur')
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+
+    const houseCard = page.getByTestId('house-card').first()
+
+    // Habitat badge: aria-hidden glyph wrapper enclosing an inline svg with the
+    // visible habitat label intact.
+    const badge = houseCard.getByTestId('habitat-badge').first()
+    await expect(badge).toBeVisible()
+    await expect(badge.locator('.icon-glyph[aria-hidden="true"] svg')).toHaveCount(1)
+    expect(((await badge.textContent()) ?? '').trim().length).toBeGreaterThan(0)
+
+    // Each favorite row: glyph present (every baked favorite is mapped) and the
+    // visible label text is unchanged/non-empty.
+    const faveBadges = houseCard.getByTestId('fave-badge')
+    const faveCount = await faveBadges.count()
+    expect(faveCount).toBeGreaterThan(0)
+    for (let i = 0; i < faveCount; i++) {
+      const button = faveBadges.nth(i)
+      await expect(button.locator('.icon-glyph[aria-hidden="true"] svg')).toHaveCount(1)
+      expect(((await button.textContent()) ?? '').trim().length).toBeGreaterThan(0)
+    }
+
+    // Open recommendations via a favorite badge; each visible fav_* header
+    // renders its decorative glyph.
+    const details = houseCard.getByTestId('recommended-items')
+    await expect(details).toBeVisible()
+    expect(await details.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false)
+    await faveBadges.first().click()
+    expect(await details.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(true)
+
+    const favHeaders = houseCard.locator('[data-testid^="fav-header-"]')
+    await expect(favHeaders.first()).toBeVisible()
+    const headerCount = await favHeaders.count()
+    expect(headerCount).toBeGreaterThan(0)
+    for (let i = 0; i < headerCount; i++) {
+      await expect(
+        favHeaders.nth(i).locator('.icon-glyph[aria-hidden="true"] svg'),
+      ).toHaveCount(1)
+    }
+  })
+
   // @lat: [[ui#ShoppingCart#Annotates cart items whose house no longer exists]]
   test('cart keeps and annotates items whose house no longer exists', async ({ page }) => {
     test.setTimeout(40_000)

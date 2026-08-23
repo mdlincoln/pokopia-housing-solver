@@ -13,7 +13,9 @@ export function sameFavorites(a: Set<string>, b: Set<string>): boolean {
 
 <script setup lang="ts">
 import { assetPath } from '@/assetPath'
+import IconGlyph from '@/components/IconGlyph.vue'
 import PokemonCard from '@/components/PokemonCard.vue'
+import { iconForFavorite } from '@/favoriteIcons'
 import {
   favoriteCoverageColumnKey,
   favoritesForItems,
@@ -505,6 +507,7 @@ watchEffect(() => {
               "
               :data-testid="`fav-header-${column}`"
             >
+              <IconGlyph :name="iconForFavorite(label as string)" />
               {{ label }} &times;{{ (field as any).count }}
             </span>
           </template>

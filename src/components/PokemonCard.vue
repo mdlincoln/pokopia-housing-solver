@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { assetPath } from '@/assetPath'
-import { HABITAT_VARIANT } from '@/habitats'
+import IconGlyph from '@/components/IconGlyph.vue'
+import { iconForFavorite } from '@/favoriteIcons'
+import { HABITAT_VARIANT, iconForHabitat } from '@/habitats'
 import { BBadge, BCard, BCardImg, BCol, BRow } from 'bootstrap-vue-next'
 import { computed } from 'vue'
 
@@ -54,6 +56,7 @@ const habitatVariant = computed(() =>
       <BCol class="d-flex align-items-center">
         <div v-if="habitat && habitatVariant">
           <BBadge :variant="habitatVariant" pill data-testid="habitat-badge">
+            <IconGlyph :name="iconForHabitat(habitat)" />
             {{ habitat }}
           </BBadge>
         </div>
@@ -76,6 +79,7 @@ const habitatVariant = computed(() =>
               title="Click to view items that fulfill this favorite"
               @click="emit('favoriteClicked', fav)"
             >
+              <IconGlyph :name="iconForFavorite(fav)" />
               {{ fav }}
             </button>
           </td>

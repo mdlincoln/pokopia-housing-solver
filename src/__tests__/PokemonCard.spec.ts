@@ -205,4 +205,49 @@ describe('PokemonCard', () => {
     expect(wrapper.find('.pokemon-card-body table.pokemon-favorites-table').exists()).toBe(false)
     expect(table.element.parentElement!.classList.contains('card')).toBe(true)
   })
+
+  it('renders a decorative inline svg in the habitat badge and each favorite row', () => {
+    const wrapper = mount(PokemonCard, {
+      props: {
+        name: 'Bulbasaur',
+        image: 'test.png',
+        favorites: ['exercise', 'cleanliness'],
+        habitat: 'Dark',
+      },
+    })
+
+    // Habitat badge: aria-hidden wrapper enclosing an inline svg; label intact.
+    const badge = wrapper.find('[data-testid="habitat-badge"]')
+    expect(badge.exists()).toBe(true)
+    const badgeGlyph = badge.find('.icon-glyph')
+    expect(badgeGlyph.exists()).toBe(true)
+    expect(badgeGlyph.attributes('aria-hidden')).toBe('true')
+    expect(badgeGlyph.find('svg').exists()).toBe(true)
+    expect(badge.text()).toBe('Dark')
+
+    // Each mapped favorite row: glyph present, visible text unchanged.
+    const faveButtons = wrapper.findAll('[data-testid="fave-badge"]')
+    expect(faveButtons.map((b) => b.text())).toEqual(['exercise', 'cleanliness'])
+    for (const button of faveButtons) {
+      const glyph = button.find('.icon-glyph')
+      expect(glyph.exists()).toBe(true)
+      expect(glyph.attributes('aria-hidden')).toBe('true')
+      expect(glyph.find('svg').exists()).toBe(true)
+    }
+  })
+
+  it('an unmapped favorite renders text-only with no svg', () => {
+    const wrapper = mount(PokemonCard, {
+      props: {
+        name: 'TestMon',
+        image: 'test.png',
+        favorites: ['totally unmapped favorite'],
+      },
+    })
+
+    const button = wrapper.find('[data-testid="fave-badge"]')
+    expect(button.text()).toBe('totally unmapped favorite')
+    expect(button.find('.icon-glyph').exists()).toBe(false)
+    expect(button.find('svg').exists()).toBe(false)
+  })
 })

@@ -1443,6 +1443,34 @@ describe('HouseRecord', () => {
     await flushPromises()
     expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_metal stuff"]').exists()).toBe(true)
   })
+
+  it('recommendation favorite column headers render a decorative svg glyph (AC.4)', async () => {
+    // Both pokemon share real catalog favorites (lowercase, mapped) so every
+    // visible fav_* header resolves to a bundled glyph.
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['exercise', 'cleanliness'], habitat: 'Dark' },
+      FitTwo: { image: '', favorites: ['exercise', 'cleanliness'], habitat: 'Dark' },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'medium',
+      capacity: 2,
+      pokemon: ['FitOne', 'FitTwo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const headers = wrapper.findAll('[data-testid^="fav-header-"]')
+    expect(headers.length).toBeGreaterThan(0)
+    for (const header of headers) {
+      const glyph = header.find('.icon-glyph')
+      expect(glyph.exists()).toBe(true)
+      expect(glyph.attributes('aria-hidden')).toBe('true')
+      expect(glyph.find('svg').exists()).toBe(true)
+    }
+  })
 })
 
 describe('sameFavorites', () => {

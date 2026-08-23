@@ -652,6 +652,13 @@ details[open] > .details-summary::before,
   min-height: 24px;
   font-weight: 700;
   letter-spacing: 0.01em;
+  /* Icon + label sit on the text baseline by default, so the inline svg reads
+     bottom-aligned; flex-centering the two (like .favorite-pill) keeps the glyph
+     vertically centered against the favorite text. */
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  vertical-align: middle;
   /* Match the sibling `.pin-icon` (.btn.btn-link.p-0) convention: inherit the
      card's text color instead of Bootstrap link blue — the control is a name,
      not a hyperlink */
@@ -673,6 +680,9 @@ details[open] > .details-summary::before,
    tap-target floor. */
 .pokemon-favorites-table td {
   padding: 0.15rem var(--space-2);
+  /* Center cell content vertically within the row so the fave-badge control
+     (and its icon+label) and the ✓ look aligned together. */
+  vertical-align: middle;
 }
 
 /* Densify the recommendations table body (its thead padding stays 0 for the
@@ -807,6 +817,18 @@ details[open] > .details-summary::before,
   flex-shrink: 0;
 }
 
+/* Decorative inline SVG glyphs (src/components/IconGlyph.vue). Scales with the
+   surrounding label/badge typography (1em) and never alters the compact
+   --space ramp, radii, or the mobile density tier. */
+.icon-glyph {
+  display: inline-flex;
+  line-height: 1;
+}
+.icon-glyph svg {
+  width: 1em;
+  height: 1em;
+}
+
 .row-group-start > th,
 .row-group-start > td {
   border-top: 1px solid var(--bs-border-color-translucent) !important;
@@ -823,12 +845,22 @@ details[open] > .details-summary::before,
   overflow: hidden;
 }
 
-.recommended-items-table thead th span {
+.recommended-items-table thead th span:not(.icon-glyph) {
   display: inline-block;
   white-space: nowrap;
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   padding: 3px 4px;
+}
+
+/* Icons inside the rotated vertical header label: the fav_* header span is
+   rotate(180deg) + vertical-rl so its text reads bottom-to-top, but a bare
+   child icon inherits that rotation and reads upside down. Counter-rotate the
+   glyph 180deg (net 360 = upright) and restore horizontal layout so it sits
+   upright beside the rotated label. */
+.recommended-items-table thead th .icon-glyph {
+  transform: rotate(180deg);
+  writing-mode: horizontal-tb;
 }
 
 .recommended-items-table thead th[aria-sort] {
