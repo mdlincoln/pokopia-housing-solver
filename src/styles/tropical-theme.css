@@ -742,6 +742,13 @@ body {
 .recommended-items-table tbody tr.recommendation-added-row {
   background-color: color-mix(in srgb, var(--trop-mint-300, #9ee8c9) 22%, transparent);
 }
+/* The row tint lives on the <tr>, but every <td> paints its own opaque
+   background over it, hiding the tint entirely. Make the non-coverage cells
+   transparent so the mint shows through, while keeping the coverage cells'
+   success/secondary variant backgrounds intact. */
+.recommended-items-table tbody tr.recommendation-added-row > td:not(.table-success):not(.table-secondary) {
+  background-color: transparent;
+}
 
 .cart-thumbnail-sm {
   width: 20px;
