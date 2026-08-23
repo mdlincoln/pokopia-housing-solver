@@ -478,7 +478,7 @@ watchEffect(() => {
       @toggle="onRecsToggle"
     >
       <summary>
-        Recommended items
+        House items
         <BFormCheckbox
           v-model="showCraftableOnly"
           switch

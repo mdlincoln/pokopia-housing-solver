@@ -349,7 +349,7 @@ test.describe('Shopping Cart', () => {
     await expect(page.getByTestId('cart-empty')).toBeVisible({ timeout: 2000 })
   })
 
-  // @lat: [[ui#House#Recommended items#Paginates at 50 rows]]
+  // @lat: [[ui#House#House items#Paginates at 50 rows]]
   test('recommendations paginate at 50 rows and appends without recreating rows', async ({ page }) => {
     test.setTimeout(40_000)
     await page.goto('/')
