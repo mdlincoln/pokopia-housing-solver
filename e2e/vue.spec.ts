@@ -227,7 +227,9 @@ test.describe('Homepage', () => {
   test('page body does not have overflow:hidden on fresh load at desktop width', async ({ page }) => {
     await page.setViewportSize({ width: 1200, height: 800 })
     await page.goto('/')
-    await expect(page.getByRole('button', { name: 'Clear all' })).toBeVisible({ timeout: 10_000 })
+    await expect(
+      page.getByTestId('houses-card').getByRole('button', { name: 'Clear all' }),
+    ).toBeVisible({ timeout: 10_000 })
     const bodyOverflow = await page.evaluate(() => document.body.style.overflow)
     expect(bodyOverflow).not.toBe('hidden')
   })
@@ -860,7 +862,9 @@ test.describe('Usability (P2 audit fixes)', () => {
   test('body min-height tracks the dynamic viewport height', async ({ page }) => {
     test.setTimeout(15_000)
     await page.goto('/')
-    await expect(page.getByRole('button', { name: 'Clear all' })).toBeVisible({ timeout: 10_000 })
+    await expect(
+      page.getByTestId('houses-card').getByRole('button', { name: 'Clear all' }),
+    ).toBeVisible({ timeout: 10_000 })
 
     const { minHeight, viewport } = await page.evaluate(() => ({
       minHeight: parseFloat(getComputedStyle(document.body).minHeight),

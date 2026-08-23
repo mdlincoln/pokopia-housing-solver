@@ -428,22 +428,6 @@ watch(
   { deep: true },
 )
 
-async function clearAll() {
-  pinStore.clear()
-  progressStore.restoreProgress({})
-  houseStore.clear()
-  small.value = 0
-  medium.value = 0
-  large.value = 0
-  selectedPokemon.value = []
-  pokemonData.value = {}
-
-  // Flush Vue's async DOM update batch so watchers complete (they set
-  // result.value = null when selectedPokemon/pokemonData become empty) and
-  // the old results section is removed from the DOM before returning.
-  await nextTick()
-}
-
 function loadSample() {
   pinStore.clear()
   progressStore.restoreProgress({})
@@ -454,6 +438,17 @@ function loadSample() {
   houseStore.reconcileHouses({ small: 1, medium: 3, large: 2 }, new Set())
   const shuffled = [...pokemonNames.value].sort(() => Math.random() - 0.5)
   selectedPokemon.value = shuffled.slice(0, 13)
+}
+
+function clearHouses() {
+  small.value = 0
+  medium.value = 0
+  large.value = 0
+}
+
+function clearPokemon() {
+  selectedPokemon.value = []
+  pokemonData.value = {}
 }
 
 async function runSolve() {
@@ -549,49 +544,66 @@ defineExpose({
   </div>
 
   <div v-if="!showCatalogLoading" class="home-theme content-stack">
+    <BAlert
+      variant="info"
+      data-testid="sample-island-alert"
+      class="d-flex flex-wrap align-items-center justify-content-center gap-2 mb-0 sample-island-alert"
+      :model-value="true"
+    >
+      <span class="me-2">Not sure where to start?</span>
+      <BButton variant="outline-secondary" class="beach-button" @click="loadSample">
+        Show a sample island
+      </BButton>
+    </BAlert>
     <BRow class="g-3 g-md-4">
-      <BCol cols="12" xl="7">
-        <BCard class="shell-card config-card h-100" data-testid="config-card">
+      <BCol cols="12" xl="3">
+        <BCard class="shell-card top-gradient-card h-100" data-testid="houses-card">
           <BCardBody class="p-3 p-md-4">
-            <h5 class="section-heading">Houses</h5>
-            <BRow class="g-3">
-              <BCol sm="4">
-                <BFormGroup label="Small (1 slot)" label-for="house-small">
-                  <BFormSpinbutton id="house-small" v-model="small" :min="minSmall" />
-                </BFormGroup>
-              </BCol>
-              <BCol sm="4">
-                <BFormGroup label="Medium (2 slots)" label-for="house-medium">
-                  <BFormSpinbutton id="house-medium" v-model="medium" :min="minMedium" />
-                </BFormGroup>
-              </BCol>
-              <BCol sm="4">
-                <BFormGroup label="Large (4 slots)" label-for="house-large">
-                  <BFormSpinbutton id="house-large" v-model="large" :min="minLarge" />
-                </BFormGroup>
-              </BCol>
-            </BRow>
-            <h5 class="section-heading">Pokémon</h5>
-            <BRow class="mt-1">
-              <PokemonSelect
-                v-model="selectedPokemon"
-                :pokemon-names="pokemonNames"
-                :pinned-names="pinStore.allPinnedPokemonNames"
-              />
-            </BRow>
-            <div class="d-flex gap-2 align-items-center flex-wrap mt-3 config-actions">
-              <BButton variant="outline-danger" class="beach-button" @click="clearAll">
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
+              <h5 class="section-heading mb-0">Houses</h5>
+              <BButton
+                variant="outline-danger"
+                class="beach-button"
+                :disabled="small === 0 && medium === 0 && large === 0"
+                @click="clearHouses"
+              >
                 Clear all
               </BButton>
+            </div>
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+              <label class="mb-0 flex-grow-1" for="house-small">Small (1 slot)</label>
+              <BFormSpinbutton id="house-small" v-model="small" :min="minSmall" style="width: 8.5rem" />
+            </div>
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+              <label class="mb-0 flex-grow-1" for="house-medium">Medium (2 slots)</label>
+              <BFormSpinbutton id="house-medium" v-model="medium" :min="minMedium" style="width: 8.5rem" />
+            </div>
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+              <label class="mb-0 flex-grow-1" for="house-large">Large (4 slots)</label>
+              <BFormSpinbutton id="house-large" v-model="large" :min="minLarge" style="width: 8.5rem" />
+            </div>
+          </BCardBody>
+        </BCard>
+      </BCol>
+      <BCol cols="12" xl="4">
+        <BCard class="shell-card top-gradient-card h-100" data-testid="pokemon-search-card">
+          <BCardBody class="p-3 p-md-4">
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
+              <h5 class="section-heading mb-0">Pokémon</h5>
               <BButton
-                variant="outline-secondary"
+                variant="outline-danger"
                 class="beach-button"
-                :disabled="pokemonNames.length === 0"
-                @click="loadSample"
+                :disabled="selectedPokemon.length === 0"
+                @click="clearPokemon"
               >
-                Show a sample island
+                Clear all
               </BButton>
             </div>
+            <PokemonSelect
+              v-model="selectedPokemon"
+              :pokemon-names="pokemonNames"
+              :pinned-names="pinStore.allPinnedPokemonNames"
+            />
           </BCardBody>
         </BCard>
       </BCol>

@@ -223,13 +223,13 @@ body {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.config-card,
+.top-gradient-card,
 .islands-card {
   position: relative;
   overflow: visible;
 }
 
-.config-card::before,
+.top-gradient-card::before,
 .islands-card::before {
   content: '';
   position: absolute;
@@ -241,6 +241,16 @@ body {
     var(--trop-mint-300),
     var(--trop-sun-300)
   );
+}
+
+.sample-island-alert {
+  border: 1px solid rgb(94 167 185 / 30%);
+  border-radius: 0.85rem;
+  background: rgb(158 232 201 / 18%);
+  color: #1f7892;
+}
+.sample-island-alert .beach-button {
+  flex-shrink: 0;
 }
 
 .action-row {
