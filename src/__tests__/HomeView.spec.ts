@@ -606,13 +606,13 @@ describe('HomeView', () => {
 
     const wrapper = await mountHome()
 
-    const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save island')
+    const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save current island')
     expect(saveButton).toBeDefined()
     expect(wrapper.find('[data-testid="saved-queries-manage"]').exists()).toBe(true)
     const select = wrapper.find('#saved-queries-select')
     expect(select.html()).toContain('Select a saved island…')
-    // The storage notice is sentence-case muted text, not a bare parenthetical.
-    const notice = wrapper.find('.action-row small.text-muted')
+    // The storage notice is sentence-case muted text in the card footer.
+    const notice = wrapper.find('.card-footer')
     expect(notice.exists()).toBe(true)
     expect(notice.text()).toBe('Saved to this browser only — nothing leaves your computer.')
   })

@@ -129,7 +129,7 @@ test.describe('Homepage', () => {
 
     await setSpinbutton(page, 'house-small', 1)
 
-    await page.getByRole('button', { name: 'Save island' }).click()
+    await page.getByRole('button', { name: 'Save current island' }).click()
     const modal = page.getByRole('dialog', { name: 'Save island' })
     await expect(modal).toBeVisible({ timeout: 2000 })
 
@@ -749,7 +749,7 @@ test.describe('Usability (P2 audit fixes)', () => {
     await page.goto('/')
 
     // Save a titled island via the modal
-    await page.getByRole('button', { name: 'Save island' }).click()
+    await page.getByRole('button', { name: 'Save current island' }).click()
     const saveModal = page.getByRole('dialog', { name: 'Save island' })
     await expect(saveModal).toBeVisible({ timeout: 2000 })
     await saveModal.locator('#query-title-input').fill('Undo test island')

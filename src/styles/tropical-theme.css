@@ -170,6 +170,22 @@ body {
   box-shadow: var(--trop-shadow-soft);
 }
 
+/* Pin the saved-islands footer flush to the bottom of its card.
+   BNV's BCard auto-wraps body + footer in a `.card-body`, so make that
+   wrapper a flex column and let the content body grow to push the footer
+   to the card's bottom edge. */
+.islands-card > .card-body {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+.islands-card > .card-body > .card-body {
+  flex: 1 1 auto;
+}
+.islands-card .card-footer {
+  padding: 0.5rem 1.25rem;
+}
+
 .section-heading {
   position: relative;
   display: inline-flex;
@@ -207,12 +223,14 @@ body {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.config-card {
+.config-card,
+.islands-card {
   position: relative;
   overflow: visible;
 }
 
-.config-card::before {
+.config-card::before,
+.islands-card::before {
   content: '';
   position: absolute;
   inset: 0 0 auto;

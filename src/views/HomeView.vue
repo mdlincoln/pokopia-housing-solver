@@ -15,11 +15,13 @@ import {
   BButton,
   BCard,
   BCardBody,
+  BCardFooter,
   BCol,
   BFormGroup,
   BFormInput,
   BFormSelect,
   BFormSpinbutton,
+  BInputGroup,
   BModal,
   BRow,
   BSpinner,
@@ -596,19 +598,16 @@ defineExpose({
       <BCol cols="12" xl="5">
         <BCard class="shell-card islands-card h-100" data-testid="islands-card">
           <BCardBody class="p-3 p-md-4">
-            <h5 class="section-heading">Saved islands</h5>
-            <div class="d-flex gap-2 align-items-center flex-wrap action-row">
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
+              <h5 class="section-heading mb-0">Saved islands</h5>
               <BButton
                 variant="outline-primary"
                 class="beach-button"
                 :disabled="pokemonNames.length === 0"
                 @click="openSaveModal"
               >
-                Save island
+                Save current island
               </BButton>
-              <small class="text-muted"
-                >Saved to this browser only — nothing leaves your computer.</small
-              >
             </div>
 
             <BAlert
@@ -644,11 +643,10 @@ defineExpose({
               label-for="saved-queries-select"
               class="mt-3 mb-0"
             >
-              <div class="d-flex gap-2 align-items-start flex-wrap">
+              <BInputGroup>
                 <BFormSelect
                   id="saved-queries-select"
                   v-model="selectedTimestamp"
-                  class="flex-grow-1"
                   :options="[
                     { value: null, text: 'Select a saved island…' },
                     ...savedQueries.map((q) => ({
@@ -659,16 +657,21 @@ defineExpose({
                     })),
                   ]"
                 />
-                <BButton
-                  variant="outline-secondary"
-                  data-testid="saved-queries-manage"
-                  @click="showManageModal = true"
-                >
-                  Manage saved islands
-                </BButton>
-              </div>
+                <template #append>
+                  <BButton
+                    variant="outline-secondary"
+                    data-testid="saved-queries-manage"
+                    @click="showManageModal = true"
+                  >
+                    Manage saved islands
+                  </BButton>
+                </template>
+              </BInputGroup>
             </BFormGroup>
           </BCardBody>
+          <BCardFooter class="small text-muted">
+            Saved to this browser only — nothing leaves your computer.
+          </BCardFooter>
         </BCard>
       </BCol>
     </BRow>
