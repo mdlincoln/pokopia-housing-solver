@@ -9,7 +9,9 @@ import {
   BFormGroup,
   BFormSelect,
   BInputGroup,
+  BToast,
 } from 'bootstrap-vue-next'
+import { nextTick, ref } from 'vue'
 
 interface SavedQuery {
   title: string
@@ -31,6 +33,27 @@ const emit = defineEmits<{
   undo: []
 }>()
 
+// Transient "Island link copied to clipboard" toast; BToast auto-dismisses after
+// the delay. Writing the hash back into itself is a no-op; the URL already
+// carries the current scenario (History.replaceState in HomeView).
+const showToast = ref(false)
+
+async function onShareLink() {
+  const url = window.location.href
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      // Clipboard unavailable (e.g. non-secure context); the toast still
+      // confirms the link can be copied from the address bar.
+    }
+  }
+  // Bump modelValue false→true so an already-visible toast restarts its timer.
+  showToast.value = false
+  await nextTick()
+  showToast.value = true
+}
+
 // BFormSelect's model update can be a number, an array (multi-select), or
 // null; this select is single, so normalize non-number payloads to null.
 function onSelectTimestamp(value: number | (number | null)[] | null) {
@@ -48,14 +71,26 @@ function optionText(q: SavedQuery): string {
   <BCard class="shell-card islands-card h-100 config-card" data-testid="islands-card">
     <BCardHeader class="config-card-header">
       <h2 class="section-heading mb-0">Saved islands</h2>
-      <BButton
-        variant="outline-primary"
-        class="beach-button beach-button--sm"
-        :disabled="!canSave"
-        @click="$emit('save')"
-      >
-        Save current island
-      </BButton>
+      <div class="d-flex gap-2 flex-shrink-0 config-card-actions">
+        <BButton
+          variant="info"
+          class="beach-button beach-button--sm share-link-btn"
+          data-testid="share-link"
+          title="Copy the link to this island"
+          @click="onShareLink"
+        >
+          Share island as a link
+          <i class="bi bi-link-45deg" aria-hidden="true"></i>
+        </BButton>
+        <BButton
+          variant="outline-primary"
+          class="beach-button beach-button--sm"
+          :disabled="!canSave"
+          @click="$emit('save')"
+        >
+          Save current island
+        </BButton>
+      </div>
     </BCardHeader>
     <BCardBody class="shell-card-body">
       <BAlert
@@ -114,5 +149,22 @@ function optionText(q: SavedQuery): string {
     <BCardFooter class="small text-muted">
       Saved to this browser only — nothing leaves your computer.
     </BCardFooter>
+
+    <!-- Fixed-position toast host: appears on any block click of Copy link. -->
+    <div
+      class="share-toast-wrap toast-container position-fixed"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      <BToast
+        v-model="showToast"
+        :delay="2600"
+        variant="info"
+        class="share-toast"
+        data-testid="share-toast"
+      >
+        Island link copied to clipboard
+      </BToast>
+    </div>
   </BCard>
 </template>

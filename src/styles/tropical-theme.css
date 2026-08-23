@@ -413,6 +413,36 @@ body {
   background: rgb(158 232 201 / 26%);
 }
 
+/* Blue info pill for "Share island as a link" — same beach-button recipe as the
+   sibling header buttons, tinted with the info palette so it reads as an
+   informational/action affordance distinct from Save's primary green. */
+.share-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+}
+.btn-info.beach-button {
+  border-color: rgb(43 169 190 / 55%);
+  color: #0f556b;
+  background: rgb(124 216 232 / 30%);
+}
+.btn-info.beach-button:hover:not(:disabled),
+.btn-info.beach-button:focus-visible {
+  background: rgb(124 216 232 / 46%);
+}
+
+/* Fixed-position host for the "Island link copied to clipboard" toast; floats
+   bottom-end so it never competes with the active controls. */
+.share-toast-wrap {
+  right: var(--space-3);
+  bottom: var(--space-3);
+  z-index: 1100;
+}
+.share-toast {
+  border: 1px solid rgb(43 169 190 / 45%);
+  box-shadow: var(--trop-shadow-mid);
+}
+
 :is(.beach-button, .modal-footer .btn):hover:not(:disabled),
 :is(.beach-button, .modal-footer .btn):focus-visible {
   transform: translateY(-2px);
