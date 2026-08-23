@@ -490,12 +490,16 @@ describe('HouseRecord', () => {
     await cartStore.addItem('S1', itemName)
     await flushPromises()
 
-    // Toy column should be hidden once fulfilled by an item in cart; others still present
+    // Toy column should persist once fulfilled by an item in cart (and turn green),
+    // matching how fulfilled favorite columns stay visible; Relaxation/Decoration remain
     const table = wrapper.find('[data-testid="recommended-items-list"]')
     const headers = table.findAll('th')
-    expect(headers.some((h) => h.text().includes('Toy'))).toBe(false)
+    expect(headers.some((h) => h.text().includes('Toy'))).toBe(true)
     expect(headers.some((h) => h.text().includes('Relaxation'))).toBe(true)
     expect(headers.some((h) => h.text().includes('Decoration'))).toBe(true)
+    const toyHeader = wrapper.find('[data-testid="tag-header-col_toy"]')
+    expect(toyHeader.exists()).toBe(true)
+    expect(toyHeader.classes()).toContain('text-success')
   })
 
   it('fav column header turns success when favorite is fulfilled in the merged table', async () => {
@@ -1312,6 +1316,61 @@ describe('HouseRecord', () => {
     }
   })
 
+  it('grays out unadded tag cells once the tag is fulfilled (mirrors redundant favorite coverage)', async () => {
+    // Shower covers 'metal stuff' and is Toy-tagged. Adding it fulfills 'metal
+    // stuff' (leaving 'stone stuff' unfulfilled) AND fulfills the Toy tag, so the
+    // unadded stone recommendations that are Toy items render a grayed tag cell.
+    const pokemonData: PokemonData = {
+      Solo: { image: '', favorites: ['metal stuff', 'stone stuff'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Solo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', 'Shower')
+    await flushPromises()
+
+    // Tag columns persist even when fulfilled.
+    const headers = wrapper.findAll('[data-testid="recommended-items-list"] th')
+    expect(headers.some((h) => h.text().includes('Toy'))).toBe(true)
+
+    const rows = wrapper.findAll('[data-testid="recommended-items-list"] tbody tr')
+    const unaddedRows = rows.filter(
+      (r) => !r.find('[data-testid="recommendation-added-badge"]').exists(),
+    )
+    // Column order is fixed: col_actions(0), col_placed(1), name(2), col_image(3),
+    // craftability(4), col_toy(5).
+    const toyCellGrayed = unaddedRows.some((r) => {
+      const tds = r.findAll('td')
+      return tds[5]?.classes().includes('table-secondary') === true
+    })
+    // At least one unadded Toy row (covering still-unfulfilled stone stuff) has a
+    // grayed-out tag cell signaling its tag is already fulfilled.
+    expect(toyCellGrayed).toBe(true)
+
+    // All grayed cells live on unadded rows; the added row keeps success.
+    const grayCells = wrapper.findAll('[data-testid="recommended-items-list"] td.table-secondary')
+    for (const cell of grayCells) {
+      const row = cell.element.closest('tr')!
+      expect(row.querySelector('[data-testid="recommendation-added-badge"]')).toBeNull()
+    }
+    const addedRows = rows.filter((r) =>
+      r.find('[data-testid="recommendation-added-badge"]').exists(),
+    )
+    expect(addedRows.length).toBeGreaterThan(0)
+    for (const row of addedRows) {
+      expect(row.findAll('td.table-secondary').length).toBe(0)
+    }
+  })
+
   it('exposes hover tooltips on favorite-coverage cells describing fulfillment', async () => {
     const pokemonData: PokemonData = {
       Solo: { image: '', favorites: ['metal stuff', 'stone stuff'] },
@@ -1348,12 +1407,15 @@ describe('HouseRecord', () => {
     expect(titles().some((t) => t === 'Shower is fulfilling metal stuff')).toBe(true)
 
     // Case 3: an unadded item covering the now-already-fulfilled 'metal stuff'
-    // (the grayed out cell) flags that it is redundant.
-    const grayTitle = wrapper.find(
+    // (the grayed out cell) flags that it is redundant. Only favorite-coverage
+    // cells carry a hover title (tag cells do not), so pick the first grayed
+    // cell that has one.
+    const grayCells = wrapper.findAll(
       '[data-testid="recommended-items-list"] td.table-secondary span.bool-check',
     )
-    expect(grayTitle.exists()).toBe(true)
-    expect(grayTitle.attributes('title')).toMatch(
+    const grayTitle = grayCells.find((c) => !!c.attributes('title'))
+    expect(grayTitle?.exists()).toBe(true)
+    expect(grayTitle!.attributes('title')).toMatch(
       / would fulfill .+ but it is fulfilled by other items already placed in this house\.$/,
     )
 

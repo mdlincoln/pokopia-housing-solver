@@ -124,18 +124,20 @@ const allFulfilled = computed(
 )
 
 const recommendationTableFields = computed(() => [
+  // The action rail (add-to-cart / remove) and the Placed checkbox sit on the
+  // left, where they stay reachable now that the favorite/tag columns make the
+  // table very wide; the two controls still never share a cell or tap area.
+  { key: 'col_actions', label: '', sortable: false },
+  { key: 'col_placed', label: 'Placed', sortable: false },
   { key: 'name', label: 'Item', sortable: true },
   { key: 'col_image', label: '', sortable: false },
   { key: 'craftability', label: 'Craftability', sortable: true },
-  ...(!fulfilledTags.value.has('Toy')
-    ? [{ key: 'col_toy', label: 'Toy', sortable: true, class: 'bool-col' }]
-    : []),
-  ...(!fulfilledTags.value.has('Relaxation')
-    ? [{ key: 'col_relaxation', label: 'Relaxation', sortable: true, class: 'bool-col' }]
-    : []),
-  ...(!fulfilledTags.value.has('Decoration')
-    ? [{ key: 'col_decoration', label: 'Decoration', sortable: true, class: 'bool-col' }]
-    : []),
+  // Tag columns are always shown (like the favorite columns below), so the
+  // user can see when a tag has been fulfilled (rendered with the green header
+  // style) rather than having the column disappear.
+  { key: 'col_toy', label: 'Toy', sortable: true, class: 'bool-col' },
+  { key: 'col_relaxation', label: 'Relaxation', sortable: true, class: 'bool-col' },
+  { key: 'col_decoration', label: 'Decoration', sortable: true, class: 'bool-col' },
   // All house-favorite columns are always shown now (the merged table is the
   // only place coverage is shown, and added rows can cover fulfilled favorites).
   // Fulfilled favorites render with the green header style, never removed.
@@ -146,8 +148,6 @@ const recommendationTableFields = computed(() => [
     class: 'bool-col',
     count: col.count,
   })),
-  { key: 'col_placed', label: 'Placed', sortable: false },
-  { key: 'col_actions', label: '', sortable: false },
 ])
 
 function craftabilityText(item: ItemDetails): string {
@@ -175,9 +175,20 @@ function buildRecommendationRow(
     col_decoration: itemData.tag === 'Decoration',
   }
   const cellVariants: Record<string, 'success' | 'secondary'> = {}
-  if (row.col_toy) cellVariants['col_toy'] = 'success'
-  if (row.col_relaxation) cellVariants['col_relaxation'] = 'success'
-  if (row.col_decoration) cellVariants['col_decoration'] = 'success'
+  // Tag coverage: a non-placed (unadded) row whose tag is already fulfilled is
+  // redundant — gray out that tag cell (like redundant favorite coverage) to
+  // signal it is lower value, while added rows keep the success highlight.
+  if (row.col_toy) {
+    cellVariants['col_toy'] = !added && fulfilledTags.value.has('Toy') ? 'secondary' : 'success'
+  }
+  if (row.col_relaxation) {
+    cellVariants['col_relaxation'] =
+      !added && fulfilledTags.value.has('Relaxation') ? 'secondary' : 'success'
+  }
+  if (row.col_decoration) {
+    cellVariants['col_decoration'] =
+      !added && fulfilledTags.value.has('Decoration') ? 'secondary' : 'success'
+  }
   const favSet = new Set(itemFavs)
   for (const col of houseFavoriteColumns.value) {
     const cellKey = favoriteCoverageColumnKey(col.favorite)
@@ -509,6 +520,7 @@ watchEffect(() => {
           >
             <span
               :class="fulfilledTags.has(label as string) ? 'text-success fw-bold' : 'text-danger'"
+              :data-testid="`tag-header-${column}`"
             >
               {{ label }}
             </span>
