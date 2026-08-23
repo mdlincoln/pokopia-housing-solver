@@ -263,6 +263,28 @@ watch(
 const sortBy = ref<BTableSortBy[]>([])
 const showCraftableOnly = ref(false)
 
+// Auto-sort tracking. While `sortIsAuto` is true the recommendation table's
+// sort is owned by the auto-ranker (aimed at the first unfulfilled favorite),
+// so it re-ranks symmetrically — re-ranking to the next unfulfilled favorite
+// when the active one is fulfilled by an added item, and restoring the
+// original favorite when that item is removed. A user-driven sort (clicking a
+// column header or a favorite badge) hands control to the user, who we never
+// override. `writingAuto` guards the detection watcher below so the
+// auto-ranker's own writes aren't mistaken for user input.
+let writingAuto = false
+const sortIsAuto = ref(true)
+
+// Any sortBy change not produced by the auto-ranker is user input (BTable
+// header click via v-model, or onFavoriteClick). Take the table out of auto
+// mode so the auto-ranker stops overriding the user's choice.
+watch(
+  sortBy,
+  () => {
+    if (!writingAuto) sortIsAuto.value = false
+  },
+  { deep: true, flush: 'sync' },
+)
+
 const recsDetails = ref<HTMLDetailsElement | null>(null)
 
 // Favorite-badge clicks (re-emitted by PokemonCard) route the user to the
@@ -372,27 +394,30 @@ watchEffect(() => {
     recommendationTableFields.value.filter((f) => f.sortable).map((f) => f.key),
   )
 
-  if (sortBy.value.length === 0 && firstKey) {
-    sortBy.value = [{ key: firstKey, order: 'desc' }]
-    return
-  }
+  const active = sortBy.value[0]
+  const activeKey = active?.key
+  const activeValid = activeKey != null && validKeys.has(activeKey)
 
-  if (sortBy.value.length > 0 && !validKeys.has(sortBy.value[0]!.key)) {
-    sortBy.value = firstKey ? [{ key: firstKey, order: 'desc' }] : []
-    return
-  }
-
-  // Rank item impact only by needs yet to be fulfilled: if the active sort
-  // column is a favorite that has become fulfilled, re-rank to the first
-  // remaining unfulfilled favorite column.
-  if (sortBy.value.length > 0 && firstKey) {
-    const active = sortBy.value[0]!
-    if (active.key.startsWith('fav_')) {
-      const favorite = active.key.slice('fav_'.length)
-      if (fulfilledFavorites.value.has(favorite) && active.key !== firstKey) {
-        sortBy.value = [{ key: firstKey, order: 'desc' }]
-      }
+  // If the user owns the sort, leave their choice alone — only fall back to
+  // the auto sort when their target column has disappeared entirely.
+  if (!sortIsAuto.value) {
+    if (active && !activeValid) {
+      writingAuto = true
+      sortBy.value = firstKey ? [{ key: firstKey, order: 'desc' }] : []
+      writingAuto = false
+      sortIsAuto.value = true
     }
+    return
+  }
+
+  // Auto-owner: aim the sort at the highest-priority unfulfilled favorite.
+  // This is symmetric — it re-ranks to the next unfulfilled favorite when the
+  // active one is fulfilled by an added item, and it restores the original
+  // favorite when that item is removed and it becomes unfulfilled again.
+  if (firstKey && activeKey !== firstKey) {
+    writingAuto = true
+    sortBy.value = [{ key: firstKey, order: 'desc' }]
+    writingAuto = false
   }
 })
 </script>

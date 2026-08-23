@@ -1389,6 +1389,46 @@ describe('HouseRecord', () => {
     expect(descHeaders().length).toBe(1)
     expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_stone stuff"]').exists()).toBe(true)
   })
+
+  it('restores the original default sort when the fulfilling item is removed', async () => {
+    const pokemonData: PokemonData = {
+      Solo: { image: '', favorites: ['metal stuff', 'stone stuff'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Solo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const descHeaders = () =>
+      wrapper.findAll('[data-testid="recommended-items-list"] th[aria-sort="descending"]')
+
+    // Initially the default sort targets the first unfulfilled favorite.
+    expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_metal stuff"]').exists()).toBe(
+      true,
+    )
+
+    // Adding Shower fulfills 'metal stuff' and re-ranks to 'stone stuff'.
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', 'Shower')
+    await flushPromises()
+    expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_stone stuff"]').exists()).toBe(
+      true,
+    )
+
+    // Removing it unfulfills 'metal stuff' again — the table must restore the
+    // original sort order (back to 'metal stuff'), not stay on 'stone stuff'.
+    await cartStore.removeItem('S1', 'Shower')
+    await flushPromises()
+    expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_metal stuff"]').exists()).toBe(
+      true,
+    )
+  })
 })
 
 describe('sameFavorites', () => {
