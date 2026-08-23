@@ -30,7 +30,6 @@ import {
   BBadge,
   BButton,
   BCloseButton,
-  BCardGroup,
   BFormCheckbox,
   BListGroupItem,
   BTable,
@@ -265,7 +264,13 @@ watch(
     for (const item of items) {
       if (baseNames.has(item.name)) continue
       addedOnlyRows.push(
-        buildRecommendationRow(item, true, order++, favByItem.get(item.name) ?? [], fulfilledFavoriteSet),
+        buildRecommendationRow(
+          item,
+          true,
+          order++,
+          favByItem.get(item.name) ?? [],
+          fulfilledFavoriteSet,
+        ),
       )
     }
 
@@ -438,9 +443,8 @@ watchEffect(() => {
       </button>
       {{ house.size }} house {{ house.houseId }}
     </h5>
-    <h6>House-wide needs</h6>
-    <p class="text-muted mb-2 house-meta">
-      <span v-if="sharedHabitats.length" class="mt-2" data-testid="shared-habitats">
+    <p v-if="sharedHabitats.length" class="text-muted house-meta">
+      <span data-testid="shared-habitats">
         <BBadge
           v-for="item in sharedHabitats"
           :key="item.habitat"
@@ -454,7 +458,7 @@ watchEffect(() => {
       </span>
     </p>
 
-    <BCardGroup v-if="house.pokemon.length > 0">
+    <div v-if="house.pokemon.length > 0" class="pokemon-grid">
       <PokemonCard
         v-for="name in house.pokemon"
         :key="name"
@@ -467,14 +471,14 @@ watchEffect(() => {
         @toggle="pinStore.togglePokemonPin(house.houseId, name)"
         @favorite-clicked="onFavoriteClick"
       />
-    </BCardGroup>
+    </div>
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
 
     <details
       v-if="activeTableItems.length"
       ref="recsDetails"
       data-testid="recommended-items"
-      class="mt-3 house-recommendations"
+      class="mt-2 house-recommendations"
       @toggle="onRecsToggle"
     >
       <summary>
@@ -627,9 +631,7 @@ watchEffect(() => {
                 variant="link"
                 class="recommendations-more-btn"
                 data-testid="recommendations-more"
-                :aria-label="
-                  `Show ${Math.min(RECOMMENDATIONS_PAGE_SIZE, remainingCount)} more recommended items`
-                "
+                :aria-label="`Show ${Math.min(RECOMMENDATIONS_PAGE_SIZE, remainingCount)} more recommended items`"
                 @click="visibleCount += RECOMMENDATIONS_PAGE_SIZE"
                 >Show 50 more</BButton
               >

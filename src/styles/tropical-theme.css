@@ -16,11 +16,19 @@
   --trop-text: #2a4c5b;
   --trop-heading-font: 'Baloo 2', 'Trebuchet MS', 'Verdana', sans-serif;
   --trop-body-font: 'Nunito', 'Avenir Next', 'Segoe UI', sans-serif;
-  --space-1: 0.5rem;
-  --space-2: 0.75rem;
-  --space-3: 1rem;
-  --space-4: 1.5rem;
-  --space-5: 2rem;
+  /* Compact density ramp (pinned by scripts/theme_tokens.test.js): all layout
+     spacing flows from these five steps. Desktop consumers that genuinely need
+     more air compose several tokens rather than reintroducing one-off values. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --trop-radius-card: 0.9rem;
+  --trop-radius-control: 0.75rem;
+  --trop-radius-alert: 0.85rem;
+  --trop-radius-pill: 999px;
+  --trop-line-height: 1.35;
   --trop-shadow-soft: 0 8px 20px rgb(22 86 104 / 10%);
   --trop-shadow-mid: 0 14px 28px rgb(22 86 104 / 14%);
   --trop-shadow-press: 0 4px 10px rgb(22 86 104 / 12%);
@@ -53,7 +61,7 @@ body {
   min-height: 100dvh;
   font-family: var(--trop-body-font);
   font-size: 1rem;
-  line-height: 1.45;
+  line-height: var(--trop-line-height);
   background:
     radial-gradient(circle at 8% 15%, rgb(255 255 255 / 55%) 0, transparent 25%),
     radial-gradient(circle at 88% 12%, rgb(255 179 168 / 35%) 0, transparent 28%),
@@ -78,15 +86,94 @@ body {
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* App shell padding replaces Bootstrap py-/px- utility classes so density
+   lives in the theme sheet, keyed off the compact --space-* ramp. */
+.app-shell {
+  padding: var(--space-2) var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .app-shell {
+    padding: var(--space-5);
+  }
+}
+
+@media (min-width: 992px) {
+  /* Desktop hierarchy tier: deliberately past the token ramp's top (1.5rem) so
+     the shell keeps margin-like breathing room on large monitors. */
+  .app-shell {
+    padding: 2rem;
+  }
+}
+
+/* Shared config-card body density (houses / pokemon / islands cards). */
+.shell-card-body {
+  padding: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .shell-card-body {
+    padding: var(--space-4);
+  }
+}
+
+/* Unified card header for the three configuration cards: title on the left,
+   the card's primary action button on the right, identical padding and a
+   soft divider from the body. All three cards carry `.config-card-header`. */
+.card-header.config-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  /* Slightly more vertical air on top so the header clears the card's gradient bar */
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-bottom: 1px solid rgb(94 167 185 / 25%);
+  background: linear-gradient(90deg, rgb(124 216 232 / 12%), rgb(255 217 122 / 10%));
+}
+
+/* The decorative ::after underline under a .section-heading renders redundant
+   with the header's bottom border, and the leading asterisk * reads as noise
+   next to the header's action button — suppress both inside card headers only. */
+.card-header.config-card-header .section-heading::after,
+.card-header.config-card-header .section-heading::before {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .card-header.config-card-header {
+    padding: var(--space-3) var(--space-4) var(--space-2);
+  }
+}
+
+/* Cards have no intrinsic margins — the row gutters (g-2/g-md-3) provide
+   identical spacing for all three. */
+.config-card {
+  margin: 0;
+}
+
+/* House-count spinbuttons: narrow enough that label + input keep sitting on
+   one row at 390px, but no narrower than the control's intrinsic content —
+   each side button is 32px (btn-sm icon + padding) and the value cell has
+   minimum width, so squeezing the box past ~8.5rem pushes the increment
+   button out beyond the rounded capsule (it looked clipped/too narrow). */
+.house-count-input {
+  width: 8.5rem;
+}
+
+/* Cart list rows collapse their default Bootstrap .list-group-item block
+   padding onto the compact ramp. */
+
 .app-footer {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
   align-items: center;
   justify-content: center;
+  margin-top: var(--space-4);
   border: 1px solid rgb(94 167 185 / 35%);
-  border-radius: 999px;
-  padding: 0.5rem 0.9rem;
+  border-radius: var(--trop-radius-pill);
+  padding: 0.35rem 0.75rem;
   background: linear-gradient(90deg, rgb(124 216 232 / 20%), rgb(255 217 122 / 18%));
   box-shadow: var(--trop-shadow-soft);
   color: #255f74;
@@ -106,8 +193,9 @@ body {
 .page-hero {
   position: relative;
   overflow: hidden;
-  border-radius: 1rem;
-  padding: 1rem 1.25rem;
+  border-radius: var(--trop-radius-card);
+  padding: 0.75rem 1rem;
+  margin-bottom: var(--space-3);
   background: linear-gradient(
     90deg,
     rgb(124 216 232 / 25%) 0%,
@@ -115,6 +203,22 @@ body {
     rgb(255 217 122 / 24%) 100%
   );
   box-shadow: var(--trop-shadow-mid);
+}
+
+.page-hero p {
+  margin-bottom: var(--space-2);
+  font-size: 0.95rem;
+}
+
+/* Secondary hero copy (approach explanation + credits) lives behind a details
+   disclosure so the first-viewport scan lands on the functional intro. */
+.page-hero-details {
+  margin-bottom: var(--space-2);
+  font-size: 0.95rem;
+}
+
+.page-hero-details p:last-child {
+  margin-bottom: 0;
 }
 
 .page-hero::before,
@@ -143,9 +247,10 @@ body {
 
 .page-title {
   margin: 0;
+  margin-bottom: var(--space-1);
   color: #19647a;
   font-family: var(--trop-heading-font);
-  font-size: clamp(1.9rem, 2.1vw + 1rem, 2.6rem);
+  font-size: clamp(1.5rem, 1.5vw + 1rem, 2rem);
   letter-spacing: 0.02em;
   font-weight: 800;
   line-height: 1.05;
@@ -165,7 +270,7 @@ body {
 .pokemon-card,
 .modal-content {
   border: 1px solid rgb(94 167 185 / 30%);
-  border-radius: 0.9rem;
+  border-radius: var(--trop-radius-card);
   background: rgb(255 255 255 / 82%);
   box-shadow: var(--trop-shadow-soft);
 }
@@ -174,12 +279,17 @@ body {
    BNV's BCard auto-wraps body + footer in a `.card-body`, so make that
    wrapper a flex column and let the content body grow to push the footer
    to the card's bottom edge. */
-.islands-card > .card-body {
+/* Pin the saved-islands footer flush to the bottom of its card and keep every
+   config card's header/body flush to the card edges. BNV's BCard auto-wraps
+   body + footer in a `.card-body`, so all three config cards zero that
+   wrapper's padding and make it a flex column; the content `.card-body`
+   (`.shell-card-body`) supplies the actual body padding. */
+.config-card > .card-body {
   display: flex;
   flex-direction: column;
   padding: 0;
 }
-.islands-card > .card-body > .card-body {
+.config-card > .card-body > .card-body {
   flex: 1 1 auto;
 }
 .islands-card .card-footer {
@@ -245,12 +355,16 @@ body {
 
 .sample-island-alert {
   border: 1px solid rgb(94 167 185 / 30%);
-  border-radius: 0.85rem;
+  border-radius: var(--trop-radius-alert);
+  padding: 0.5rem 0.75rem;
   background: rgb(158 232 201 / 18%);
   color: #1f7892;
 }
+/* The sample-island CTA keeps the shared pill recipe; only its vertical size
+   is compressed. The 24px tap-target floor still governs. */
 .sample-island-alert .beach-button {
   flex-shrink: 0;
+  padding-block: 0.2rem;
 }
 
 .action-row {
@@ -262,11 +376,14 @@ body {
   margin-bottom: var(--space-2);
 }
 
-.beach-button {
+/* Single pill-button recipe: components opt in with the `beach-button` class;
+   modal footer buttons inherit it by position. Size variants only adjust
+   padding/font-size — colors and shape stay shared. */
+:is(.beach-button, .modal-footer .btn) {
   border-width: 2px;
   font-weight: 700;
   letter-spacing: 0.01em;
-  border-radius: 999px;
+  border-radius: var(--trop-radius-pill);
   transition:
     transform 180ms ease,
     box-shadow 180ms ease,
@@ -275,25 +392,33 @@ body {
     color 180ms ease;
 }
 
-.btn-outline-secondary.beach-button {
+/* Compact size knob for secondary rows (cart Clear all, modal row deletes,
+   alert Undo). Colors still come from the variant-specific rules + the
+   variant's own themed palette. */
+.beach-button--sm {
+  padding: 0.2rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+:is(.btn-outline-secondary.beach-button, .modal-footer .btn-secondary) {
   border-color: rgb(43 169 190 / 55%);
   color: #1e6c83;
   background: rgb(232 251 255 / 72%);
 }
 
-.btn-outline-primary.beach-button {
+:is(.btn-outline-primary.beach-button, .modal-footer .btn-primary) {
   border-color: rgb(47 143 111 / 60%);
   color: #1f7358;
   background: rgb(158 232 201 / 26%);
 }
 
-.beach-button:hover:not(:disabled),
-.beach-button:focus-visible {
+:is(.beach-button, .modal-footer .btn):hover:not(:disabled),
+:is(.beach-button, .modal-footer .btn):focus-visible {
   transform: translateY(-2px);
   box-shadow: var(--trop-shadow-mid);
 }
 
-.beach-button:active:not(:disabled) {
+:is(.beach-button, .modal-footer .btn):active:not(:disabled) {
   transform: translateY(0);
   box-shadow: var(--trop-shadow-press);
 }
@@ -355,10 +480,12 @@ body {
 
 .tropical-dropdown {
   border: 1px solid rgb(94 167 185 / 32%);
-  border-radius: 0.75rem;
+  border-radius: var(--trop-radius-control);
   box-shadow: var(--trop-shadow-mid);
   background-color: rgb(255 255 255 / 97%);
   z-index: 40;
+  /* Viewport-bounded option list — keeps ~5 options visible (12.5rem) */
+  max-height: 12.5rem;
 }
 
 .tropical-dropdown .list-group-item {
@@ -383,7 +510,7 @@ body {
 }
 
 .results-section {
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
 }
 
 .results-list {
@@ -445,8 +572,13 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1);
+  margin-bottom: var(--space-2);
 }
 
+/* Shared collapsed-section affordance: bold summary text, no triangle, and a
+   +/- glyph that flips when open. HouseRecord keeps its positional selector;
+   other disclosures (e.g. the hero details) opt in via `.details-summary`. */
+.details-summary,
 .house-recommendations summary {
   font-weight: 700;
   color: #2a6d85;
@@ -454,16 +586,19 @@ body {
   list-style: none;
 }
 
+.details-summary::-webkit-details-marker,
 .house-recommendations summary::-webkit-details-marker {
   display: none;
 }
 
+.details-summary::before,
 .house-recommendations summary::before {
   content: '+';
   margin-right: 0.36rem;
   font-size: 0.9em;
 }
 
+details[open] > .details-summary::before,
 .house-recommendations[open] summary::before {
   content: '-';
 }
@@ -486,7 +621,7 @@ body {
 }
 
 .pokemon-card-header {
-  padding: var(--space-2) var(--space-3) var(--space-1);
+  padding: var(--space-2);
 }
 
 .pokemon-name-col {
@@ -503,6 +638,8 @@ body {
 
 .pokemon-avatar {
   border-radius: 0.7rem;
+  width: 4.5rem;
+  margin: var(--space-2);
 }
 
 .pokemon-favorites-table {
@@ -535,8 +672,27 @@ body {
   text-decoration: none;
 }
 
-.house-card .card-group {
+/* Wrapping card grid: one card per row on phones (≥392px content box), flowing
+   3–4 per row at desktop widths. Replaces Bootstrap's non-wrapping .card-group,
+   which squeezed four pokemon into a single squeezed row at 390px. */
+.pokemon-grid {
+  display: grid;
   gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+}
+
+/* Measured dense-table cell padding (deliberately sub-ramp): keeps favorite
+   rows scannable while .favorite-need's own 24px min-height governs the
+   tap-target floor. */
+.pokemon-favorites-table td {
+  padding: 0.15rem var(--space-2);
+}
+
+/* Densify the recommendations table body (its thead padding stays 0 for the
+   rotated headers). */
+.house-recommendations .table-sm th,
+.house-recommendations .table-sm td {
+  padding: 0.3rem 0.45rem;
 }
 
 .badge.bg-success,
@@ -592,7 +748,7 @@ body {
 .form-control,
 .form-select {
   border-color: rgb(94 167 185 / 35%);
-  border-radius: 0.75rem;
+  border-radius: var(--trop-radius-control);
   background-color: rgb(255 255 255 / 95%);
 }
 
@@ -602,84 +758,47 @@ body {
   box-shadow: 0 0 0 0.2rem rgb(124 216 232 / 25%);
 }
 
+/* The house-count spinbuttons are Bootstrap BFormSpinbutton wrappers; theme
+   them to match the other text/form controls. */
+.b-form-spinbutton {
+  border-color: rgb(94 167 185 / 35%);
+  border-radius: var(--trop-radius-control);
+  background-color: rgb(255 255 255 / 95%);
+}
+
+.b-form-spinbutton.focus {
+  border-color: var(--trop-ocean-300);
+  box-shadow: 0 0 0 0.2rem rgb(124 216 232 / 25%);
+}
+
 .alert {
-  border-radius: 0.85rem;
+  border-radius: var(--trop-radius-alert);
 }
 
 .alert-heading {
   font-family: var(--trop-heading-font);
 }
 
-.modal-footer .btn {
-  border-width: 2px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  border-radius: 999px;
-  transition:
-    transform 180ms ease,
-    box-shadow 180ms ease,
-    background-color 180ms ease,
-    border-color 180ms ease,
-    color 180ms ease;
-}
-
-.modal-footer .btn-primary {
-  border-color: rgb(47 143 111 / 60%);
-  color: #1f7358;
-  background: rgb(158 232 201 / 26%);
-}
-
-.modal-footer .btn-primary:hover:not(:disabled),
-.modal-footer .btn-primary:focus-visible {
-  transform: translateY(-2px);
-  box-shadow: var(--trop-shadow-mid);
-}
-
-.modal-footer .btn-primary:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: var(--trop-shadow-press);
-}
-
-.modal-footer .btn-secondary {
-  border-color: rgb(43 169 190 / 55%);
-  color: #1e6c83;
-  background: rgb(232 251 255 / 72%);
-}
-
-.modal-footer .btn-secondary:hover:not(:disabled),
-.modal-footer .btn-secondary:focus-visible {
-  transform: translateY(-2px);
-  box-shadow: var(--trop-shadow-mid);
-}
-
-.modal-footer .btn-secondary:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: var(--trop-shadow-press);
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .beach-button,
-  .favorite-pill,
-  .modal-footer .btn {
+  :is(.beach-button, .modal-footer .btn),
+  .favorite-pill {
     transition: none;
   }
 }
 
-@media (max-width: 768px) {
-  .page-hero {
-    padding: 0.9rem 1rem;
-  }
-
-  .page-title {
-    font-size: 1.75rem;
-  }
-
+/* Mobile density tier — aligned with Bootstrap's md breakpoint. Component
+   paddings collapse onto the small end of the compact token ramp. */
+@media (max-width: 767.98px) {
   .house-card {
     padding: var(--space-2);
   }
 
   .pokemon-card-header {
     padding: var(--space-2);
+  }
+
+  .pokemon-avatar {
+    width: 3.5rem;
   }
 }
 
@@ -804,13 +923,39 @@ body {
   font-weight: 600;
 }
 
+/* Recipe lists indent under the item name column; sub-line offset is a
+   measured layout value (aligns with the 24px remove ✕ rail), not a ramp
+   step. */
 .cart-recipe {
   font-size: 0.88em;
   list-style: none;
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
 }
 
+.cart-recipe-empty {
+  display: block;
+  margin-top: var(--space-1);
+  padding-left: var(--space-4);
+}
+
+/* Transient full-page loading state: generous margins are fine — the gate is
+   not part of the dense browsing flow. */
+.catalog-loading {
+  margin-block: 3rem;
+}
+
+/* Cart list rows collapse their default Bootstrap .list-group-item block
+   padding onto the compact ramp. */
 .cart-item {
   border-bottom: 1px solid var(--trop-sand-100);
+  padding: var(--space-2) 0;
+}
+
+/* Let long item names shrink/wrap within the flex row instead of pushing the
+   remove ✕ off the right edge. */
+.cart-item-body {
+  min-width: 0;
 }
 
 /* Shared quiet close control for removing a single cart item. Matching the

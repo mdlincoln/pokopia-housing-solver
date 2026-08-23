@@ -36,7 +36,15 @@ const showMobileCart = ref(false)
 
 // Query kept aligned with Bootstrap Vue Next's own smallerOrEqual('lg')
 // (max-width: 992px) to avoid a fractional-pixel boundary disagreement.
-const isBelowLg = ref(false)
+//
+// Initialized synchronously — not in onMounted — so a below-lg page load never
+// spends a frame with isBelowLg=false: during that window the model would be
+// `true`, and the (invisible, still-closed) offcanvas would install its focus
+// trap and steal focus back from any control the user clicks, swallowing
+// keyboard input on phones until the trap tears down.
+const isBelowLg = ref(
+  typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 992px)').matches,
+)
 let mediaQuery: MediaQueryList | undefined
 
 function syncBreakpoint(event?: MediaQueryListEvent) {
@@ -108,8 +116,8 @@ function orphanNote(houseId: string): string {
     <template v-else>
       <div class="d-flex justify-content-end mb-2">
         <BButton
-          size="sm"
           variant="outline-danger"
+          class="beach-button beach-button--sm"
           data-testid="cart-clear"
           @click="cart.clearCart()"
         >
@@ -179,7 +187,7 @@ function orphanNote(houseId: string): string {
                   :alt="item.name"
                   class="cart-thumbnail mt-1 flex-shrink-0"
                 />
-                <div class="flex-grow-1" style="min-width: 0">
+                <div class="flex-grow-1 cart-item-body">
                   <div class="d-flex align-items-start gap-1 mb-1">
                     <strong
                       :title="item.flavorText ?? undefined"
@@ -223,7 +231,7 @@ function orphanNote(houseId: string): string {
                 </div>
               </div>
 
-              <ul v-if="item.recipe.length" class="cart-recipe mb-0 ps-3 mt-2">
+              <ul v-if="item.recipe.length" class="cart-recipe">
                 <li
                   v-for="ing in item.recipe"
                   :key="ing.ingredientName"
@@ -238,7 +246,7 @@ function orphanNote(houseId: string): string {
                   <span>{{ ing.count }}&times; {{ ing.ingredientName }}</span>
                 </li>
               </ul>
-              <span v-else class="text-muted small ps-3 mt-1 d-block">(no recipe)</span>
+              <span v-else class="text-muted small cart-recipe-empty">(no recipe)</span>
 
               <div class="progress-actions">
                 <label

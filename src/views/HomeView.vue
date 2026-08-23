@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import HouseRecord from '@/components/HouseRecord.vue'
-import PokemonSelect from '@/components/PokemonSelect.vue'
+import HousesConfigCard from '@/components/HousesConfigCard.vue'
+import PokemonConfigCard from '@/components/PokemonConfigCard.vue'
+import SavedIslandsCard from '@/components/SavedIslandsCard.vue'
 import { loadAdjacencyMap, loadItemGraph, loadPokemonData, loadPokemonNames } from '@/queries'
 import { type AdjacencyData, type PokemonData, type SolverResult } from '@/solver'
 import { solveInWorker, SupersededError } from '@/solverClient'
@@ -13,15 +15,9 @@ import { useProgressStore } from '@/stores/progress'
 import {
   BAlert,
   BButton,
-  BCard,
-  BCardBody,
-  BCardFooter,
   BCol,
   BFormGroup,
   BFormInput,
-  BFormSelect,
-  BFormSpinbutton,
-  BInputGroup,
   BModal,
   BRow,
   BSpinner,
@@ -539,7 +535,7 @@ defineExpose({
   <div
     v-if="showCatalogLoading"
     data-testid="catalog-loading"
-    class="d-flex flex-column align-items-center justify-content-center gap-3 my-5"
+    class="d-flex flex-column align-items-center justify-content-center gap-3 catalog-loading"
     role="status"
     aria-live="polite"
   >
@@ -559,136 +555,42 @@ defineExpose({
         Show a sample island
       </BButton>
     </BAlert>
-    <BRow class="g-3 g-md-4">
+    <BRow class="g-2 g-md-3">
       <BCol cols="12" xl="3">
-        <BCard class="shell-card top-gradient-card h-100" data-testid="houses-card">
-          <BCardBody class="p-3 p-md-4">
-            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
-              <h5 class="section-heading mb-0">Houses</h5>
-              <BButton
-                variant="outline-danger"
-                class="beach-button"
-                :disabled="small === 0 && medium === 0 && large === 0"
-                @click="clearHouses"
-              >
-                Clear all
-              </BButton>
-            </div>
-            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-              <label class="mb-0 flex-grow-1" for="house-small">Small (1 slot)</label>
-              <BFormSpinbutton id="house-small" v-model="small" :min="minSmall" style="width: 8.5rem" />
-            </div>
-            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-              <label class="mb-0 flex-grow-1" for="house-medium">Medium (2 slots)</label>
-              <BFormSpinbutton id="house-medium" v-model="medium" :min="minMedium" style="width: 8.5rem" />
-            </div>
-            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-              <label class="mb-0 flex-grow-1" for="house-large">Large (4 slots)</label>
-              <BFormSpinbutton id="house-large" v-model="large" :min="minLarge" style="width: 8.5rem" />
-            </div>
-          </BCardBody>
-        </BCard>
+        <HousesConfigCard
+          :small="small"
+          :medium="medium"
+          :large="large"
+          :min-small="minSmall"
+          :min-medium="minMedium"
+          :min-large="minLarge"
+          @update:small="small = $event"
+          @update:medium="medium = $event"
+          @update:large="large = $event"
+          @clear-all="clearHouses"
+        />
       </BCol>
       <BCol cols="12" xl="4">
-        <BCard class="shell-card top-gradient-card h-100" data-testid="pokemon-search-card">
-          <BCardBody class="p-3 p-md-4">
-            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
-              <h5 class="section-heading mb-0">Pokémon</h5>
-              <BButton
-                variant="outline-danger"
-                class="beach-button"
-                :disabled="selectedPokemon.length === 0"
-                @click="clearPokemon"
-              >
-                Clear all
-              </BButton>
-            </div>
-            <PokemonSelect
-              v-model="selectedPokemon"
-              :pokemon-names="pokemonNames"
-              :pinned-names="pinStore.allPinnedPokemonNames"
-            />
-          </BCardBody>
-        </BCard>
+        <PokemonConfigCard
+          :selected-pokemon="selectedPokemon"
+          :pokemon-names="pokemonNames"
+          :pinned-names="pinStore.allPinnedPokemonNames"
+          @update:selected-pokemon="selectedPokemon = $event"
+          @clear-all="clearPokemon"
+        />
       </BCol>
       <BCol cols="12" xl="5">
-        <BCard class="shell-card islands-card h-100" data-testid="islands-card">
-          <BCardBody class="p-3 p-md-4">
-            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
-              <h5 class="section-heading mb-0">Saved islands</h5>
-              <BButton
-                variant="outline-primary"
-                class="beach-button"
-                :disabled="pokemonNames.length === 0"
-                @click="openSaveModal"
-              >
-                Save current island
-              </BButton>
-            </div>
-
-            <BAlert
-              v-if="saveSuccess"
-              variant="success"
-              :model-value="true"
-              class="mb-3 status-alert"
-            >
-              Island saved.
-            </BAlert>
-
-            <BAlert
-              v-if="deletedUndo"
-              variant="warning"
-              :model-value="true"
-              class="mb-3 status-alert"
-              data-testid="saved-query-deleted"
-            >
-              Deleted "{{ deletedUndoTitle }}".
-              <BButton
-                size="sm"
-                variant="outline-dark"
-                class="ms-2"
-                data-testid="saved-query-undo"
-                @click="undoDelete"
-                >Undo</BButton
-              >
-            </BAlert>
-
-            <BFormGroup
-              v-if="savedQueries.length"
-              label="Restore a saved island"
-              label-for="saved-queries-select"
-              class="mt-3 mb-0"
-            >
-              <BInputGroup>
-                <BFormSelect
-                  id="saved-queries-select"
-                  v-model="selectedTimestamp"
-                  :options="[
-                    { value: null, text: 'Select a saved island…' },
-                    ...savedQueries.map((q) => ({
-                      value: q.timestamp,
-                      text: q.title
-                        ? `${q.title} (${new Date(q.timestamp).toLocaleString()})`
-                        : new Date(q.timestamp).toLocaleString(),
-                    })),
-                  ]"
-                />
-                <template #append>
-                  <BButton
-                    variant="outline-secondary"
-                    data-testid="saved-queries-manage"
-                    @click="showManageModal = true"
-                  >
-                    Manage saved islands
-                  </BButton>
-                </template>
-              </BInputGroup>
-            </BFormGroup>
-          </BCardBody>
-          <BCardFooter class="small text-muted">
-            Saved to this browser only — nothing leaves your computer.
-          </BCardFooter>
-        </BCard>
+        <SavedIslandsCard
+          :saved-queries="savedQueries"
+          :selected-timestamp="selectedTimestamp"
+          :save-success="saveSuccess"
+          :deleted-undo-title="deletedUndoTitle"
+          :can-save="pokemonNames.length > 0"
+          @update:selected-timestamp="selectedTimestamp = $event"
+          @save="openSaveModal"
+          @manage="showManageModal = true"
+          @undo="undoDelete"
+        />
       </BCol>
     </BRow>
 
@@ -730,8 +632,8 @@ defineExpose({
             >
           </span>
           <BButton
-            size="sm"
             variant="outline-danger"
+            class="beach-button beach-button--sm"
             data-testid="saved-query-delete"
             :aria-label="`Delete saved island ${q.title || new Date(q.timestamp).toLocaleString()}`"
             @click="deleteSaved(q.timestamp)"
@@ -758,7 +660,7 @@ defineExpose({
   <section
     v-if="resultsSafeToRender && !showCatalogLoading"
     data-testid="results"
-    class="mt-4 results-section"
+    class="results-section"
   >
     <h2 class="section-heading">Results</h2>
 

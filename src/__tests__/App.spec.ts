@@ -1,9 +1,23 @@
 import { useCartStore } from '@/stores/cart'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import App from '../App.vue'
+
+// jsdom never applies the SFC <style> block, so the non-interactive overlay
+// pin (Playwright relies on the overlay never swallowing clicks) is asserted
+// against the source of the rule instead of a computed style.
+const APP_VUE_PATH = path.join(process.cwd(), 'src', 'App.vue')
+const APP_VUE_SOURCE = readFileSync(APP_VUE_PATH, 'utf8')
+
+function cartBusyOverlayRule() {
+  const match = /\.cart-busy-overlay\s*\{([^}]*)\}/s.exec(APP_VUE_SOURCE)
+  expect(match, '.cart-busy-overlay rule must exist in App.vue').not.toBeNull()
+  return match![1]!
+}
 
 function mountApp() {
   return mount(App, {
@@ -47,7 +61,8 @@ describe('App', () => {
     vi.advanceTimersByTime(1)
     await nextTick()
     expect(overlay().exists()).toBe(true)
-    expect(overlay().attributes('style')).toContain('pointer-events: none')
+    // Click-through is a styled-class concern now (see top of file).
+    expect(cartBusyOverlayRule()).toContain('pointer-events: none')
     expect(overlay().text()).toContain('Updating cart…')
 
     cart.pendingMutations = 0

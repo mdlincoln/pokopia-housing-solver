@@ -119,7 +119,6 @@ function onBlur() {
         :id="listboxId"
         role="listbox"
         class="position-absolute w-100 overflow-auto tropical-dropdown"
-        style="max-height: 200px; z-index: 10"
       >
         <BListGroupItem
           v-for="(name, i) in filtered.slice(0, 50)"
@@ -134,7 +133,7 @@ function onBlur() {
         </BListGroupItem>
       </BListGroup>
     </div>
-    <div v-if="modelValue.length" class="d-flex flex-wrap gap-1 mt-3">
+    <div v-if="modelValue.length" class="d-flex flex-wrap gap-1 mt-2">
       <BBadge
         v-for="name in modelValue"
         :key="name"

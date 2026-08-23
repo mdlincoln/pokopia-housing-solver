@@ -832,6 +832,9 @@ test.describe('Usability (P2 audit fixes)', () => {
     await assertTapTarget(page, 'house pin', page.getByTestId('progress-checkbox-house').first())
     await assertTapTarget(page, 'pokemon pin', page.getByTestId('progress-checkbox-pokemon').first())
     await assertTapTarget(page, 'favorite badge', page.getByTestId('fave-badge').first())
+    // The "+" add-to-cart control leads the action rail — density compaction
+    // must not shrink it below the 24px floor.
+    await assertTapTarget(page, 'add-to-cart', page.getByTestId('add-to-cart').first())
     // Desktop cart remove controls — also asserts AC.5 (visible at ≥992px)
     await assertTapTarget(page, 'cart-remove', page.getByTestId('cart-remove').first())
     await assertTapTarget(page, 'recommendation-remove', page.getByTestId('recommendation-remove').first())
@@ -856,6 +859,9 @@ test.describe('Usability (P2 audit fixes)', () => {
       'recommendation-placed',
       page.locator('.recommended-items-table .progress-action--placed').first(),
     )
+    // The "+" rails are mounted behind the cart overlay but must still keep the
+    // 24px floor at mobile width.
+    await assertTapTarget(page, 'add-to-cart', page.getByTestId('add-to-cart').first())
   })
 
   // @lat: [[ui#HomeView#Accessibility#Layout uses dynamic viewport units]]

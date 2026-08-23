@@ -1124,16 +1124,13 @@ describe('HouseRecord', () => {
     expect(buyRows.length).toBeGreaterThan(0)
     const buyName = buyRows[0]!.element
       .closest('tr')!
-      .querySelector('[data-testid="item-name"]')!
-      .textContent
+      .querySelector('[data-testid="item-name"]')!.textContent
 
     const cartStore = useCartStore()
     await cartStore.addItem('S1', buyName!)
     await flushPromises()
 
-    const toggle = wrapper.find(
-      '[data-testid="recommended-items"] summary input[type="checkbox"]',
-    )
+    const toggle = wrapper.find('[data-testid="recommended-items"] summary input[type="checkbox"]')
     expect(toggle.exists()).toBe(true)
     await toggle.setValue(true)
     await flushPromises()
@@ -1395,7 +1392,9 @@ describe('HouseRecord', () => {
     // Before anything is placed, unadded recommendations covering a
     // still-unfulfilled need hint that placing them would fulfill it (case 2).
     expect(
-      titles().some((t) => t.includes('could fulfill') && t.endsWith(' if it were placed in this house')),
+      titles().some(
+        (t) => t.includes('could fulfill') && t.endsWith(' if it were placed in this house'),
+      ),
     ).toBe(true)
 
     // Add Shower → fulfills 'metal stuff', leaving 'stone stuff' unfulfilled.
@@ -1448,9 +1447,7 @@ describe('HouseRecord', () => {
     // Before adding anything, the default sort targets the first unfulfilled
     // favorite — 'metal stuff' (alphabetically before 'stone stuff').
     expect(descHeaders().length).toBe(1)
-    expect(
-      descHeaders()[0]!.find('[data-testid="fav-header-fav_metal stuff"]').exists(),
-    ).toBe(true)
+    expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_metal stuff"]').exists()).toBe(true)
 
     // Adding Shower fulfills 'metal stuff'; the table must re-rank to the only
     // remaining unfulfilled favorite, 'stone stuff' — not stay on the fulfilled
@@ -1460,9 +1457,7 @@ describe('HouseRecord', () => {
     await flushPromises()
 
     expect(descHeaders().length).toBe(1)
-    expect(
-      descHeaders()[0]!.find('[data-testid="fav-header-fav_stone stuff"]').exists(),
-    ).toBe(true)
+    expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_stone stuff"]').exists()).toBe(true)
   })
 })
 

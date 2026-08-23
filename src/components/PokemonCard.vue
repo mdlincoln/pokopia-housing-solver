@@ -49,12 +49,7 @@ const habitatVariant = computed(() =>
 
     <BRow class="g-0">
       <BCol cols="auto">
-        <BCardImg
-          :src="imgURL"
-          :alt="name"
-          class="rounded-0 m-2 pokemon-avatar"
-          style="width: 6rem"
-        />
+        <BCardImg :src="imgURL" :alt="name" class="pokemon-avatar" />
       </BCol>
       <BCol class="d-flex align-items-center">
         <div v-if="habitat && habitatVariant">
