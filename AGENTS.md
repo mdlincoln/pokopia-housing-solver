@@ -115,7 +115,7 @@ Houses have fixed capacities: small=1, medium=2, large=4, each with a stable str
 
 **Pinned assignments.** When `pinnedAssignments` (a `Map<houseId, pokemonNames[]>`) is provided, pinned pokemon are pre-placed before clustering. A **pin-complement fill** step then fills the rest of each partially-occupied pinned house (empty houses are temporarily hidden) via `greedyFillRemaining` restricted to those houses — this ensures free pokemon pair by affinity to the pinned resident rather than each other, and prevents partial large houses from being misclassified as medium by the clustering phases. Only then does `clusterPreAssign` run on the remaining free pokemon and empty houses.
 
-**Helpers:** `enumerateHouses(config)` flattens a `HousingConfig` into an ordered list. `countSharedFavorites(a, b)` is the fallback scoring function used by `greedyFillRemaining` when no adjacency is available. `rankHouseFavorites(favoriteSets)` returns favorites shared by ≥2 pokemon in a house, used by the UI.
+**Helpers:** `enumerateHouses(config)` flattens a `HousingConfig` into an ordered list. `countSharedFavorites(a, b)` is the fallback scoring function used by `greedyFillRemaining` when no adjacency is available.
 
 ## Solver client / Web Worker
 

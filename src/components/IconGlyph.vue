@@ -4,7 +4,6 @@ import { computed } from 'vue'
 
 const props = defineProps<{
   name?: string
-  className?: string
 }>()
 
 // The glyph is purely decorative: accessible names come from the surrounding
@@ -16,5 +15,5 @@ const markup = computed(() => svgForIcon(props.name ?? ''))
 </script>
 
 <template>
-  <span v-if="markup" class="icon-glyph" :class="className" aria-hidden="true" v-html="markup" />
+  <span v-if="markup" class="icon-glyph" aria-hidden="true" v-html="markup" />
 </template>

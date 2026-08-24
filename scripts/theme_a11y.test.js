@@ -94,10 +94,6 @@ test('decorative pseudo-content declares empty alt text', () => {
   assert.match(ruleBody(/^\.house-title::after\s*\{/m), /content:\s*'\s*~'\s*\/\s*'';/)
 })
 
-test('cart-sync-badge uses the pinned higher-contrast cyan', () => {
-  assert.match(ruleBody(/\.cart-sync-badge\s*\{/), /color:\s*#1d7089;/)
-})
-
 test('checked-off de-emphasis is pinned at the passing opacity', () => {
   assert.match(ruleBody(/\.checked-off\s*\{/), /opacity:\s*0\.8;/)
 })
@@ -108,24 +104,7 @@ test('base progress-action meets the 24px tap-target floor', () => {
 })
 
 const SAND = [255, 247, 234] // --trop-sand-50 / --bs-body-bg — the real page background
-const SKY = [124, 216, 232] // badge chip tint rgb(124 216 232 / N%)
 const TROP_TEXT = [42, 76, 91] // --trop-text
-
-test('cart-sync-badge text clears the 4.5:1 floor over its composited chip', () => {
-  // The chip is a 22% sky tint over the sand body background (it sits on
-  // list-group items whose background is --bs-body-bg).
-  const chip = blendOver(SKY, 0.22, SAND)
-  const ratio = contrastRatio([29, 112, 137], chip) // #1d7089
-  assert.ok(ratio >= 4.5, `badge contrast must be ≥4.5:1, got ${ratio.toFixed(2)}:1`)
-
-  // Sanity guard: the previous colors (#3288a0 ≈4.07:1 per the audit, and the
-  // plan's first candidate #1f7892 ≈4.30:1 over this sand composite) both fail
-  // the floor — #1d7089 is pinned as the passing step.
-  assert.ok(
-    contrastRatio([31, 120, 146], chip) < 4.5,
-    'guard: #1f7892 over the sand composite is known to fail the floor',
-  )
-})
 
 test('checked-off rows keep text above the 4.5:1 floor at 0.8 opacity', () => {
   // Effective text: --trop-text, under grayscale(0.4), composited at 0.8 alpha

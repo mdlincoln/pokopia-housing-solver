@@ -392,21 +392,6 @@ export function enumerateHouses(config: HousingConfig): EnumeratedHouse[] {
   return houses
 }
 
-export function rankHouseFavorites(
-  favoriteSets: Set<string>[],
-): Array<{ favorite: string; count: number }> {
-  const freq = new Map<string, number>()
-  for (const set of favoriteSets) {
-    for (const fav of set) {
-      freq.set(fav, (freq.get(fav) ?? 0) + 1)
-    }
-  }
-  return Array.from(freq.entries())
-    .filter(([, count]) => count >= 1)
-    .map(([favorite, count]) => ({ favorite, count }))
-    .sort((a, b) => b.count - a.count)
-}
-
 export function countSharedFavorites(nameA: string, nameB: string, data: PokemonData): number {
   const entryA = data[nameA]
   const entryB = data[nameB]

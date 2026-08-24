@@ -13,8 +13,7 @@ import {
 // The baked item-graph payload the query layer hydrates from. No mock needed:
 // the baked JSON is the real committed output of scripts/build_data.mjs.
 import bakedItems from '@/data/items.json'
-// Golden snapshots captured from the pre-refactor sql.js implementation by
-// scripts/capture_baseline.mjs (AC.7). Inputs are recorded in the fixtures;
+// Golden snapshot of pre-refactor query output (AC.7). Inputs are recorded in the fixtures;
 // the baked-data implementations must reproduce them exactly.
 import recommendationsGolden from './fixtures/recommendations-golden.json'
 import aggregatedGolden from './fixtures/aggregated-golden.json'

@@ -8,7 +8,7 @@
 //                                 Int16Array (kept out of the JS bundle)
 
 import { assetPath } from '@/assetPath'
-import type { AdjacencyData, PokemonData } from '@/solver'
+import type { AdjacencyData } from '@/solver'
 
 import pokemonJson from './pokemon.json'
 import itemsJson from './items.json'
@@ -80,5 +80,3 @@ export function loadAdjacencyData(): Promise<AdjacencyData> {
   return _adjacencyPromise
 }
 
-// Re-export so `@/data` alone satisfies the old `@/queries` type imports.
-export type { PokemonData }

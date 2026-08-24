@@ -40,8 +40,6 @@ export const useCartStore = defineStore('cart', () => {
   const items = ref(new Map<string, CartEntry>())
   const recipes = ref(new Map<string, RecipeIngredient[]>())
   const aggregated = ref<AggregatedIngredient[]>([])
-  const totalItems = computed(() => items.value.size)
-
   // Busy counter: incremented while any cart mutation (add/remove/restore/clear)
   // is in flight so the UI can show an "updating cart" indicator. A counter (not
   // a boolean) so overlapping mutations stay busy until all settle.
@@ -216,7 +214,6 @@ export const useCartStore = defineStore('cart', () => {
     items,
     recipes,
     aggregated,
-    totalItems,
     itemList,
     itemsByHouse,
     busy,
