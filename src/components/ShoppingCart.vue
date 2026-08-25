@@ -66,7 +66,7 @@ onBeforeUnmount(() => {
 const offcanvasId = 'shopping-cart-offcanvas'
 
 const cartToggleLabel = computed(
-  () => `Open shopping cart, ${cart.itemList.length} item${cart.itemList.length === 1 ? '' : 's'}`,
+  () => `Open shopping cart, ${cart.cartCount} item${cart.cartCount === 1 ? '' : 's'}`,
 )
 
 // Offcanvas close interactions (X / Esc / backdrop) surface as
@@ -115,7 +115,7 @@ function orphanNote(houseId: string): string {
       <h2 :id="`${offcanvasId}-offcanvas-label`" class="offcanvas-title">Shopping Cart</h2>
       <BCloseButton aria-label="Close" @click="onCartModelUpdate(false)" />
     </template>
-    <template v-if="cart.itemList.length === 0">
+    <template v-if="cart.cartCount === 0">
       <p class="text-muted" data-testid="cart-empty">No items in cart.</p>
     </template>
 
@@ -288,8 +288,8 @@ function orphanNote(houseId: string): string {
     @click="showMobileCart = true"
   >
     🛒 Cart
-    <BBadge v-if="cart.itemList.length" variant="light" pill class="ms-1">{{
-      cart.itemList.length
+    <BBadge v-if="cart.cartCount" variant="light" pill class="ms-1">{{
+      cart.cartCount
     }}</BBadge>
   </BButton>
 </template>

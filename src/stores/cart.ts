@@ -6,7 +6,7 @@ import {
   type AggregatedIngredient,
   type RecipeIngredient,
 } from '@/queries'
-import { defineStore } from 'pinia'
+import { acceptHMRUpdate, defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { useProgressStore } from '@/stores/progress'
 
@@ -65,6 +65,19 @@ export const useCartStore = defineStore('cart', () => {
       category: entry.category,
       flavorText: entry.flavorText,
       tag: entry.tag,
+    })),
+  )
+
+  // Safe count accessor: reads Map.size directly, never depends on itemList's
+  // reactive effect (which can be stopped by HMR store disposal).
+  const cartCount = computed(() => items.value.size)
+
+  // Safe serialization accessor: derives directly from items Map ref (same as
+  // cartCount), avoiding any dependency on itemList's reactive effect.
+  const serializedCart = computed(() =>
+    Array.from(items.value.entries()).map(([key, entry]) => ({
+      houseId: entry.houseId,
+      name: key.slice(key.indexOf(':') + 1),
     })),
   )
 
@@ -215,6 +228,8 @@ export const useCartStore = defineStore('cart', () => {
     recipes,
     aggregated,
     itemList,
+    cartCount,
+    serializedCart,
     itemsByHouse,
     busy,
     pendingMutations,
@@ -224,3 +239,9 @@ export const useCartStore = defineStore('cart', () => {
     clearCart,
   }
 })
+
+// Ensure HMR updates the store definition for already-mounted components
+// instead of leaving a stale store proxy that lacks new properties.
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useCartStore, import.meta.hot))
+}
