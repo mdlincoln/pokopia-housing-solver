@@ -12,6 +12,7 @@
     "test:e2e": "playwright test",
     "harvest:pokemon": "node scripts/harvest_pokemon.js",
     "harvest:items": "node scripts/harvest_items.js",
+    "harvest:habitats": "node scripts/harvest_habitats.js",
     "test:harvest": "node --test \"scripts/*.test.js\"",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",

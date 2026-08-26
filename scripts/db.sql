@@ -49,6 +49,36 @@ CREATE TABLE
       , opposite TEXT NOT NULL REFERENCES habitats (habitat) DEFERRABLE INITIALLY DEFERRED
     );
 
+CREATE TABLE
+    serebii_habitats (
+        id INTEGER PRIMARY KEY
+      , number INTEGER NOT NULL
+      , name TEXT UNIQUE NOT NULL
+      , detail_slug TEXT
+      , image_path TEXT
+      , description TEXT
+      , category TEXT NOT NULL DEFAULT 'main'
+    );
+
+CREATE TABLE
+    habitat_recipe (
+        habitat_id INTEGER NOT NULL REFERENCES serebii_habitats (id)
+      , item_name TEXT NOT NULL
+      , quantity INTEGER NOT NULL
+      , PRIMARY KEY (habitat_id, item_name)
+    );
+
+CREATE TABLE
+    habitat_pokemon (
+        habitat_id INTEGER NOT NULL REFERENCES serebii_habitats (id)
+      , pokemon_name TEXT NOT NULL
+      , rarity TEXT
+      , locations TEXT
+      , times TEXT
+      , weathers TEXT
+      , PRIMARY KEY (habitat_id, pokemon_name)
+    );
+
 CREATE VIEW
     shared_favorites AS
 SELECT

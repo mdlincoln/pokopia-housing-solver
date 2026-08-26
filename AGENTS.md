@@ -74,6 +74,33 @@ Unit tests live in `scripts/harvest_items.test.js` and `scripts/harvest_pokemon.
 npm run test:harvest
 ```
 
+# Habitat Maintenance
+
+`scripts/harvest_habitats.js` syncs the `serebii_habitats`, `habitat_recipe`, and `habitat_pokemon` tables in `public/pokehousing.sqlite` with Serebii's Pokémon Pokopia habitat database. It scrapes the habitats list page to discover all 252 habitats across three sections (Main #001–#209, Basin #001–#036, Event #001–#007), then fetches each habitat's detail page to extract the full-size image, flavor text, building requirements (item name + quantity), and available pokemon spawns (with rarity, locations, times, and weathers).
+
+```bash
+npm run harvest:habitats              # scrape + add missing habitats
+npm run harvest:habitats -- --dry-run # report only, no DB/image writes
+npm run harvest:habitats -- --verify  # completeness + data-integrity check
+npm run harvest:habitats -- --delay 1.0  # raise base request delay (jittered to [delay, 3.0]s)
+```
+
+The script uses only the Node standard library (`fetch`, `node:sqlite`, `node:util`). It requests pages with a jittered delay to scrape politely. Habitat full-size images are downloaded to `public/images/habitats/`, stored as `images/habitats/<basename>.png` where `<basename>` is the image filename stem from the detail page (e.g. `93`, `b1`, `e7`), globally unique across Main/Basin/Event sections.
+
+The new DB tables (defined in `scripts/db.sql`, created at runtime via `CREATE TABLE IF NOT EXISTS`):
+
+- `serebii_habitats` — habitat metadata (number, name, detail_slug, image_path, description, category).
+- `habitat_recipe` — building requirements: `item_name` stored as text (not an FK) because habitat-building items may not all be in the `items` table.
+- `habitat_pokemon` — pokemon spawn data: `rarity`, `locations`/`times`/`weathers` stored as pipe-delimited text.
+
+The existing `habitats` table (habitat axis pairings: Dark/Bright, Cool/Warm, Dry/Humid — used by the solver) is unrelated and must not be conflated with `serebii_habitats`.
+
+Unit tests live in `scripts/harvest_habitats.test.js` and use Node's built-in `node:test`. Run with:
+
+```bash
+npm run test:harvest
+```
+
 # Architecture
 
 ## Data layer
