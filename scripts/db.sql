@@ -50,7 +50,7 @@ CREATE TABLE
     );
 
 CREATE TABLE
-    serebii_habitats (
+    habitat_entries (
         id INTEGER PRIMARY KEY
       , number INTEGER NOT NULL
       , name TEXT UNIQUE NOT NULL
@@ -62,7 +62,7 @@ CREATE TABLE
 
 CREATE TABLE
     habitat_recipe (
-        habitat_id INTEGER NOT NULL REFERENCES serebii_habitats (id)
+        habitat_id INTEGER NOT NULL REFERENCES habitat_entries (id)
       , item_name TEXT NOT NULL
       , quantity INTEGER NOT NULL
       , PRIMARY KEY (habitat_id, item_name)
@@ -70,13 +70,37 @@ CREATE TABLE
 
 CREATE TABLE
     habitat_pokemon (
-        habitat_id INTEGER NOT NULL REFERENCES serebii_habitats (id)
+        habitat_id INTEGER NOT NULL REFERENCES habitat_entries (id)
       , pokemon_name TEXT NOT NULL
       , rarity TEXT
-      , locations TEXT
-      , times TEXT
-      , weathers TEXT
       , PRIMARY KEY (habitat_id, pokemon_name)
+    );
+
+CREATE TABLE
+    habitat_pokemon_location (
+        habitat_id INTEGER NOT NULL REFERENCES habitat_entries (id)
+      , pokemon_name TEXT NOT NULL
+      , location TEXT NOT NULL
+      , PRIMARY KEY (habitat_id, pokemon_name, location)
+      , FOREIGN KEY (habitat_id, pokemon_name) REFERENCES habitat_pokemon (habitat_id, pokemon_name)
+    );
+
+CREATE TABLE
+    habitat_pokemon_time (
+        habitat_id INTEGER NOT NULL REFERENCES habitat_entries (id)
+      , pokemon_name TEXT NOT NULL
+      , time TEXT NOT NULL
+      , PRIMARY KEY (habitat_id, pokemon_name, time)
+      , FOREIGN KEY (habitat_id, pokemon_name) REFERENCES habitat_pokemon (habitat_id, pokemon_name)
+    );
+
+CREATE TABLE
+    habitat_pokemon_weather (
+        habitat_id INTEGER NOT NULL REFERENCES habitat_entries (id)
+      , pokemon_name TEXT NOT NULL
+      , weather TEXT NOT NULL
+      , PRIMARY KEY (habitat_id, pokemon_name, weather)
+      , FOREIGN KEY (habitat_id, pokemon_name) REFERENCES habitat_pokemon (habitat_id, pokemon_name)
     );
 
 CREATE VIEW

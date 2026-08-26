@@ -531,10 +531,10 @@ test('parseHabitatDetailHtml: basin/event letter-prefixed image basename', () =>
   assert.strictEqual(detail.imageNumber, 'b1')
 
   // Event example
-  const eventHtml = BASIN_DETAIL_HTML.replace(
-    'habitatdex/b1.png',
-    'habitatdex/e7.png',
-  ).replace('Basin tall grass', 'Event habitat')
+  const eventHtml = BASIN_DETAIL_HTML.replace('habitatdex/b1.png', 'habitatdex/e7.png').replace(
+    'Basin tall grass',
+    'Event habitat',
+  )
   const eventDetail = parseHabitatDetailHtml(eventHtml, 'eventhabitat')
   assert.ok(eventDetail)
   assert.strictEqual(eventDetail.imageNumber, 'e7')
@@ -594,15 +594,26 @@ test('DB helpers: createTables on empty DB', (t) => {
 
   const ro = new DatabaseSync(dbPath, { readOnly: true })
   const tables = ro
-    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('serebii_habitats', 'habitat_recipe', 'habitat_pokemon')")
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name IN " +
+        "('habitat_entries', 'habitat_recipe', 'habitat_pokemon', " +
+        "'habitat_pokemon_location', 'habitat_pokemon_time', 'habitat_pokemon_weather')",
+    )
     .all()
     .map((r) => r.name)
   ro.close()
 
-  assert.strictEqual(tables.length, 3)
-  assert.ok(tables.includes('serebii_habitats'))
-  assert.ok(tables.includes('habitat_recipe'))
-  assert.ok(tables.includes('habitat_pokemon'))
+  assert.strictEqual(tables.length, 6)
+  for (const name of [
+    'habitat_entries',
+    'habitat_recipe',
+    'habitat_pokemon',
+    'habitat_pokemon_location',
+    'habitat_pokemon_time',
+    'habitat_pokemon_weather',
+  ]) {
+    assert.ok(tables.includes(name), `missing table ${name}`)
+  }
 })
 
 test('DB helpers: createTables is idempotent', (t) => {
@@ -615,7 +626,9 @@ test('DB helpers: createTables is idempotent', (t) => {
 
   const ro = new DatabaseSync(dbPath, { readOnly: true })
   const count = ro
-    .prepare("SELECT COUNT(*) AS cnt FROM sqlite_master WHERE type='table' AND name='serebii_habitats'")
+    .prepare(
+      "SELECT COUNT(*) AS cnt FROM sqlite_master WHERE type='table' AND name='habitat_entries'",
+    )
     .get()
   ro.close()
   assert.strictEqual(count.cnt, 1)
@@ -627,12 +640,20 @@ test('DB helpers: addHabitatToDb returns valid habitatId', (t) => {
   const dbPath = dbPathFor(tmp)
   createTables(dbPath)
 
-  const id = addHabitatToDb(dbPath, 1, 'Tall Grass', 'tallgrass', 'images/habitats/1.png', 'desc', 'main')
+  const id = addHabitatToDb(
+    dbPath,
+    1,
+    'Tall Grass',
+    'tallgrass',
+    'images/habitats/1.png',
+    'desc',
+    'main',
+  )
   assert.strictEqual(typeof id, 'number')
   assert.ok(id > 0)
 
   const ro = new DatabaseSync(dbPath, { readOnly: true })
-  const row = ro.prepare('SELECT * FROM serebii_habitats WHERE id = ?').get(id)
+  const row = ro.prepare('SELECT * FROM habitat_entries WHERE id = ?').get(id)
   ro.close()
   assert.strictEqual(row.name, 'Tall Grass')
   assert.strictEqual(row.number, 1)
@@ -655,7 +676,9 @@ test('DB helpers: addHabitatRecipe inserts item_name and quantity', (t) => {
 
   const ro = new DatabaseSync(dbPath, { readOnly: true })
   const rows = ro
-    .prepare('SELECT item_name, quantity FROM habitat_recipe WHERE habitat_id = ? ORDER BY item_name')
+    .prepare(
+      'SELECT item_name, quantity FROM habitat_recipe WHERE habitat_id = ? ORDER BY item_name',
+    )
     .all(id)
   ro.close()
 
@@ -666,7 +689,7 @@ test('DB helpers: addHabitatRecipe inserts item_name and quantity', (t) => {
   assert.strictEqual(rows[1].quantity, 4)
 })
 
-test('DB helpers: addHabitatPokemon inserts pipe-joined fields', (t) => {
+test('DB helpers: addHabitatPokemon writes base row plus one row per value', (t) => {
   const tmp = makeTempDir()
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
   const dbPath = dbPathFor(tmp)
@@ -684,16 +707,38 @@ test('DB helpers: addHabitatPokemon inserts pipe-joined fields', (t) => {
   ])
 
   const ro = new DatabaseSync(dbPath, { readOnly: true })
-  const row = ro
-    .prepare('SELECT * FROM habitat_pokemon WHERE habitat_id = ?')
-    .get(id)
-  ro.close()
 
-  assert.strictEqual(row.pokemon_name, 'Bulbasaur')
-  assert.strictEqual(row.rarity, 'Common')
-  assert.strictEqual(row.locations, 'Withered Wastelands|Bleak Beach')
-  assert.strictEqual(row.times, 'Morning|Day')
-  assert.strictEqual(row.weathers, 'Sun|Rain')
+  // habitat_pokemon holds only the normalized base row — no pipe-delimited columns.
+  const hpColumns = ro
+    .prepare('PRAGMA table_info(habitat_pokemon)')
+    .all()
+    .map((r) => r.name)
+  assert.deepStrictEqual(hpColumns, ['habitat_id', 'pokemon_name', 'rarity'])
+
+  const base = ro.prepare('SELECT * FROM habitat_pokemon WHERE habitat_id = ?').all(id)
+  assert.strictEqual(base.length, 1)
+  assert.strictEqual(base[0].pokemon_name, 'Bulbasaur')
+  assert.strictEqual(base[0].rarity, 'Common')
+
+  const locations = ro
+    .prepare('SELECT location FROM habitat_pokemon_location WHERE habitat_id = ? ORDER BY location')
+    .all(id)
+    .map((r) => r.location)
+  assert.deepStrictEqual(locations, ['Bleak Beach', 'Withered Wastelands'])
+
+  const times = ro
+    .prepare('SELECT time FROM habitat_pokemon_time WHERE habitat_id = ? ORDER BY time')
+    .all(id)
+    .map((r) => r.time)
+  assert.deepStrictEqual(times, ['Day', 'Morning'])
+
+  const weathers = ro
+    .prepare('SELECT weather FROM habitat_pokemon_weather WHERE habitat_id = ? ORDER BY weather')
+    .all(id)
+    .map((r) => r.weather)
+  assert.deepStrictEqual(weathers, ['Rain', 'Sun'])
+
+  ro.close()
 })
 
 test('INSERT OR IGNORE idempotence for recipe/pokemon', (t) => {
@@ -715,19 +760,35 @@ test('INSERT OR IGNORE idempotence for recipe/pokemon', (t) => {
     },
   ]
 
-  // Insert twice — should not duplicate
+  // Insert twice — should not duplicate in the base or any join table
   addHabitatRecipe(dbPath, id, recipe)
   addHabitatRecipe(dbPath, id, recipe)
   addHabitatPokemon(dbPath, id, pokemon)
   addHabitatPokemon(dbPath, id, pokemon)
 
   const ro = new DatabaseSync(dbPath, { readOnly: true })
-  const recipeCount = ro.prepare('SELECT COUNT(*) AS cnt FROM habitat_recipe WHERE habitat_id = ?').get(id)
-  const pokeCount = ro.prepare('SELECT COUNT(*) AS cnt FROM habitat_pokemon WHERE habitat_id = ?').get(id)
+  const recipeCount = ro
+    .prepare('SELECT COUNT(*) AS cnt FROM habitat_recipe WHERE habitat_id = ?')
+    .get(id)
+  const pokeCount = ro
+    .prepare('SELECT COUNT(*) AS cnt FROM habitat_pokemon WHERE habitat_id = ?')
+    .get(id)
+  const locCount = ro
+    .prepare('SELECT COUNT(*) AS cnt FROM habitat_pokemon_location WHERE habitat_id = ?')
+    .get(id)
+  const timeCount = ro
+    .prepare('SELECT COUNT(*) AS cnt FROM habitat_pokemon_time WHERE habitat_id = ?')
+    .get(id)
+  const weathCount = ro
+    .prepare('SELECT COUNT(*) AS cnt FROM habitat_pokemon_weather WHERE habitat_id = ?')
+    .get(id)
   ro.close()
 
   assert.strictEqual(recipeCount.cnt, 1)
   assert.strictEqual(pokeCount.cnt, 1)
+  assert.strictEqual(locCount.cnt, 1)
+  assert.strictEqual(timeCount.cnt, 1)
+  assert.strictEqual(weathCount.cnt, 1)
 })
 
 test('FK ordering: recipe/pokemon fail on nonexistent habitat_id', (t) => {
@@ -762,8 +823,22 @@ test('getExistingHabitats and findMissingHabitats', (t) => {
   assert.ok(slugSet.has('tallgrass'))
 
   const allEntries = [
-    { number: 1, name: 'Tall Grass', slug: 'tallgrass', thumbnailBasename: '1', description: 'd', category: 'main' },
-    { number: 2, name: 'Tree-shaded tall grass', slug: 'treeshadedtallgrass', thumbnailBasename: '2', description: 'd', category: 'main' },
+    {
+      number: 1,
+      name: 'Tall Grass',
+      slug: 'tallgrass',
+      thumbnailBasename: '1',
+      description: 'd',
+      category: 'main',
+    },
+    {
+      number: 2,
+      name: 'Tree-shaded tall grass',
+      slug: 'treeshadedtallgrass',
+      thumbnailBasename: '2',
+      description: 'd',
+      category: 'main',
+    },
   ]
   const missing = findMissingHabitats(allEntries, namesLower)
   assert.strictEqual(missing.length, 1)
@@ -789,8 +864,10 @@ function habitatsFetchMap() {
       return BASIN_DETAIL_HTML.replace('b1', 'e1').replace('Basin tall grass', 'Yellow carpet')
     }
     if (url.includes('treeshadedtallgrass.shtml')) {
-      return DETAIL_HTML.replace('/habitatdex/1.png', '/habitatdex/2.png')
-        .replace('<h1>Tall Grass</h1>', '<h1>Tree-shaded tall grass</h1>')
+      return DETAIL_HTML.replace('/habitatdex/1.png', '/habitatdex/2.png').replace(
+        '<h1>Tall Grass</h1>',
+        '<h1>Tree-shaded tall grass</h1>',
+      )
     }
     return ''
   }
@@ -820,7 +897,7 @@ test('main --dry-run with stubbed fetch does not write to DB', async (t) => {
 
   // DB should have no habitats (only the table was created)
   const ro = new DatabaseSync(dbPath, { readOnly: true })
-  const row = ro.prepare('SELECT COUNT(*) AS cnt FROM serebii_habitats').get()
+  const row = ro.prepare('SELECT COUNT(*) AS cnt FROM habitat_entries').get()
   ro.close()
   assert.strictEqual(row.cnt, 0)
 

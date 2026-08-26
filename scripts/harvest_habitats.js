@@ -47,13 +47,11 @@ const SECTION_DIVIDER_RE = /Habitats\s*\((Basin|Event)\)/i
 const LIST_NUMBER_RE = /<td class="cen">#(\d+)<\/td>/i
 
 // Thumbnail link: <a href="habitatdex/<slug>.shtml"><img src="habitatdex/th/<basename>.png" ...>
-const LIST_THUMB_RE = /<a href="habitatdex\/([^"]+)\.shtml"><img src="habitatdex\/th\/([^"]+)\.png"/i
+const LIST_THUMB_RE =
+  /<a href="habitatdex\/([^"]+)\.shtml"><img src="habitatdex\/th\/([^"]+)\.png"/i
 
 // Name link: <a href="habitatdex/<slug>.shtml"><u>Name</u></a>
 const LIST_NAME_RE = /<a href="habitatdex\/[^"]+\.shtml"><u>([^<]+)<\/u><\/a>/i
-
-// Description: <td class="fooinfo">text</td>
-const LIST_DESC_RE = /<td class="fooinfo">([^<]*(?:<(?!\/td>)[^<]*)*)<\/td>/i
 
 // Detail page: habitat name from <h1>
 const DETAIL_NAME_RE = /<h1>([^<]+)<\/h1>/i
@@ -193,8 +191,7 @@ export function parseHabitatDetailHtml(html, slug) {
     const availHtml = availMatch[0]
 
     // Split into batches: each batch starts at a names row (fooevo + pokedex link).
-    const batchStartRe =
-      /<tr>\s*<td class="fooevo"><a href="\/pokemonpokopia\/pokedex\//g
+    const batchStartRe = /<tr>\s*<td class="fooevo"><a href="\/pokemonpokopia\/pokedex\//g
     const batchStarts = [...availHtml.matchAll(batchStartRe)].map((m) => m.index)
 
     for (let bi = 0; bi < batchStarts.length; bi++) {
@@ -301,9 +298,7 @@ function parsePokemonBatch(batchHtml) {
 export function getExistingHabitats(dbPath) {
   const db = openReadOnlyDb(dbPath)
   try {
-    const rows = db
-      .prepare('SELECT id, name, detail_slug FROM serebii_habitats')
-      .all()
+    const rows = db.prepare('SELECT id, name, detail_slug FROM habitat_entries').all()
     const namesLower = new Set()
     const slugSet = new Set()
     for (const { name, detail_slug } of rows) {
@@ -326,12 +321,21 @@ export function findMissingHabitats(allEntries, existingNamesLower) {
 }
 
 /**
- * Create the three habitat tables if they don't already exist.
+ * Create the habitat tables if they don't already exist.
  * Reads CREATE TABLE statements from scripts/db.sql.
  */
 export function createTables(dbPath) {
   const schemaSql = fs.readFileSync(DB_SQL_PATH, 'utf8')
-  const tableNames = ['serebii_habitats', 'habitat_recipe', 'habitat_pokemon']
+  const tableNames = [
+    'habitat_entries',
+    'habitat_recipe',
+    'habitat_pokemon',
+    // Join tables must be created after habitat_pokemon: their composite
+    // foreign keys reference habitat_pokemon (habitat_id, pokemon_name).
+    'habitat_pokemon_location',
+    'habitat_pokemon_time',
+    'habitat_pokemon_weather',
+  ]
 
   const statements = []
   for (const tableName of tableNames) {
@@ -360,7 +364,7 @@ export function addHabitatToDb(dbPath, number, name, slug, imagePath, descriptio
   try {
     const result = db
       .prepare(
-        'INSERT INTO serebii_habitats (number, name, detail_slug, image_path, description, category) ' +
+        'INSERT INTO habitat_entries (number, name, detail_slug, image_path, description, category) ' +
           'VALUES (?, ?, ?, ?, ?, ?)',
       )
       .run(number, name, slug, imagePath, description, category)
@@ -387,19 +391,32 @@ export function addHabitatRecipe(dbPath, habitatId, recipe) {
 export function addHabitatPokemon(dbPath, habitatId, pokemon) {
   const db = openWritableDb(dbPath)
   try {
-    const insert = db.prepare(
-      'INSERT OR IGNORE INTO habitat_pokemon (habitat_id, pokemon_name, rarity, locations, times, weathers) ' +
-        'VALUES (?, ?, ?, ?, ?, ?)',
+    // Base row first (parent), then one row per value in each join table.
+    // All INSERT OR IGNORE keeps re-runs idempotent; the composite FKs on the
+    // join tables require the parent row to exist before join inserts.
+    const insertBase = db.prepare(
+      'INSERT OR IGNORE INTO habitat_pokemon (habitat_id, pokemon_name, rarity) VALUES (?, ?, ?)',
+    )
+    const insertLocation = db.prepare(
+      'INSERT OR IGNORE INTO habitat_pokemon_location (habitat_id, pokemon_name, location) VALUES (?, ?, ?)',
+    )
+    const insertTime = db.prepare(
+      'INSERT OR IGNORE INTO habitat_pokemon_time (habitat_id, pokemon_name, time) VALUES (?, ?, ?)',
+    )
+    const insertWeather = db.prepare(
+      'INSERT OR IGNORE INTO habitat_pokemon_weather (habitat_id, pokemon_name, weather) VALUES (?, ?, ?)',
     )
     for (const p of pokemon) {
-      insert.run(
-        habitatId,
-        p.name,
-        p.rarity ?? null,
-        p.locations.length > 0 ? p.locations.join('|') : null,
-        p.times.length > 0 ? p.times.join('|') : null,
-        p.weathers.length > 0 ? p.weathers.join('|') : null,
-      )
+      insertBase.run(habitatId, p.name, p.rarity ?? null)
+      for (const location of p.locations) {
+        insertLocation.run(habitatId, p.name, location)
+      }
+      for (const time of p.times) {
+        insertTime.run(habitatId, p.name, time)
+      }
+      for (const weather of p.weathers) {
+        insertWeather.run(habitatId, p.name, weather)
+      }
     }
   } finally {
     db.close()
@@ -473,7 +490,7 @@ export async function backfillHabitats(dbPath, imagesDir, baseDelay) {
   try {
     incomplete = ro
       .prepare(
-        'SELECT id, name, detail_slug, image_path, number, category FROM serebii_habitats h ' +
+        'SELECT id, name, detail_slug, image_path, number, category FROM habitat_entries h ' +
           'WHERE (' +
           '  (SELECT COUNT(*) FROM habitat_recipe WHERE habitat_id = h.id) = 0' +
           '  AND (SELECT COUNT(*) FROM habitat_pokemon WHERE habitat_id = h.id) = 0' +
@@ -493,7 +510,7 @@ export async function backfillHabitats(dbPath, imagesDir, baseDelay) {
 
   let backfilled = 0
   let skipped = 0
-  for (const { id, name, detail_slug, image_path, number, category } of incomplete) {
+  for (const { id, name, detail_slug } of incomplete) {
     if (!detail_slug) {
       console.log(`  SKIP '${name}': no detail_slug`)
       skipped += 1
@@ -543,12 +560,10 @@ export async function backfillHabitats(dbPath, imagesDir, baseDelay) {
 export function verifyHabitats(dbPath, allEntries, imagesDir) {
   const db = openReadOnlyDb(dbPath)
   let dbHabitats
-  let dbRecipes
   let dbPokemon
   let dbPokemonNames
   try {
-    dbHabitats = db.prepare('SELECT * FROM serebii_habitats').all()
-    dbRecipes = db.prepare('SELECT * FROM habitat_recipe').all()
+    dbHabitats = db.prepare('SELECT * FROM habitat_entries').all()
     dbPokemon = db.prepare('SELECT * FROM habitat_pokemon').all()
     dbPokemonNames = new Set(
       db
@@ -699,7 +714,7 @@ export async function main(argv = process.argv.slice(2)) {
     const db = openReadOnlyDb(dbPath)
     let dbHabitats
     try {
-      dbHabitats = db.prepare('SELECT * FROM serebii_habitats').all()
+      dbHabitats = db.prepare('SELECT * FROM habitat_entries').all()
     } catch {
       dbHabitats = []
     } finally {
@@ -735,7 +750,9 @@ export async function main(argv = process.argv.slice(2)) {
       for (const { name, quantity } of detail.recipe) {
         const dbQty = dbRecipeMap.get(name.toLowerCase())
         if (dbQty === undefined) {
-          console.log(`  [${i + 1}/${allEntries.length}] MISSING RECIPE ITEM: ${entry.name} / ${name}`)
+          console.log(
+            `  [${i + 1}/${allEntries.length}] MISSING RECIPE ITEM: ${entry.name} / ${name}`,
+          )
           mismatches += 1
         } else if (dbQty !== quantity) {
           console.log(
@@ -754,7 +771,9 @@ export async function main(argv = process.argv.slice(2)) {
       for (const p of detail.pokemon) {
         const dbPoke = dbPokeMap.get(p.name.toLowerCase())
         if (!dbPoke) {
-          console.log(`  [${i + 1}/${allEntries.length}] MISSING POKEMON: ${entry.name} / ${p.name}`)
+          console.log(
+            `  [${i + 1}/${allEntries.length}] MISSING POKEMON: ${entry.name} / ${p.name}`,
+          )
           mismatches += 1
         }
       }
