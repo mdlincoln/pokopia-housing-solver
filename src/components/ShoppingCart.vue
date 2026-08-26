@@ -288,8 +288,6 @@ function orphanNote(houseId: string): string {
     @click="showMobileCart = true"
   >
     🛒 Cart
-    <BBadge v-if="cart.cartCount" variant="light" pill class="ms-1">{{
-      cart.cartCount
-    }}</BBadge>
+    <BBadge v-if="cart.cartCount" variant="light" pill class="ms-1">{{ cart.cartCount }}</BBadge>
   </BButton>
 </template>

@@ -26,20 +26,15 @@ describe('cart itemList guard regression contract', () => {
   })
 
   it('cart store exposes cartCount and serializedCart accessors', () => {
-    expect(
-      CART_STORE_SOURCE,
-      'cart.ts must define cartCount computed',
-    ).toContain('cartCount')
-    expect(
-      CART_STORE_SOURCE,
-      'cart.ts must define serializedCart computed',
-    ).toContain('serializedCart')
+    expect(CART_STORE_SOURCE, 'cart.ts must define cartCount computed').toContain('cartCount')
+    expect(CART_STORE_SOURCE, 'cart.ts must define serializedCart computed').toContain(
+      'serializedCart',
+    )
   })
 
   it('cart store registers acceptHMRUpdate', () => {
-    expect(
-      CART_STORE_SOURCE,
-      'cart.ts must register acceptHMRUpdate for HMR',
-    ).toContain('acceptHMRUpdate')
+    expect(CART_STORE_SOURCE, 'cart.ts must register acceptHMRUpdate for HMR').toContain(
+      'acceptHMRUpdate',
+    )
   })
 })

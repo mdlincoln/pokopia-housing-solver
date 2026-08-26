@@ -5,15 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "predev": "npm run build:data",
     "build": "npm run build:data && run-p type-check \"build-only {@}\" --",
     "build:data": "node scripts/build_data.mjs",
     "preview": "vite preview",
     "test:unit": "vitest",
+    "pretest:unit": "npm run build:data",
     "test:e2e": "playwright test",
     "harvest:pokemon": "node scripts/harvest_pokemon.js",
     "harvest:items": "node scripts/harvest_items.js",
     "harvest:habitats": "node scripts/harvest_habitats.js",
-    "test:harvest": "node --test \"scripts/*.test.js\"",
+    "test:harvest": "npm run build:data && node --test \"scripts/*.test.js\"",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "run-s lint:*",
@@ -21,7 +23,7 @@
     "lint:eslint": "eslint . --fix --cache",
     "format": "oxfmt src/ scripts/",
     "prepare": "husky",
-    "check": "run-s format lint type-check test:unit test:harvest"
+    "check": "run-s format lint build:data type-check test:unit test:harvest"
   },
   "dependencies": {
     "bootstrap": "^5.3.8",

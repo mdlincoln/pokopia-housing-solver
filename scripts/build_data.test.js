@@ -14,13 +14,8 @@ import path from 'node:path'
 import { test } from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
 
-import { DEFAULT_DB_PATH, openReadOnlyDb, PROJECT_ROOT } from './harvest_lib.js'
-import { buildAdjacency, buildItems, buildPokemon } from './build_data.mjs'
-import { formatDataJson } from './format_data.mjs'
-
-const POKEMON_JSON = path.join(PROJECT_ROOT, 'src', 'data', 'pokemon.json')
-const ITEMS_JSON = path.join(PROJECT_ROOT, 'src', 'data', 'items.json')
-const ADJACENCY_JSON = path.join(PROJECT_ROOT, 'public', 'data', 'adjacency.json')
+import { DEFAULT_DB_PATH, openReadOnlyDb } from './harvest_lib.js'
+import { bake, buildAdjacency, buildItems, buildPokemon } from './build_data.mjs'
 
 function withDb(fn) {
   const db = openReadOnlyDb(DEFAULT_DB_PATH)
@@ -236,25 +231,35 @@ test('npm run build:data is deterministic (identical bytes on re-run)', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Committed-output sync: src/data/*.json and public/data/adjacency.json must
-// match what the generator produces from the committed DB (clean checkouts
-// build without running build:data first, so staleness is a silent-skew risk).
+// File-write: bake() writes all three output files to disk and they parse as
+// valid JSON. Covers the main() → disk path that the individual build* tests
+// don't exercise (they call build* directly, never touching output paths).
 // ---------------------------------------------------------------------------
 
-test('committed generated files are byte-identical to the generator output', () => {
-  withDb((db) => {
-    const adj = buildAdjacency(db)
-    const expected = [
-      [POKEMON_JSON, formatDataJson(buildPokemon(db))],
-      [ITEMS_JSON, formatDataJson(buildItems(db))],
-      [ADJACENCY_JSON, formatDataJson({ names: adj.names, size: adj.size, data: adj.data })],
-    ]
-    for (const [file, expectedText] of expected) {
-      assert.strictEqual(
-        fs.readFileSync(file, 'utf8'),
-        expectedText,
-        `${path.basename(file)} is stale — run npm run build:data`,
-      )
-    }
-  })
+test('bake() writes all three output files and they parse as JSON', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'build-data-write-'))
+  const snapshotDb = path.join(tmp, 'pokehousing.sqlite')
+  fs.copyFileSync(DEFAULT_DB_PATH, snapshotDb)
+  try {
+    const stats = bake(snapshotDb, tmp)
+    const { pokemonOut, itemsOut, adjacencyOut } = stats.paths
+
+    assert.ok(fs.statSync(pokemonOut).size > 0, 'pokemon.json was written')
+    assert.ok(fs.statSync(itemsOut).size > 0, 'items.json was written')
+    assert.ok(fs.statSync(adjacencyOut).size > 0, 'adjacency.json was written')
+
+    const pokemon = JSON.parse(fs.readFileSync(pokemonOut, 'utf8'))
+    assert.ok(Array.isArray(pokemon.names))
+    assert.ok(typeof pokemon.dataByName === 'object')
+
+    const items = JSON.parse(fs.readFileSync(itemsOut, 'utf8'))
+    assert.ok(typeof items.itemDetailsByName === 'object')
+
+    const adjacency = JSON.parse(fs.readFileSync(adjacencyOut, 'utf8'))
+    assert.ok(Array.isArray(adjacency.names))
+    assert.ok(typeof adjacency.size === 'number')
+    assert.ok(typeof adjacency.data === 'string')
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true })
+  }
 })

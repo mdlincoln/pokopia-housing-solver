@@ -19,7 +19,7 @@ export const USER_AGENT =
 
 const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url))
 export const PROJECT_ROOT = path.resolve(SCRIPTS_DIR, '..')
-export const DEFAULT_DB_PATH = path.join(PROJECT_ROOT, 'public', 'pokehousing.sqlite')
+export const DEFAULT_DB_PATH = path.join(PROJECT_ROOT, 'src', 'pokehousing.sqlite')
 export const DEFAULT_IMAGES_DIR = path.join(PROJECT_ROOT, 'public', 'images')
 
 // ---------------------------------------------------------------------------

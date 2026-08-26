@@ -4,7 +4,7 @@ This file provides guidance to LLM coding agents when working with code in this 
 
 # Project
 
-Pokopia Housing Solver — a browser-only Vue 3 SPA that optimizes cohousing assignments for Pokopia Pokémon using agglomerative clustering on a precomputed adjacency graph. There is no backend and no runtime SQL: `public/pokehousing.sqlite` remains the source of truth, but it is baked into static payloads at build time (`npm run build:data`) and the app ships zero WASM.
+Pokopia Housing Solver — a browser-only Vue 3 SPA that optimizes cohousing assignments for Pokopia Pokémon using agglomerative clustering on a precomputed adjacency graph. There is no backend and no runtime SQL: `src/pokehousing.sqlite` remains the source of truth, but it is baked into static payloads at build time (`npm run build:data`) and the app ships zero WASM. The JSON payloads are gitignored build artifacts — on a fresh clone, run `npm run build:data` (or `npm run dev`, which triggers it via `predev`) before the app or tests will work.
 
 # Commands
 
@@ -34,9 +34,11 @@ npx playwright test e2e/vue.spec.ts -g "Saves title with query"     # one e2e by
 
 A pre-commit hook runs lint-staged (eslint + oxlint + oxfmt) on staged `.js`/`.ts`/`.vue` files.
 
+> **Fresh clones:** the JSON payloads (`src/data/*.json`, `public/data/adjacency.json`) are gitignored build artifacts. Run `npm run build:data` first (or `npm run dev`, which triggers it via `predev`) — without it, `npm run test:unit`, `npm run build`, and `npx vitest` will fail because `src/data/index.ts` imports them at module load time. `npm run test:unit`, `npm run build`, `npm run check`, and `npm run test:harvest` all run `build:data` automatically via `pre`/prerequisite scripts; only `npx vitest run ...` (single-file test runs) bypasses these, so run `npm run build:data` manually first on a fresh clone.
+
 # Data Maintenance
 
-`scripts/harvest_pokemon.js` syncs the pokemon catalog in `public/pokehousing.sqlite` with Serebii's Pokopia PokéDex. It scrapes Serebii's list pages, compares case-insensitively against the DB, downloads sprite images to `public/images/`, and inserts any missing pokemon with their image path, ideal habitat, and favorites. Any Serebii favorites not present in the DB `favorites` table are flagged (not auto-inserted) for manual review.
+`scripts/harvest_pokemon.js` syncs the pokemon catalog in `src/pokehousing.sqlite` with Serebii's Pokopia PokéDex. It scrapes Serebii's list pages, compares case-insensitively against the DB, downloads sprite images to `public/images/`, and inserts any missing pokemon with their image path, ideal habitat, and favorites. Any Serebii favorites not present in the DB `favorites` table are flagged (not auto-inserted) for manual review.
 
 ```bash
 npm run harvest:pokemon              # scrape + add missing pokemon
@@ -49,7 +51,7 @@ The script uses only the Node standard library (`fetch`, `node:sqlite`, `node:ut
 
 # Item Maintenance
 
-`scripts/harvest_items.js` syncs the `items`, `item_favorites`, and `item_recipe` tables in `public/pokehousing.sqlite` with Serebii's Pokémon Pokopia item database. It scrapes all 43 favorites-category list pages and the comprehensive items listing to discover items and their favorite-category mappings, then fetches each missing item's detail page to extract metadata (category, tag, flavor text), crafting recipe (ingredients + counts), and favorite mappings. Item sprite images are downloaded to `public/images/`.
+`scripts/harvest_items.js` syncs the `items`, `item_favorites`, and `item_recipe` tables in `src/pokehousing.sqlite` with Serebii's Pokémon Pokopia item database. It scrapes all 43 favorites-category list pages and the comprehensive items listing to discover items and their favorite-category mappings, then fetches each missing item's detail page to extract metadata (category, tag, flavor text), crafting recipe (ingredients + counts), and favorite mappings. Item sprite images are downloaded to `public/images/`.
 
 Recipes use a two-pass insertion approach: all new items are inserted first (Pass 1), then recipes and favorite mappings are inserted (Pass 2) referencing the newly created item IDs, ensuring foreign-key constraints on `item_recipe.ingredient_id` are satisfied. Existing items with incomplete favorite mappings are backfilled, and existing items lacking recipes (e.g., from a prior partial run) get their recipes backfilled on subsequent runs.
 
@@ -64,7 +66,7 @@ The script uses only the Node standard library (`fetch`, `node:sqlite`, `node:ut
 
 `node:sqlite` is experimental and requires **Node 22+** (`.nvmrc` pins `22.22.2`); it prints a harmless `ExperimentalWarning`.
 
-**After any harvest, re-run `npm run build:data`** to regenerate the baked payloads (`src/data/*.json`, `public/data/adjacency.json`) and commit them together with the DB. The full workflow is: harvest (writes sqlite) → `npm run build:data` (bakes static payloads) → build/test.
+**After any harvest, re-run `npm run build:data`** to regenerate the gitignored payloads (`src/data/*.json`, `public/data/adjacency.json`) — only `src/pokehousing.sqlite` is committed. The full workflow is: harvest (writes sqlite) → `npm run build:data` (bakes static payloads) → build/test.
 
 Any harvest that adds or renames a **favorite** or **habitat** must also add the corresponding icon mapping (`src/favoriteIcons.ts`, `src/habitats.ts` `HABITAT_ICONS`) **and** its `?raw` SVG import in `src/iconSvg.ts`; `src/__tests__/favoriteIcons.spec.ts` fails until both are added.
 
@@ -76,7 +78,7 @@ npm run test:harvest
 
 # Habitat Maintenance
 
-`scripts/harvest_habitats.js` syncs the `habitat_entries`, `habitat_recipe`, and `habitat_pokemon` tables (plus the three `habitat_pokemon_*` spawn join tables below) in `public/pokehousing.sqlite` with Serebii's Pokémon Pokopia habitat database. It scrapes the habitats list page to discover all 252 habitats across three sections (Main #001–#209, Basin #001–#036, Event #001–#007), then fetches each habitat's detail page to extract the full-size image, flavor text, building requirements (item name + quantity), and available pokemon spawns (with rarity, locations, times, and weathers).
+`scripts/harvest_habitats.js` syncs the `habitat_entries`, `habitat_recipe`, and `habitat_pokemon` tables (plus the three `habitat_pokemon_*` spawn join tables below) in `src/pokehousing.sqlite` with Serebii's Pokémon Pokopia habitat database. It scrapes the habitats list page to discover all 252 habitats across three sections (Main #001–#209, Basin #001–#036, Event #001–#007), then fetches each habitat's detail page to extract the full-size image, flavor text, building requirements (item name + quantity), and available pokemon spawns (with rarity, locations, times, and weathers).
 
 ```bash
 npm run harvest:habitats              # scrape + add missing habitats
@@ -106,13 +108,13 @@ npm run test:harvest
 
 ## Data layer
 
-`public/pokehousing.sqlite` is the source of truth, but no SQL or WASM runs in the browser. `scripts/build_data.mjs` (`npm run build:data`, Node 22+ `node:sqlite`, stdlib only) reads the DB at build time and emits three denormalized payloads:
+`src/pokehousing.sqlite` is the source of truth, but no SQL or WASM runs in the browser. `scripts/build_data.mjs` (`npm run build:data`, Node 22+ `node:sqlite`, stdlib only) reads the DB at build time and emits three denormalized payloads:
 
 - `src/data/pokemon.json` — `{ names: string[] (sorted), dataByName }`; bundled by Vite.
 - `src/data/items.json` — the item-graph shape (`itemDetailsByName`, `itemsByFavorite`, `favoritesByItem`, `recipeByItem`); bundled by Vite. **Key insertion order is load-bearing** — it mirrors the generator's SQL `ORDER BY` and drives recommendation/aggregation ordering; never re-sort at runtime.
 - `public/data/adjacency.json` — `{ names, size, data }` where `data` is base64 of a dense `Int16Array(N×N)` keyed by pokemon id: `-1` = hard exclusion (opposite habitat axis), `0` = no edge, `>0` = score. Fetched once at runtime (kept out of the JS bundle).
 
-The generated files are **committed**; `scripts/build_data.test.js` asserts they stay in sync with the generator output (re-run `npm run build:data` after any harvest). `src/data/index.ts` loads them: pokemon/items via bundled import, adjacency via one `fetch` decoded into the flat `AdjacencyData` (`{ names, indexByName, size, matrix }`) that is cheap to structured-clone to the solver worker. Production assets are served under `/pokopia-housing-solver/`; `src/assetPath.ts` wraps `import.meta.env.BASE_URL` so the adjacency fetch works in both dev and prod.
+The generated files are gitignored build artifacts, regenerated by `npm run build:data`; `scripts/build_data.test.js` guards shape, ordering parity, round-trip correctness, and determinism. `src/data/index.ts` loads them: pokemon/items via bundled import, adjacency via one `fetch` decoded into the flat `AdjacencyData` (`{ names, indexByName, size, matrix }`) that is cheap to structured-clone to the solver worker. Production assets are served under `/pokopia-housing-solver/`; `src/assetPath.ts` wraps `import.meta.env.BASE_URL` so the adjacency fetch works in both dev and prod.
 
 **`src/queries.ts` is the only module that reads the baked data** (via `src/data/index.ts`) — never import `src/data/*` from components or other modules. The DB schema lives in `scripts/db.sql`. Key tables:
 

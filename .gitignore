@@ -43,3 +43,8 @@ playwright-report/
 .claude
 .mcp.json
 .playwright-mcp
+
+# Build-time artifacts (regenerated from src/pokehousing.sqlite by `npm run build:data`)
+src/data/pokemon.json
+src/data/items.json
+public/data/adjacency.json

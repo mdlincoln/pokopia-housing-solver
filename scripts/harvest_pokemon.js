@@ -3,7 +3,7 @@
 //
 // Scrapes Serebii's Pokopia Pokedex list pages to discover all pokemon
 // detail-page URLs and display names, compares case-insensitively against the
-// existing ``public/pokehousing.sqlite`` database, then for each missing pokemon
+// existing ``src/pokehousing.sqlite`` database, then for each missing pokemon
 // fetches its detail page to extract the sprite image URL, ideal habitat, and
 // favorites. The sprite is downloaded to ``public/images/`` and the pokemon
 // record + favorites are inserted into SQLite.

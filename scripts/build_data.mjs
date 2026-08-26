@@ -1,4 +1,4 @@
-// Build-time data bake: reads public/pokehousing.sqlite (source of truth,
+// Build-time data bake: reads src/pokehousing.sqlite (source of truth,
 // maintained by the harvest scripts) and emits denormalized, ready-to-use
 // payloads so the app ships with zero runtime SQL and zero WASM.
 //
@@ -19,9 +19,13 @@ import path from 'node:path'
 import { DEFAULT_DB_PATH, openReadOnlyDb, PROJECT_ROOT } from './harvest_lib.js'
 import { formatDataJson } from './format_data.mjs'
 
-const POKEMON_OUT = path.join(PROJECT_ROOT, 'src', 'data', 'pokemon.json')
-const ITEMS_OUT = path.join(PROJECT_ROOT, 'src', 'data', 'items.json')
-const ADJACENCY_OUT = path.join(PROJECT_ROOT, 'public', 'data', 'adjacency.json')
+export function outputPaths(projectRoot = PROJECT_ROOT) {
+  return {
+    pokemonOut: path.join(projectRoot, 'src', 'data', 'pokemon.json'),
+    itemsOut: path.join(projectRoot, 'src', 'data', 'items.json'),
+    adjacencyOut: path.join(projectRoot, 'public', 'data', 'adjacency.json'),
+  }
+}
 
 export function buildPokemon(db) {
   const rows = db
@@ -137,41 +141,56 @@ export function buildAdjacency(db) {
   return { names, size, data, edgeCount: edgeRows.length }
 }
 
-function main() {
-  const db = openReadOnlyDb(DEFAULT_DB_PATH)
+export function bake(dbPath, projectRoot = PROJECT_ROOT) {
+  const { pokemonOut, itemsOut, adjacencyOut } = outputPaths(projectRoot)
+  const db = openReadOnlyDb(dbPath)
   try {
     const pokemon = buildPokemon(db)
     const items = buildItems(db)
     const adjacency = buildAdjacency(db)
 
-    fs.mkdirSync(path.dirname(POKEMON_OUT), { recursive: true })
-    fs.mkdirSync(path.dirname(ITEMS_OUT), { recursive: true })
-    fs.mkdirSync(path.dirname(ADJACENCY_OUT), { recursive: true })
+    fs.mkdirSync(path.dirname(pokemonOut), { recursive: true })
+    fs.mkdirSync(path.dirname(itemsOut), { recursive: true })
+    fs.mkdirSync(path.dirname(adjacencyOut), { recursive: true })
 
     // Format via the same deterministic pretty-printer the committed files
     // carry (matches lint-staged's oxfmt pass on src/**), so re-running the
     // bake never dirties the tree. JSON.parse ignores whitespace, so this
     // has no runtime effect.
-    fs.writeFileSync(POKEMON_OUT, formatDataJson(pokemon))
-    fs.writeFileSync(ITEMS_OUT, formatDataJson(items))
+    fs.writeFileSync(pokemonOut, formatDataJson(pokemon))
+    fs.writeFileSync(itemsOut, formatDataJson(items))
     fs.writeFileSync(
-      ADJACENCY_OUT,
+      adjacencyOut,
       formatDataJson({ names: adjacency.names, size: adjacency.size, data: adjacency.data }),
     )
 
-    console.log(`pokemon.json: ${pokemon.names.length} pokemon`)
-    console.log(
-      `items.json: ${Object.keys(items.itemDetailsByName).length} items, ` +
-        `${Object.keys(items.itemsByFavorite).length} favorites, ` +
-        `${Object.keys(items.recipeByItem).length} recipes`,
-    )
-    console.log(
-      `adjacency.json: ${adjacency.size}x${adjacency.size} matrix, ` +
-        `${adjacency.edgeCount} edges, ${(fs.statSync(ADJACENCY_OUT).size / 1024).toFixed(0)} KiB on disk`,
-    )
+    return {
+      pokemonCount: pokemon.names.length,
+      itemCount: Object.keys(items.itemDetailsByName).length,
+      favoriteCount: Object.keys(items.itemsByFavorite).length,
+      recipeCount: Object.keys(items.recipeByItem).length,
+      adjacencySize: adjacency.size,
+      adjacencyEdgeCount: adjacency.edgeCount,
+      adjacencyBytes: fs.statSync(adjacencyOut).size,
+      paths: { pokemonOut, itemsOut, adjacencyOut },
+    }
   } finally {
     db.close()
   }
+}
+
+function main() {
+  const stats = bake(DEFAULT_DB_PATH)
+  console.log(`pokemon.json: ${stats.pokemonCount} pokemon`)
+  console.log(
+    `items.json: ${stats.itemCount} items, ` +
+      `${stats.favoriteCount} favorites, ` +
+      `${stats.recipeCount} recipes`,
+  )
+  console.log(
+    `adjacency.json: ${stats.adjacencySize}x${stats.adjacencySize} matrix, ` +
+      `${stats.adjacencyEdgeCount} edges, ${(stats.adjacencyBytes / 1024).toFixed(0)} KiB on disk`,
+  )
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename ?? '')) {
