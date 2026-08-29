@@ -3,6 +3,7 @@ import { assetPath } from '@/assetPath'
 import IconGlyph from '@/components/IconGlyph.vue'
 import { iconForFavorite } from '@/favoriteIcons'
 import { HABITAT_VARIANT, iconForHabitat } from '@/habitats'
+import type { SpawnHabitat } from '@/queries'
 import { BBadge, BCard, BCardImg, BCol, BRow } from 'bootstrap-vue-next'
 import { computed } from 'vue'
 
@@ -13,10 +14,12 @@ const props = defineProps<{
   habitat?: string
   checked?: boolean
   fulfilledFavorites?: Set<string>
+  spawnHabitats?: SpawnHabitat[]
 }>()
 
 const emit = defineEmits<{
   favoriteClicked: [favorite: string]
+  habitatClicked: [habitat: SpawnHabitat]
   toggle: []
 }>()
 
@@ -53,12 +56,26 @@ const habitatVariant = computed(() =>
       <BCol cols="auto">
         <BCardImg :src="imgURL" :alt="name" class="pokemon-avatar" />
       </BCol>
-      <BCol class="d-flex align-items-center">
+      <BCol class="d-flex flex-column align-items-start justify-content-center">
         <div v-if="habitat && habitatVariant">
           <BBadge :variant="habitatVariant" pill data-testid="habitat-badge">
             <IconGlyph :name="iconForHabitat(habitat)" />
             {{ habitat }}
           </BBadge>
+        </div>
+        <div v-if="spawnHabitats?.length" class="habitat-thumbs" data-testid="habitat-thumbs">
+          <button
+            v-for="spawnHabitat in spawnHabitats"
+            :key="spawnHabitat.id"
+            type="button"
+            class="habitat-thumb"
+            data-testid="habitat-thumb"
+            :aria-label="`View ${spawnHabitat.name} habitat details`"
+            :title="spawnHabitat.name"
+            @click="emit('habitatClicked', spawnHabitat)"
+          >
+            <img :src="assetPath(spawnHabitat.image)" :alt="spawnHabitat.name" loading="lazy" />
+          </button>
         </div>
       </BCol>
     </BRow>

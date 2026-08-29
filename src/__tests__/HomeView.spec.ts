@@ -1,4 +1,9 @@
-import { loadAdjacencyMap, loadPokemonData, loadPokemonNames } from '@/queries'
+import {
+  loadAdjacencyMap,
+  loadPokemonData,
+  loadPokemonNames,
+  loadSpawnHabitatsByName,
+} from '@/queries'
 import type { SolverResult } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
@@ -37,6 +42,8 @@ vi.mock('@/queries', async (importOriginal) => {
     loadPokemonNames: vi.fn<() => Promise<string[]>>(),
     loadPokemonData: vi.fn<() => Promise<import('@/solver').PokemonData>>(),
     loadAdjacencyMap: vi.fn<() => Promise<import('@/solver').AdjacencyData>>(),
+    loadSpawnHabitatsByName:
+      vi.fn<() => Promise<Record<string, import('@/queries').SpawnHabitat[]>>>(),
   }
 })
 
@@ -44,6 +51,15 @@ const testPokemonData = {
   AlphaOne: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
   AlphaTwo: { image: '', favorites: ['A', 'B', 'C', 'D', 'F'], habitat: 'Dark' },
   BetaOne: { image: '', favorites: ['X', 'Y', 'Z', 'W', 'V'], habitat: 'Bright' },
+}
+
+const testSpawnHabitats = {
+  AlphaOne: [
+    { id: 1, name: 'Tall Grass', image: 'images/habitats/1.png' },
+    { id: 22, name: 'Bench with greenery', image: 'images/habitats/22.png' },
+  ],
+  AlphaTwo: [{ id: 1, name: 'Tall Grass', image: 'images/habitats/1.png' }],
+  BetaOne: [{ id: 40, name: 'Fountain square', image: 'images/habitats/40.png' }],
 }
 
 async function mountHome() {
@@ -94,6 +110,14 @@ describe('HomeView', () => {
       indexByName: new Map(),
       size: 0,
       matrix: new Int16Array(0),
+    })
+    vi.mocked(loadSpawnHabitatsByName).mockImplementation(async (names?: string[]) => {
+      if (!names) return testSpawnHabitats
+      return Object.fromEntries(
+        names
+          .map((name) => [name, testSpawnHabitats[name as keyof typeof testSpawnHabitats]])
+          .filter(([, value]) => !!value),
+      )
     })
     window.location.hash = ''
   })
@@ -218,6 +242,75 @@ describe('HomeView', () => {
     await flushPromises()
 
     expect(loadPokemonData).toHaveBeenCalledTimes(1)
+  })
+
+  it('hydrates spawnHabitatsByName when pokemon are selected and prunes on deselect', async () => {
+    const wrapper = await mountHome()
+
+    wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo']
+    await flushPromises()
+
+    expect(loadSpawnHabitatsByName).toHaveBeenCalledExactlyOnceWith(['AlphaOne', 'AlphaTwo'])
+    expect(wrapper.vm.spawnHabitatsByName).toEqual({
+      AlphaOne: testSpawnHabitats.AlphaOne,
+      AlphaTwo: testSpawnHabitats.AlphaTwo,
+    })
+
+    // Deselecting prunes the deselected name's habitats.
+    wrapper.vm.selectedPokemon = ['AlphaOne']
+    await flushPromises()
+
+    expect(wrapper.vm.spawnHabitatsByName).toEqual({
+      AlphaOne: testSpawnHabitats.AlphaOne,
+    })
+
+    // Re-selecting merges without clobbering the survivor's entry.
+    wrapper.vm.selectedPokemon = ['AlphaOne', 'BetaOne']
+    await flushPromises()
+
+    expect(wrapper.vm.spawnHabitatsByName).toEqual({
+      AlphaOne: testSpawnHabitats.AlphaOne,
+      BetaOne: testSpawnHabitats.BetaOne,
+    })
+  })
+
+  it('a pinned pokemon deselected from the search keeps its spawnHabitatsByName entry', async () => {
+    const wrapper = await mountHome()
+    const pinStore = usePinStore()
+
+    wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo']
+    await flushPromises()
+    expect(wrapper.vm.spawnHabitatsByName).toEqual({
+      AlphaOne: testSpawnHabitats.AlphaOne,
+      AlphaTwo: testSpawnHabitats.AlphaTwo,
+    })
+
+    // Pin AlphaTwo to a house, then remove it from the selection: it stays
+    // rendered in its house via the pin, so its thumbnails must survive —
+    // mirroring prunePokemonData's pinned-pokemon preservation.
+    pinStore.togglePokemonPin('M1', 'AlphaTwo')
+
+    wrapper.vm.selectedPokemon = ['AlphaOne']
+    await flushPromises()
+
+    expect(wrapper.vm.spawnHabitatsByName).toEqual({
+      AlphaOne: testSpawnHabitats.AlphaOne,
+      AlphaTwo: testSpawnHabitats.AlphaTwo,
+    })
+  })
+
+  it('clearPokemon resets spawnHabitatsByName', async () => {
+    const wrapper = await mountHome()
+
+    wrapper.vm.selectedPokemon = ['AlphaOne']
+    await flushPromises()
+    expect(Object.keys(wrapper.vm.spawnHabitatsByName)).toEqual(['AlphaOne'])
+
+    // Clearing the pokemon selection (the "Clear all" button) empties the map.
+    wrapper.vm.selectedPokemon = []
+    await flushPromises()
+
+    expect(wrapper.vm.spawnHabitatsByName).toEqual({})
   })
 
   it('displays results with all pokemon housed', async () => {

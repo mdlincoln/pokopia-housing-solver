@@ -250,4 +250,71 @@ describe('PokemonCard', () => {
     expect(button.find('.icon-glyph').exists()).toBe(false)
     expect(button.find('svg').exists()).toBe(false)
   })
+
+  describe('spawn habitat thumbnails', () => {
+    const spawnHabitats = [
+      { id: 1, name: 'Tall Grass', image: 'images/habitats/1.png' },
+      { id: 22, name: 'Bench with greenery', image: 'images/habitats/22.png' },
+    ]
+    const baseProps = { name: 'Bulbasaur', image: 'test.png', favorites: [] }
+
+    it('renders one thumbnail button per spawnHabitats entry with a habitat-name aria-label', () => {
+      const wrapper = mount(PokemonCard, {
+        props: { ...baseProps, habitat: 'Dark', spawnHabitats },
+      })
+
+      const thumbs = wrapper.findAll('[data-testid="habitat-thumb"]')
+      expect(thumbs).toHaveLength(2)
+      expect(thumbs[0]!.attributes('aria-label')).toBe('View Tall Grass habitat details')
+      expect(thumbs[1]!.attributes('aria-label')).toBe('View Bench with greenery habitat details')
+      expect(thumbs[0]!.attributes('title')).toBe('Tall Grass')
+    })
+
+    it('renders no thumbnails without the prop or with an empty array', () => {
+      const withoutProp = mount(PokemonCard, { props: { ...baseProps } })
+      expect(withoutProp.find('[data-testid="habitat-thumbs"]').exists()).toBe(false)
+
+      const withEmpty = mount(PokemonCard, {
+        props: { ...baseProps, spawnHabitats: [] },
+      })
+      expect(withEmpty.find('[data-testid="habitat-thumbs"]').exists()).toBe(false)
+    })
+
+    it('thumbnails are native type=button controls wrapping the habitat image', () => {
+      const wrapper = mount(PokemonCard, {
+        props: { ...baseProps, spawnHabitats },
+      })
+
+      for (const thumb of wrapper.findAll('[data-testid="habitat-thumb"]')) {
+        expect(thumb.element.tagName).toBe('BUTTON')
+        expect(thumb.attributes('type')).toBe('button')
+      }
+      const img = wrapper.find('[data-testid="habitat-thumb"] img')
+      expect(img.attributes('src')).toBe('/images/habitats/1.png')
+      expect(img.attributes('alt')).toBe('Tall Grass')
+      expect(img.attributes('loading')).toBe('lazy')
+    })
+
+    it('clicking a thumbnail emits habitatClicked with the habitat object', async () => {
+      const wrapper = mount(PokemonCard, {
+        props: { ...baseProps, spawnHabitats },
+      })
+
+      await wrapper.findAll('[data-testid="habitat-thumb"]')[1]!.trigger('click')
+      expect(wrapper.emitted('habitatClicked')).toEqual([[spawnHabitats[1]]])
+    })
+
+    it('thumbnails render under the habitat pill inside the info column', () => {
+      const wrapper = mount(PokemonCard, {
+        props: { ...baseProps, habitat: 'Dark', spawnHabitats },
+      })
+
+      const badge = wrapper.find('[data-testid="habitat-badge"]')
+      const thumbs = wrapper.find('[data-testid="habitat-thumbs"]')
+      expect(badge.exists()).toBe(true)
+      // Both live in the avatar row's info column, thumbs after (below) the pill.
+      expect(thumbs.element.parentElement!.contains(badge.element)).toBe(true)
+      expect(thumbs.element.previousElementSibling!.contains(badge.element)).toBe(true)
+    })
+  })
 })

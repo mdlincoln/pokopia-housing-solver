@@ -692,6 +692,149 @@ details[open] > .details-summary::before,
   text-decoration: none;
 }
 
+/* Spawn-habitat thumbnails: a wrapping row of quiet image buttons under the
+   habitat pill. Clicking one opens the habitat-detail modal. */
+.habitat-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.habitat-thumb {
+  /* WCAG 2.5.8 minimum tap target: 24×24 CSS px (matches .favorite-need /
+     .item-remove). The 1.5rem image plus padding/visual leaves keep the
+     bounding box above the floor without extra padding tricks. */
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: 1px solid var(--trop-ocean-300);
+  border-radius: var(--trop-radius-control);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.habitat-thumb:hover,
+.habitat-thumb:focus-visible {
+  border-color: var(--trop-ocean-500);
+  box-shadow: var(--trop-shadow-soft);
+}
+
+.habitat-thumb:focus-visible {
+  outline: 2px solid var(--trop-ocean-500);
+  outline-offset: 1px;
+}
+
+.habitat-thumb img {
+  display: block;
+  width: var(--space-5); /* 1.5rem */
+  height: var(--space-5);
+  object-fit: cover;
+  border-radius: calc(var(--trop-radius-control) - 2px);
+  pointer-events: none; /* the button is the hit target */
+}
+
+/* Habitat-detail modal (src/components/HabitatModal.vue). BModal teleports
+   this content to document.body, so the selectors are document-scoped class
+   names, not scoped styles. All spacing flows from the --space ramp. */
+.habitat-modal-state {
+  padding-block: var(--space-4);
+}
+
+.habitat-modal-image {
+  display: block;
+  width: 100%;
+  max-width: 22rem;
+  border-radius: var(--trop-radius-card);
+  border: 1px solid var(--trop-ocean-300);
+  margin-bottom: var(--space-2);
+}
+
+.habitat-modal-description {
+  margin-bottom: var(--space-3);
+}
+
+.habitat-modal-roster {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-left: var(--space-4);
+  margin-bottom: 0;
+}
+
+.habitat-modal-spawn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.habitat-modal-spawn-main {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.habitat-modal-sprite {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.habitat-modal-spawn-name {
+  font-weight: 700;
+}
+
+.habitat-modal-conditions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* A labeled Time/Weather row. Each spawn's times and weathers render as
+   separate wraps so the two kinds of pill never share a line. */
+.habitat-modal-row-label {
+  font-size: 0.8em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--trop-text);
+  opacity: 0.7;
+  margin-right: var(--space-1);
+}
+
+.habitat-modal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0 var(--space-2);
+  border-radius: var(--trop-radius-pill);
+  background-color: color-mix(in srgb, var(--trop-ocean-300) 22%, transparent);
+  font-size: 0.9em;
+}
+
+/* Time-of-day pills (amber) vs. weather pills (sky blue) are tinted
+   differently so they are never mistaken for one another. */
+.habitat-modal-chip--time {
+  background-color: color-mix(in srgb, var(--trop-sun-300) 34%, transparent);
+}
+
+.habitat-modal-chip--weather {
+  background-color: color-mix(in srgb, var(--trop-ocean-300) 30%, transparent);
+}
+
+.habitat-modal-locations {
+  display: block;
+  font-size: 0.9em;
+  overflow-wrap: break-word; /* location lists can be long at 390px */
+}
+
 /* Wrapping card grid: one card per row on phones (≥392px content box), flowing
    3–4 per row at desktop widths. Replaces Bootstrap's non-wrapping .card-group,
    which squeezed four pokemon into a single squeezed row at 390px. */

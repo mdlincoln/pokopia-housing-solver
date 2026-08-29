@@ -3,7 +3,14 @@ import HouseRecord from '@/components/HouseRecord.vue'
 import HousesConfigCard from '@/components/HousesConfigCard.vue'
 import PokemonConfigCard from '@/components/PokemonConfigCard.vue'
 import SavedIslandsCard from '@/components/SavedIslandsCard.vue'
-import { loadAdjacencyMap, loadItemGraph, loadPokemonData, loadPokemonNames } from '@/queries'
+import {
+  loadAdjacencyMap,
+  loadItemGraph,
+  loadPokemonData,
+  loadPokemonNames,
+  loadSpawnHabitatsByName,
+  type SpawnHabitat,
+} from '@/queries'
 import { type AdjacencyData, type PokemonData, type SolverResult } from '@/solver'
 import { solveInWorker, SupersededError } from '@/solverClient'
 import { debounce } from '@/utils/debounce'
@@ -31,6 +38,10 @@ const progressStore = useProgressStore()
 
 const pokemonNames = ref<string[]>([])
 const pokemonData = ref<PokemonData>({})
+// Spawn-habitat thumbnails per pokemon name — hydrated alongside pokemonData
+// but kept separate so the solver PokemonData shape stays unchanged. Pruning
+// mirrors prunePokemonData (incl. pinned-pokemon survival).
+const spawnHabitatsByName = ref<Record<string, SpawnHabitat[]>>({})
 const adjacencyData = ref<AdjacencyData | null>(null)
 const hydratedPokemonReady = computed(() => {
   const allSelected = selectedPokemon.value.every((name) => !!pokemonData.value[name])
@@ -160,8 +171,29 @@ function prunePokemonData(names: string[]) {
   pokemonData.value = nextPokemonData
 }
 
+// Mirrors prunePokemonData for the spawn-habitat thumbnail map, including the
+// pinned-pokemon survival rule: a pinned pokemon deselected from the search
+// keeps its thumbnails while it remains rendered in its house.
+function pruneSpawnHabitats(names: string[]) {
+  const keep = new Set([...names, ...pinStore.allPinnedPokemonNames])
+  const nextSpawnHabitats: Record<string, SpawnHabitat[]> = {}
+  for (const [name, habitats] of Object.entries(spawnHabitatsByName.value)) {
+    if (keep.has(name)) nextSpawnHabitats[name] = habitats
+  }
+  const currentKeys = Object.keys(spawnHabitatsByName.value)
+  const nextKeys = Object.keys(nextSpawnHabitats)
+  if (
+    currentKeys.length === nextKeys.length &&
+    currentKeys.every((name) => Object.prototype.hasOwnProperty.call(nextSpawnHabitats, name))
+  ) {
+    return
+  }
+  spawnHabitatsByName.value = nextSpawnHabitats
+}
+
 async function hydratePokemonSelection(names: string[]) {
   prunePokemonData(names)
+  pruneSpawnHabitats(names)
 
   // Flush Vue's async DOM update batch so watchers that depend on the new
   // pokemonData (e.g. the solve watch that sets result.value = null when
@@ -184,7 +216,10 @@ async function hydratePokemonSelection(names: string[]) {
   }
 
   try {
-    const loadedPokemon = await loadPokemonData(missingNames)
+    const [loadedPokemon, loadedSpawnHabitats] = await Promise.all([
+      loadPokemonData(missingNames),
+      loadSpawnHabitatsByName(missingNames),
+    ])
     const selected = new Set(selectedPokemon.value)
     const nextPokemonData: PokemonData = { ...pokemonData.value }
     for (const [name, entry] of Object.entries(loadedPokemon)) {
@@ -192,12 +227,28 @@ async function hydratePokemonSelection(names: string[]) {
         nextPokemonData[name] = entry
       }
     }
+    // Deleted keys must exclude ALL pinned pokemon (not just still-selected
+    // ones), mirroring prunePokemonData's pinned-pokemon survival so the two
+    // pruning paths can never disagree mid-race: a pinned pokemon deselected
+    // from the search (only reachable via restore/sample flows) keeps both
+    // its pokemonData entry and its thumbnails.
+    const pinned = pinStore.allPinnedPokemonNames
     for (const name of Object.keys(nextPokemonData)) {
-      if (!selected.has(name)) {
+      if (!selected.has(name) && !pinned.has(name)) {
         delete nextPokemonData[name]
       }
     }
     pokemonData.value = nextPokemonData
+
+    // Merge only still-selected spawn habitats (pinned-survival pruning above
+    // handles names deselected before this load resolves).
+    const nextSpawnHabitats: Record<string, SpawnHabitat[]> = { ...spawnHabitatsByName.value }
+    for (const [name, habitats] of Object.entries(loadedSpawnHabitats)) {
+      if (selected.has(name)) {
+        nextSpawnHabitats[name] = habitats
+      }
+    }
+    spawnHabitatsByName.value = nextSpawnHabitats
   } finally {
     for (const name of missingNames) {
       pendingPokemonLoads.delete(name)
@@ -445,6 +496,7 @@ function clearHouses() {
 function clearPokemon() {
   selectedPokemon.value = []
   pokemonData.value = {}
+  spawnHabitatsByName.value = {}
 }
 
 async function runSolve() {
@@ -519,6 +571,7 @@ defineExpose({
   medium,
   large,
   selectedPokemon,
+  spawnHabitatsByName,
   queryTitle,
   confirmSave,
   selectedTimestamp,
@@ -691,6 +744,7 @@ defineExpose({
         :key="house.houseId"
         :house="house"
         :pokemon-data="pokemonData!"
+        :spawn-habitats-by-name="spawnHabitatsByName"
       />
     </TransitionGroup>
   </section>

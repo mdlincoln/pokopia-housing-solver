@@ -882,6 +882,8 @@ test.describe('Usability (P2 audit fixes)', () => {
     await assertTapTarget(page, 'house pin', page.getByTestId('progress-checkbox-house').first())
     await assertTapTarget(page, 'pokemon pin', page.getByTestId('progress-checkbox-pokemon').first())
     await assertTapTarget(page, 'favorite badge', page.getByTestId('fave-badge').first())
+    // Spawn-habitat thumbnails (small image buttons) must keep the 24px floor.
+    await assertTapTarget(page, 'habitat thumb', page.getByTestId('habitat-thumb').first())
     // The "+" add-to-cart control leads the action rail — density compaction
     // must not shrink it below the 24px floor.
     await assertTapTarget(page, 'add-to-cart', page.getByTestId('add-to-cart').first())
@@ -924,6 +926,9 @@ test.describe('Usability (P2 audit fixes)', () => {
     // The "+" rails are mounted behind the cart overlay but must still keep the
     // 24px floor at mobile width.
     await assertTapTarget(page, 'add-to-cart', page.getByTestId('add-to-cart').first())
+    // Habitat thumbs stay in main content behind the cart overlay — still
+    // floored at 24px at mobile width.
+    await assertTapTarget(page, 'habitat thumb', page.getByTestId('habitat-thumb').first())
   })
 
   // @lat: [[ui#HomeView#Accessibility#Layout uses dynamic viewport units]]

@@ -5,6 +5,7 @@
 // Outputs:
 //   src/data/pokemon.json        — { names, dataByName }        (bundled by Vite)
 //   src/data/items.json          — the ItemGraph shape          (bundled by Vite)
+//   src/data/habitats.json       — the HabitatCatalog shape     (bundled by Vite)
 //   public/data/adjacency.json   — { names, size, data(base64 Int16Array) }
 //                                  (fetched once at runtime, kept out of the bundle)
 //
@@ -23,6 +24,7 @@ export function outputPaths(projectRoot = PROJECT_ROOT) {
   return {
     pokemonOut: path.join(projectRoot, 'src', 'data', 'pokemon.json'),
     itemsOut: path.join(projectRoot, 'src', 'data', 'items.json'),
+    habitatsOut: path.join(projectRoot, 'src', 'data', 'habitats.json'),
     adjacencyOut: path.join(projectRoot, 'public', 'data', 'adjacency.json'),
   }
 }
@@ -39,6 +41,30 @@ export function buildPokemon(db) {
     )
     .all()
 
+  // Spawn habitats per pokemon (one thumbnail per habitat the pokemon spawns
+  // in, ordered by habitat number). Pokemon with no spawn rows get the key
+  // omitted so loadPokemonData's solver-shaped output needs no stripping.
+  // he.id is a deterministic final tiebreak: habitat `number` is only unique
+  // within a section (Main/Basin/Event), not globally.
+  const spawnRows = db
+    .prepare(
+      `SELECT p.name AS pokemon_name, he.id AS habitat_id, he.number AS habitat_number,
+              he.name AS habitat_name, he.image_path
+       FROM pokemon p
+       JOIN habitat_pokemon hp ON hp.pokemon_name = p.name
+       JOIN habitat_entries he ON he.id = hp.habitat_id
+       ORDER BY p.name ASC, he.number ASC, he.id ASC`,
+    )
+    .all()
+  const spawnHabitatsByName = {}
+  for (const row of spawnRows) {
+    ;(spawnHabitatsByName[row.pokemon_name] ??= []).push({
+      id: row.habitat_id,
+      name: row.habitat_name,
+      image: row.image_path,
+    })
+  }
+
   const names = []
   const dataByName = {}
   for (const row of rows) {
@@ -47,6 +73,7 @@ export function buildPokemon(db) {
       image: row.image_path || '',
       favorites: row.favorites_str ? String(row.favorites_str).split('|') : [],
       habitat: row.habitat || undefined,
+      ...(spawnHabitatsByName[row.name] ? { spawnHabitats: spawnHabitatsByName[row.name] } : {}),
     }
   }
   return { names, dataByName }
@@ -114,6 +141,90 @@ export function buildItems(db) {
   return { itemDetailsByName, itemsByFavorite, favoritesByItem, recipeByItem }
 }
 
+// Normalizes scraped habitat-pokemon rarity values into the pinned set
+// {null, 'Common', 'Rare', 'Very Rare'}. The harvest-side bug that produced
+// the duplicated 'CommonCommon' string is a documented follow-up; normalizing
+// here makes the bake self-healing for future dirty harvests.
+const VALID_RARITIES = new Set(['Common', 'Rare', 'Very Rare'])
+
+export function normalizeRarity(rarity) {
+  if (rarity === null || rarity === undefined) return null
+  const value = String(rarity)
+  if (VALID_RARITIES.has(value)) return value
+  // Doubled-word scrape artifacts ('CommonCommon' → 'Common').
+  if (value.length % 2 === 0) {
+    const half = value.slice(0, value.length / 2)
+    if (half + half === value && VALID_RARITIES.has(half)) return half
+  }
+  return null
+}
+
+// The habitat spawn catalog keyed by habitat id: every habitat's metadata plus
+// its full pokemon roster (rarity, spawn times, weathers, locations). Insert
+// order follows habitat_entries.id ASC (roster rows follow habitat_id ASC,
+// pokemon_name ASC; roster join values ASC).
+export function buildHabitats(db) {
+  const habitats = {}
+  for (const row of db
+    .prepare(
+      `SELECT id, name, image_path, description, category
+       FROM habitat_entries
+       ORDER BY id ASC`,
+    )
+    .all()) {
+    habitats[row.id] = {
+      id: row.id,
+      name: row.name,
+      image: row.image_path,
+      description: row.description ?? '',
+      category: row.category ?? '',
+      pokemon: [],
+    }
+  }
+
+  for (const row of db
+    .prepare(
+      `SELECT habitat_id, pokemon_name, rarity
+       FROM habitat_pokemon
+       ORDER BY habitat_id ASC, pokemon_name ASC`,
+    )
+    .all()) {
+    const habitat = habitats[row.habitat_id]
+    if (!habitat) continue
+    habitat.pokemon.push({
+      name: row.pokemon_name,
+      rarity: normalizeRarity(row.rarity),
+      times: [],
+      weathers: [],
+      locations: [],
+    })
+  }
+
+  // Spawn join values, one row per value. (habitat_id, pokemon_name) is unique
+  // in habitat_pokemon, so each spawn appears at most once per roster scan.
+  const joinLists = [
+    ['habitat_pokemon_time', 'time', 'times'],
+    ['habitat_pokemon_weather', 'weather', 'weathers'],
+    ['habitat_pokemon_location', 'location', 'locations'],
+  ]
+  for (const [table, column, target] of joinLists) {
+    for (const row of db
+      .prepare(
+        `SELECT habitat_id, pokemon_name, ${column} AS value
+         FROM ${table}
+         ORDER BY habitat_id ASC, pokemon_name ASC, value ASC`,
+      )
+      .all()) {
+      const habitat = habitats[row.habitat_id]
+      if (!habitat) continue
+      const spawn = habitat.pokemon.find((p) => p.name === row.pokemon_name)
+      if (spawn) spawn[target].push(row.value)
+    }
+  }
+
+  return habitats
+}
+
 export function buildAdjacency(db) {
   // ids are dense 1..N — index directly.
   const idRows = db.prepare(`SELECT id, name FROM pokemon ORDER BY id`).all()
@@ -142,15 +253,17 @@ export function buildAdjacency(db) {
 }
 
 export function bake(dbPath, projectRoot = PROJECT_ROOT) {
-  const { pokemonOut, itemsOut, adjacencyOut } = outputPaths(projectRoot)
+  const { pokemonOut, itemsOut, habitatsOut, adjacencyOut } = outputPaths(projectRoot)
   const db = openReadOnlyDb(dbPath)
   try {
     const pokemon = buildPokemon(db)
     const items = buildItems(db)
+    const habitats = buildHabitats(db)
     const adjacency = buildAdjacency(db)
 
     fs.mkdirSync(path.dirname(pokemonOut), { recursive: true })
     fs.mkdirSync(path.dirname(itemsOut), { recursive: true })
+    fs.mkdirSync(path.dirname(habitatsOut), { recursive: true })
     fs.mkdirSync(path.dirname(adjacencyOut), { recursive: true })
 
     // Format via the same deterministic pretty-printer the committed files
@@ -159,6 +272,7 @@ export function bake(dbPath, projectRoot = PROJECT_ROOT) {
     // has no runtime effect.
     fs.writeFileSync(pokemonOut, formatDataJson(pokemon))
     fs.writeFileSync(itemsOut, formatDataJson(items))
+    fs.writeFileSync(habitatsOut, formatDataJson(habitats))
     fs.writeFileSync(
       adjacencyOut,
       formatDataJson({ names: adjacency.names, size: adjacency.size, data: adjacency.data }),
@@ -169,10 +283,12 @@ export function bake(dbPath, projectRoot = PROJECT_ROOT) {
       itemCount: Object.keys(items.itemDetailsByName).length,
       favoriteCount: Object.keys(items.itemsByFavorite).length,
       recipeCount: Object.keys(items.recipeByItem).length,
+      habitatCount: Object.keys(habitats).length,
+      habitatSpawnCount: Object.values(habitats).reduce((sum, h) => sum + h.pokemon.length, 0),
       adjacencySize: adjacency.size,
       adjacencyEdgeCount: adjacency.edgeCount,
       adjacencyBytes: fs.statSync(adjacencyOut).size,
-      paths: { pokemonOut, itemsOut, adjacencyOut },
+      paths: { pokemonOut, itemsOut, habitatsOut, adjacencyOut },
     }
   } finally {
     db.close()
@@ -186,6 +302,9 @@ function main() {
     `items.json: ${stats.itemCount} items, ` +
       `${stats.favoriteCount} favorites, ` +
       `${stats.recipeCount} recipes`,
+  )
+  console.log(
+    `habitats.json: ${stats.habitatCount} habitats, ${stats.habitatSpawnCount} spawn rows`,
   )
   console.log(
     `adjacency.json: ${stats.adjacencySize}x${stats.adjacencySize} matrix, ` +

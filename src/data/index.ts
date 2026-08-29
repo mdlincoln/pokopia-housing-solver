@@ -12,10 +12,22 @@ import type { AdjacencyData } from '@/solver'
 
 import pokemonJson from './pokemon.json'
 import itemsJson from './items.json'
+import habitatsJson from './habitats.json'
 
 export interface PokemonCatalog {
   names: string[]
-  dataByName: Record<string, { image: string; favorites: string[]; habitat?: string }>
+  dataByName: Record<
+    string,
+    {
+      image: string
+      favorites: string[]
+      habitat?: string
+      // Spawn habitats (one thumbnail per habitat the pokemon spawns in).
+      // Optional: the ~19 catalog pokemon with no spawn data omit the key.
+      // NOT part of the solver PokemonData shape — loadPokemonData strips it.
+      spawnHabitats?: Array<{ id: number; name: string; image: string }>
+    }
+  >
 }
 
 // JSON-shaped item graph (plain objects/arrays instead of Maps). Key insertion
@@ -48,8 +60,33 @@ export function loadPokemonCatalog(): PokemonCatalog {
   return catalog
 }
 
+// JSON-shaped habitat spawn catalog (plain objects instead of Maps), keyed by
+// habitat id (insert order follows habitat_entries.id ASC — numeric JS keys
+// iterate ascending regardless, matching id order). Built by buildHabitats()
+// — see scripts/build_data.mjs.
+export interface HabitatCatalogData {
+  id: number
+  name: string
+  image: string
+  description: string
+  category: string
+  pokemon: Array<{
+    name: string
+    rarity: string | null
+    times: string[]
+    weathers: string[]
+    locations: string[]
+  }>
+}
+
+const habitatCatalog = habitatsJson as Record<string, HabitatCatalogData>
+
 export function loadItemGraphData(): ItemGraphData {
   return itemGraph
+}
+
+export function loadHabitatCatalogData(): Record<string, HabitatCatalogData> {
+  return habitatCatalog
 }
 
 interface AdjacencyPayload {

@@ -2,8 +2,9 @@
 //
 // Each icon is statically imported from the installed bootstrap-icons package
 // via Vite's `?raw` suffix, which inlines the file contents as a string at
-// build time. This bundles ONLY the ~49 glyphs referenced by FAVORITE_ICONS and
-// HABITAT_ICONS (a few KB total) — never the 1.3 MB full sprite or the icon
+// build time. This bundles ONLY the ~56 glyphs referenced by FAVORITE_ICONS,
+// HABITAT_ICONS, SPAWN_TIME_ICONS and SPAWN_WEATHER_ICONS (a few KB total) —
+// never the 1.3 MB full sprite or the icon
 // web font — and the markup is a trusted build-time constant from an MIT
 // package, not user input (so v-html injection in IconGlyph.vue is safe).
 //
@@ -22,6 +23,8 @@ import brightnessHighFill from 'bootstrap-icons/icons/brightness-high-fill.svg?r
 import bucket from 'bootstrap-icons/icons/bucket.svg?raw'
 import carFront from 'bootstrap-icons/icons/car-front.svg?raw'
 import circleFill from 'bootstrap-icons/icons/circle-fill.svg?raw'
+import cloud from 'bootstrap-icons/icons/cloud.svg?raw'
+import cloudRain from 'bootstrap-icons/icons/cloud-rain.svg?raw'
 import cone from 'bootstrap-icons/icons/cone.svg?raw'
 import controller from 'bootstrap-icons/icons/controller.svg?raw'
 import cpu from 'bootstrap-icons/icons/cpu.svg?raw'
@@ -50,6 +53,8 @@ import rainbow from 'bootstrap-icons/icons/rainbow.svg?raw'
 import scissors from 'bootstrap-icons/icons/scissors.svg?raw'
 import stars from 'bootstrap-icons/icons/stars.svg?raw'
 import sunFill from 'bootstrap-icons/icons/sun-fill.svg?raw'
+import sunrise from 'bootstrap-icons/icons/sunrise.svg?raw'
+import sunset from 'bootstrap-icons/icons/sunset.svg?raw'
 import thermometerSnow from 'bootstrap-icons/icons/thermometer-snow.svg?raw'
 import thermometerSun from 'bootstrap-icons/icons/thermometer-sun.svg?raw'
 import trashFill from 'bootstrap-icons/icons/trash-fill.svg?raw'
@@ -73,6 +78,8 @@ export const ICON_SVG: Readonly<Record<string, string>> = {
   bucket,
   'car-front': carFront,
   'circle-fill': circleFill,
+  cloud,
+  'cloud-rain': cloudRain,
   cone,
   controller,
   cpu,
@@ -101,6 +108,8 @@ export const ICON_SVG: Readonly<Record<string, string>> = {
   scissors,
   stars,
   'sun-fill': sunFill,
+  sunrise,
+  sunset,
   'thermometer-snow': thermometerSnow,
   'thermometer-sun': thermometerSun,
   'trash-fill': trashFill,

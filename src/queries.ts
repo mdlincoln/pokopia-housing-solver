@@ -4,7 +4,12 @@
 // decoded into a flat Int16Array. This module is the only one that reads the
 // baked data — never import src/data/* from components or other modules.
 
-import { loadAdjacencyData, loadItemGraphData, loadPokemonCatalog } from '@/data'
+import {
+  loadAdjacencyData,
+  loadHabitatCatalogData,
+  loadItemGraphData,
+  loadPokemonCatalog,
+} from '@/data'
 import type { AdjacencyData, PokemonData } from '@/solver'
 
 export interface ItemDetails {
@@ -308,7 +313,11 @@ export async function loadPokemonData(names?: string[]): Promise<PokemonData> {
   const pokemonData: PokemonData = {}
   if (names && names.length === 0) return pokemonData
 
-  // Lazy hydration: with a names list, hydrate only the selected set.
+  // Lazy hydration: with a names list, hydrate only the selected set. The
+  // returned entries are built fresh with exactly the solver-facing keys —
+  // the catalog's `spawnHabitats` array is deliberately NOT copied through,
+  // keeping the PokemonData worker payload shape byte-identical (guarded by
+  // src/__tests__/queries.spec.ts).
   const selected = names ?? catalog.names
   for (const name of selected) {
     const detail = catalog.dataByName[name]
@@ -320,6 +329,89 @@ export async function loadPokemonData(names?: string[]): Promise<PokemonData> {
     }
   }
   return pokemonData
+}
+
+// ---------------------------------------------------------------------------
+// Spawn habitats (the habitat_entries / habitat_pokemon* DB surface).
+// ---------------------------------------------------------------------------
+
+export interface SpawnHabitat {
+  id: number
+  name: string
+  image: string
+}
+
+export interface HabitatSpawn {
+  name: string
+  rarity: string | null
+  times: string[]
+  weathers: string[]
+  locations: string[]
+}
+
+export interface HabitatDetails {
+  id: number
+  name: string
+  image: string
+  description: string
+  category: string
+  pokemon: HabitatSpawn[]
+}
+
+// Hydrates the spawn-habitat arrays for the given pokemon (all catalog pokemon
+// when omitted). Entries are fresh objects so Vue reactivity proxies wrapping
+// the result never reach the cached catalog. Pokemon with no spawn data are
+// omitted from the result.
+export async function loadSpawnHabitatsByName(
+  names?: string[],
+): Promise<Record<string, SpawnHabitat[]>> {
+  const catalog = loadPokemonCatalog()
+  const result: Record<string, SpawnHabitat[]> = {}
+  const selected = names ?? catalog.names
+  for (const name of selected) {
+    const detail = catalog.dataByName[name]
+    if (!detail?.spawnHabitats) continue
+    result[name] = detail.spawnHabitats.map((habitat) => ({ ...habitat }))
+  }
+  return result
+}
+
+let _habitatGraphPromise: Promise<Map<number, HabitatDetails>> | null = null
+
+// Hydrates the bundled habitats.json into a Map keyed by habitat id. Insertion
+// order follows the baked key order (habitat id ASC). Cached promise mirrors
+// loadItemGraph: every habitat-facing helper below is a pure map lookup, and
+// detail/sprite results are shallow copies so callers (components) never
+// mutate or reactively wrap the shared graph data.
+export function loadHabitatGraph(): Promise<Map<number, HabitatDetails>> {
+  _habitatGraphPromise ??= (async (): Promise<Map<number, HabitatDetails>> => {
+    const baked = loadHabitatCatalogData()
+    const graph = new Map<number, HabitatDetails>()
+    for (const [key, habitat] of Object.entries(baked)) {
+      graph.set(Number(key), {
+        ...habitat,
+        pokemon: habitat.pokemon.map((spawn) => ({ ...spawn })),
+      })
+    }
+    return graph
+  })()
+  return _habitatGraphPromise
+}
+
+export async function getHabitatDetails(id: number): Promise<HabitatDetails | null> {
+  return (await loadHabitatGraph()).get(id) ?? null
+}
+
+// Batch catalog sprite lookup for a habitat roster. Roster names absent from
+// the pokemon catalog (e.g. Porygon-Z) map to null so the modal can render a
+// name-only row.
+export async function getPokemonSprites(names: string[]): Promise<Record<string, string | null>> {
+  const catalog = loadPokemonCatalog()
+  const result: Record<string, string | null> = {}
+  for (const name of names) {
+    result[name] = catalog.dataByName[name]?.image ?? null
+  }
+  return result
 }
 
 export async function getItemPicturePath(itemName: string): Promise<string | null> {

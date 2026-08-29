@@ -47,4 +47,5 @@ playwright-report/
 # Build-time artifacts (regenerated from src/pokehousing.sqlite by `npm run build:data`)
 src/data/pokemon.json
 src/data/items.json
+src/data/habitats.json
 public/data/adjacency.json

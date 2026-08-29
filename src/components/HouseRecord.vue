@@ -13,6 +13,7 @@ export function sameFavorites(a: Set<string>, b: Set<string>): boolean {
 
 <script setup lang="ts">
 import { assetPath } from '@/assetPath'
+import HabitatModal from '@/components/HabitatModal.vue'
 import IconGlyph from '@/components/IconGlyph.vue'
 import PokemonCard from '@/components/PokemonCard.vue'
 import { iconForFavorite } from '@/favoriteIcons'
@@ -22,6 +23,7 @@ import {
   RECOMMENDED_ITEM_TAGS,
   recommendedItemsForHouseAllNeeds,
   type ItemDetails,
+  type SpawnHabitat,
 } from '@/queries'
 import { type HouseAssignment, type PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
@@ -41,11 +43,20 @@ import { computed, ref, watch, watchEffect } from 'vue'
 const props = defineProps<{
   house: HouseAssignment
   pokemonData: PokemonData
+  spawnHabitatsByName?: Record<string, SpawnHabitat[]>
 }>()
 
 const cartStore = useCartStore()
 const pinStore = usePinStore()
 const progressStore = useProgressStore()
+
+// Habitat-detail modal state: one HabitatModal per house card; only one is
+// ever open. Thumbnails re-emit `habitatClicked` from PokemonCards.
+const openHabitat = ref<SpawnHabitat | null>(null)
+
+function onHabitatClick(habitat: SpawnHabitat) {
+  openHabitat.value = habitat
+}
 
 function toggleHousePin() {
   pinStore.toggleHousePin(props.house.houseId, props.house.pokemon)
@@ -470,8 +481,10 @@ watchEffect(() => {
         :habitat="pokemonData[name]?.habitat"
         :checked="pinStore.isPokemonPinned(house.houseId, name)"
         :fulfilled-favorites="fulfilledFavorites"
+        :spawn-habitats="spawnHabitatsByName?.[name] ?? []"
         @toggle="pinStore.togglePokemonPin(house.houseId, name)"
         @favorite-clicked="onFavoriteClick"
+        @habitat-clicked="onHabitatClick"
       />
     </div>
     <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
@@ -642,5 +655,7 @@ watchEffect(() => {
         </template>
       </BTable>
     </details>
+
+    <HabitatModal :habitat="openHabitat" @close="openHabitat = null" />
   </BListGroupItem>
 </template>

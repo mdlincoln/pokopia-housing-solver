@@ -1559,6 +1559,86 @@ describe('HouseRecord', () => {
       expect(glyph.find('svg').exists()).toBe(true)
     }
   })
+
+  describe('habitat modal wiring', () => {
+    const spawnHabitatsByName = {
+      FitOne: [
+        { id: 1, name: 'Tall Grass', image: 'images/habitats/1.png' },
+        { id: 22, name: 'Bench with greenery', image: 'images/habitats/22.png' },
+      ],
+    }
+    const pokemonData: PokemonData = {
+      FitOne: { image: '', favorites: ['exercise'], habitat: 'Dark' },
+      FitTwo: { image: '', favorites: ['exercise'], habitat: 'Bright' },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'medium',
+      capacity: 2,
+      pokemon: ['FitOne', 'FitTwo'],
+    }
+
+    it('passes spawn-habitats through to each PokemonCard', () => {
+      const wrapper = mount(HouseRecord, {
+        props: { house, pokemonData, spawnHabitatsByName },
+      })
+
+      const thumbs = wrapper.findAll('[data-testid="habitat-thumb"]')
+      expect(thumbs).toHaveLength(2)
+      expect(thumbs[0]!.attributes('aria-label')).toBe('View Tall Grass habitat details')
+      expect(thumbs[1]!.attributes('aria-label')).toBe('View Bench with greenery habitat details')
+    })
+
+    it('a thumbnail click opens the HabitatModal with the clicked habitat', async () => {
+      const habitatModalStub = {
+        name: 'HabitatModal',
+        props: ['habitat'],
+        emits: ['close'],
+        template: '<div class="habitat-modal-stub"></div>',
+      }
+      const wrapper = mount(HouseRecord, {
+        props: { house, pokemonData, spawnHabitatsByName },
+        global: { stubs: { HabitatModal: habitatModalStub } },
+      })
+
+      const modal = wrapper.findComponent(habitatModalStub)
+      expect(modal.props('habitat')).toBeNull()
+
+      await wrapper.findAll('[data-testid="habitat-thumb"]')[1]!.trigger('click')
+
+      expect(modal.props('habitat')).toEqual(spawnHabitatsByName.FitOne[1])
+    })
+
+    it('the modal close event nulls the open habitat', async () => {
+      const habitatModalStub = {
+        name: 'HabitatModal',
+        props: ['habitat'],
+        emits: ['close'],
+        template: '<div class="habitat-modal-stub"></div>',
+      }
+      const wrapper = mount(HouseRecord, {
+        props: {
+          house: { ...house, pokemon: ['FitOne'] },
+          pokemonData,
+          spawnHabitatsByName,
+        },
+        global: { stubs: { HabitatModal: habitatModalStub } },
+      })
+
+      await wrapper.find('[data-testid="habitat-thumb"]').trigger('click')
+      const modal = wrapper.findComponent(habitatModalStub)
+      expect(modal.props('habitat')).toEqual(spawnHabitatsByName.FitOne[0])
+
+      modal.vm.$emit('close')
+      await flushPromises()
+      expect(modal.props('habitat')).toBeNull()
+    })
+
+    it('renders no thumbnails without the spawnHabitatsByName prop', () => {
+      const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+      expect(wrapper.find('[data-testid="habitat-thumbs"]').exists()).toBe(false)
+    })
+  })
 })
 
 describe('sameFavorites', () => {

@@ -14,8 +14,15 @@ import path from 'node:path'
 import { test } from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
 
-import { DEFAULT_DB_PATH, openReadOnlyDb } from './harvest_lib.js'
-import { bake, buildAdjacency, buildItems, buildPokemon } from './build_data.mjs'
+import { DEFAULT_DB_PATH, openReadOnlyDb, PROJECT_ROOT } from './harvest_lib.js'
+import {
+  bake,
+  buildAdjacency,
+  buildHabitats,
+  buildItems,
+  buildPokemon,
+  normalizeRarity,
+} from './build_data.mjs'
 
 function withDb(fn) {
   const db = openReadOnlyDb(DEFAULT_DB_PATH)
@@ -55,6 +62,130 @@ test('items payload: graph keys present with expected cardinalities', () => {
       assert.strictEqual(detail.name, name)
       assert.strictEqual(typeof detail.isCraftable, 'boolean')
     }
+  })
+})
+
+test('habitats payload: 252 habitats, valid rarity/times/weathers, existing images', () => {
+  withDb((db) => {
+    const habitats = buildHabitats(db)
+    const ids = Object.keys(habitats).map(Number)
+    assert.strictEqual(ids.length, 252)
+    // Keyed by habitat id, iterated in ascending id order.
+    assert.deepStrictEqual(
+      ids,
+      [...ids].sort((a, b) => a - b),
+    )
+
+    const VALID_RARITIES = new Set([null, 'Common', 'Rare', 'Very Rare'])
+    const VALID_TIMES = new Set(['Morning', 'Day', 'Evening', 'Night'])
+    const VALID_WEATHERS = new Set(['Sun', 'Cloud', 'Rain'])
+
+    for (const habitat of Object.values(habitats)) {
+      assert.strictEqual(typeof habitat.id, 'number')
+      assert.strictEqual(typeof habitat.name, 'string')
+      assert.ok(habitat.image.startsWith('images/habitats/'), habitat.image)
+      assert.ok(fs.existsSync(path.join(PROJECT_ROOT, 'public', habitat.image)), habitat.image)
+      assert.strictEqual(typeof habitat.description, 'string')
+      assert.strictEqual(typeof habitat.category, 'string')
+      for (const spawn of habitat.pokemon) {
+        assert.ok(VALID_RARITIES.has(spawn.rarity), `${habitat.name}: ${spawn.rarity}`)
+        for (const time of spawn.times) assert.ok(VALID_TIMES.has(time), time)
+        for (const weather of spawn.weathers) assert.ok(VALID_WEATHERS.has(weather), weather)
+        for (const location of spawn.locations) assert.strictEqual(typeof location, 'string')
+      }
+    }
+
+    const spawnRowCount = Object.values(habitats).reduce((sum, h) => sum + h.pokemon.length, 0)
+    assert.strictEqual(
+      spawnRowCount,
+      db.prepare(`SELECT COUNT(*) AS c FROM habitat_pokemon`).get().c,
+    )
+  })
+})
+
+test('habitats payload: Bulbasaur roster row in habitat 1 (Tall Grass)', () => {
+  withDb((db) => {
+    const habitats = buildHabitats(db)
+    const tallGrass = habitats['1']
+    assert.strictEqual(tallGrass.name, 'Tall Grass')
+    const bulbasaur = tallGrass.pokemon.find((p) => p.name === 'Bulbasaur')
+    assert.ok(bulbasaur)
+    assert.strictEqual(bulbasaur.rarity, 'Common')
+    assert.deepStrictEqual([...bulbasaur.times].sort(), ['Day', 'Evening', 'Morning', 'Night'])
+    assert.deepStrictEqual([...bulbasaur.weathers].sort(), ['Cloud', 'Rain', 'Sun'])
+    assert.strictEqual(bulbasaur.locations.length, 6)
+    for (const location of [
+      'Bleak Beach',
+      'Cloud Island',
+      'Palette Town',
+      'Rocky Ridges',
+      'Sparkling Skylands',
+      'Withered Wastelands',
+    ]) {
+      assert.ok(bulbasaur.locations.includes(location), location)
+    }
+  })
+})
+
+test('habitats payload: habitat 151 roster includes Poliwrath with null rarity', () => {
+  withDb((db) => {
+    const habitats = buildHabitats(db)
+    const habitat151 = habitats['151']
+    assert.ok(habitat151)
+    const poliwrath = habitat151.pokemon.find((p) => p.name === 'Poliwrath')
+    assert.ok(poliwrath)
+    assert.strictEqual(poliwrath.rarity, null)
+  })
+})
+
+test('habitats payload: rarity normalization (CommonCommon → Common)', () => {
+  assert.strictEqual(normalizeRarity('Common'), 'Common')
+  assert.strictEqual(normalizeRarity('Rare'), 'Rare')
+  assert.strictEqual(normalizeRarity('Very Rare'), 'Very Rare')
+  assert.strictEqual(normalizeRarity('CommonCommon'), 'Common')
+  assert.strictEqual(normalizeRarity(null), null)
+  assert.strictEqual(normalizeRarity(undefined), null)
+  assert.strictEqual(normalizeRarity('garbage'), null)
+})
+
+test('pokemon payload: spawnHabitats arrays ordered by habitat number, omitted when no spawns', () => {
+  withDb((db) => {
+    const { names, dataByName } = buildPokemon(db)
+
+    // Bulbasaur spawns in habitats 1 (Tall Grass) and 22 (Bench with greenery).
+    assert.deepStrictEqual(dataByName['Bulbasaur'].spawnHabitats, [
+      { id: 1, name: 'Tall Grass', image: 'images/habitats/1.png' },
+      { id: 22, name: 'Bench with greenery', image: 'images/habitats/22.png' },
+    ])
+
+    // Every spawnHabitats image resolves to an existing file under public/.
+    let spawnPokemonCount = 0
+    for (const name of names) {
+      const d = dataByName[name]
+      if (!d.spawnHabitats) continue
+      spawnPokemonCount++
+      for (const habitat of d.spawnHabitats) {
+        assert.ok(habitat.image.startsWith('images/habitats/'), habitat.image)
+        assert.ok(fs.existsSync(path.join(PROJECT_ROOT, 'public', habitat.image)), habitat.image)
+        assert.strictEqual(typeof habitat.id, 'number')
+        assert.strictEqual(typeof habitat.name, 'string')
+      }
+    }
+
+    // Counts match the DB: pokemon present in habitat_pokemon AND in the
+    // pokemon catalog get the key. Porygon-Z appears in rosters but not in
+    // the catalog, so it can't appear in pokemon.json; Articuno spawns
+    // nowhere so its entry gets the key omitted.
+    const dbSpawnPokemon = new Set(
+      db
+        .prepare(`SELECT DISTINCT pokemon_name FROM habitat_pokemon`)
+        .all()
+        .map((r) => r.pokemon_name),
+    )
+    const hydratableSpawnPokemon = names.filter((name) => dbSpawnPokemon.has(name))
+    assert.strictEqual(spawnPokemonCount, hydratableSpawnPokemon.length)
+    assert.ok(!dbSpawnPokemon.has('Articuno'))
+    assert.ok(!('spawnHabitats' in dataByName['Articuno']))
   })
 })
 
@@ -214,10 +345,12 @@ test('npm run build:data is deterministic (identical bytes on re-run)', () => {
       try {
         const pokemon = buildPokemon(db)
         const items = buildItems(db)
+        const habitats = buildHabitats(db)
         const adjacency = buildAdjacency(db)
         return [
           JSON.stringify(pokemon),
           JSON.stringify(items),
+          JSON.stringify(habitats),
           JSON.stringify({ names: adjacency.names, size: adjacency.size, data: adjacency.data }),
         ]
       } finally {
@@ -236,16 +369,17 @@ test('npm run build:data is deterministic (identical bytes on re-run)', () => {
 // don't exercise (they call build* directly, never touching output paths).
 // ---------------------------------------------------------------------------
 
-test('bake() writes all three output files and they parse as JSON', () => {
+test('bake() writes all four output files and they parse as JSON', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'build-data-write-'))
   const snapshotDb = path.join(tmp, 'pokehousing.sqlite')
   fs.copyFileSync(DEFAULT_DB_PATH, snapshotDb)
   try {
     const stats = bake(snapshotDb, tmp)
-    const { pokemonOut, itemsOut, adjacencyOut } = stats.paths
+    const { pokemonOut, itemsOut, habitatsOut, adjacencyOut } = stats.paths
 
     assert.ok(fs.statSync(pokemonOut).size > 0, 'pokemon.json was written')
     assert.ok(fs.statSync(itemsOut).size > 0, 'items.json was written')
+    assert.ok(fs.statSync(habitatsOut).size > 0, 'habitats.json was written')
     assert.ok(fs.statSync(adjacencyOut).size > 0, 'adjacency.json was written')
 
     const pokemon = JSON.parse(fs.readFileSync(pokemonOut, 'utf8'))
@@ -254,6 +388,10 @@ test('bake() writes all three output files and they parse as JSON', () => {
 
     const items = JSON.parse(fs.readFileSync(itemsOut, 'utf8'))
     assert.ok(typeof items.itemDetailsByName === 'object')
+
+    const habitats = JSON.parse(fs.readFileSync(habitatsOut, 'utf8'))
+    assert.strictEqual(Object.keys(habitats).length, 252)
+    assert.ok(Array.isArray(habitats['1'].pokemon))
 
     const adjacency = JSON.parse(fs.readFileSync(adjacencyOut, 'utf8'))
     assert.ok(Array.isArray(adjacency.names))
