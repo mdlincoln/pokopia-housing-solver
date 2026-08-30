@@ -245,6 +245,12 @@ When inspecting the running app with Playwright, always clean up any screenshots
 
 GitHub Actions builds on push to `main` (installs Node from `.nvmrc`, runs `npm ci && npm run build`). Production assets are published from `dist/` to the `web` branch under `/pokopia-housing-solver/`. The Vite `base` and Vue Router `history` both key off `import.meta.env.BASE_URL` so route and asset paths stay aligned.
 
+## Changelog
+
+The app has a static changelog page at `/changelog` (route → `src/views/ChangelogView.vue`), fed by the typed, Vite-bundled data module `src/changelog.ts` (a `ChangeLogEntry[]`, newest-first). Each entry carries an ISO `YYYY-MM-DD` `date`, a one-line `summary`, and `changes: string[]` bullets. **Consecutive entry dates are ≥7 days apart** (minimum one-week buckets); the invariants (valid ISO dates, non-empty fields, newest-first sort, ≥7-day spacing, no duplicate dates) are pinned by `src/__tests__/changelog.spec.ts`, and backfill provenance against the real git commit window is guarded by `scripts/changelog_source.test.js` (auto-skipped when history is shallow).
+
+**Do not edit `src/changelog.ts` by hand.** Maintain it through the `update-changelog` skill (`.polytoken/skills/update-changelog/SKILL.md`) — it condenses `git log` since the last entry into dated weekly buckets, always stops for operator signoff before editing, and must be reloaded via `/daemon-reload` after changes. The footer "Changelog" `RouterLink` (`data-testid="changelog-link"`) is asserted by `App.spec.ts`; the route's render and no-horizontal-overflow-at-390px behavior are covered by `e2e/changelog.spec.ts`.
+
 # Credits
 
 Original data collection is from https://pokopia-roommate-matchmaker.netlify.app/ and https://github.com/JEschete/PokopiaPlanning.

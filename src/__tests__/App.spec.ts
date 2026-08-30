@@ -21,7 +21,10 @@ function cartBusyOverlayRule() {
 
 function mountApp() {
   return mount(App, {
-    global: { plugins: [createPinia()], stubs: { ShoppingCart: true } },
+    global: {
+      plugins: [createPinia()],
+      stubs: { ShoppingCart: true, RouterLink: true, RouterView: true },
+    },
   })
 }
 
@@ -41,6 +44,13 @@ describe('App', () => {
     expect(updated.exists()).toBe(true)
     expect(updated.text()).toContain('Last updated:')
     expect(updated.text()).toMatch(/Last updated: \d{4}-\d{2}-\d{2}/)
+  })
+
+  it('provides a footer Changelog link to /changelog', () => {
+    const wrapper = mountApp()
+    const link = wrapper.find('[data-testid="changelog-link"]')
+    expect(link.exists()).toBe(true)
+    expect(link.attributes('to')).toBe('/changelog')
   })
 
   it('shows the cart-busy overlay only after 150ms of sustained busy, then clears', async () => {

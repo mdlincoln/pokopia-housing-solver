@@ -368,6 +368,36 @@ body {
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* Changelog page */
+.changelog-entry {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.changelog-date {
+  font-family: var(--trop-font-heading, inherit);
+  font-size: 1.05rem;
+  color: #1f7892;
+  font-weight: 700;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.changelog-changes {
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.changelog-intro {
+  margin: 0;
+  color: #255f74;
+}
+
+.changelog-empty {
+  color: #255f74;
+  font-style: italic;
+}
+
 .top-gradient-card,
 .islands-card {
   position: relative;

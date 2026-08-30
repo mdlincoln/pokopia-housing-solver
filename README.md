@@ -26,4 +26,6 @@ scripts request pages with a jittered delay to scrape politely (raise it with
 
 ## Credits
 
+See also the appended [changelog](https://github.com/mdlincoln/pokopia-housing-solver/blob/main/src/changelog.ts) — the in-app `/changelog` page records how the app has evolved.
+
 This project in indebted to the original data collection done by https://pokopia-roommate-matchmaker.netlify.app/ and https://github.com/JEschete/PokopiaPlanning.

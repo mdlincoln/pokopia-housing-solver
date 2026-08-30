@@ -69,6 +69,8 @@ onBeforeUnmount(() => {
         <span>Source:</span>
         <a href="https://github.com/mdlincoln/pokopia-housing-solver">pokopia-housing-solver</a>
         ❧
+        <RouterLink to="/changelog" data-testid="changelog-link">Changelog</RouterLink>
+        ❧
         <span>Created by <a href="https://matthewlincoln.net">Matt Lincoln</a>, 2026</span>
       </footer>
     </BContainer>
