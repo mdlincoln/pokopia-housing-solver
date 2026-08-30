@@ -882,12 +882,11 @@ details[open] > .details-summary::before,
 /* Wrapping card grid: one card per row on phones (≥392px content box), flowing
    3–4 per row at desktop widths. Replaces Bootstrap's non-wrapping .card-group,
    which squeezed four pokemon into a single squeezed row at 390px. The unhoused
-   alert's card container is a *denser* variant (`.unhoused-grid`, never
-   `.pokemon-grid`) so broad `.pokemon-grid` selectors (e.g.
-   e2e/compactness.spec.ts) keep matching only house grids. Unhoused alert cards
-   omit the spawn-habitat thumbnails and live in the narrower alert body, so they
-   use a smaller 10rem minimum track — fitting 3+ per row in the same width that
-   a 15rem house card would only fit 2 of. */
+   alert's card container (`.unhoused-grid`) is scoped separately from
+   `.pokemon-grid` so broad `.pokemon-grid` selectors (e.g.
+   e2e/compactness.spec.ts) keep matching only house grids, but it shares the
+   same 15rem minimum track so unhoused cards render at the same width as housed
+   cards instead of being compressed in the narrower alert body. */
 .pokemon-grid {
   display: grid;
   gap: var(--space-2);
@@ -897,7 +896,7 @@ details[open] > .details-summary::before,
 .unhoused-grid {
   display: grid;
   gap: var(--space-2);
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
 }
 
 /* BAlert wraps the default slot in a `.d-flex.gap-2 > .alert-body`. The body is
