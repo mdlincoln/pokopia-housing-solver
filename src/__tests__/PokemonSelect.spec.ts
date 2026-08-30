@@ -101,6 +101,22 @@ describe('PokemonSelect combobox semantics (AC.6)', () => {
     expect(status.text()).toBe('No Pokémon match')
   })
 
+  it('hides excludeNames entries from suggestion filtering', async () => {
+    const wrapper = mount(PokemonSelect, {
+      props: { pokemonNames: NAMES, modelValue: [], excludeNames: new Set(['Abra']) },
+    })
+    const input = wrapper.find('input.pokemon-search')
+
+    await input.trigger('focus')
+    expect(wrapper.findAll('[role="option"]').map((o) => o.text())).toEqual(['Absol', 'Bulbasaur'])
+
+    // Excluded names stay hidden even when the query would match them, and
+    // unlike modelValue entries they never render as chips.
+    await input.setValue('ab')
+    expect(wrapper.findAll('[role="option"]').map((o) => o.text())).toEqual(['Absol'])
+    expect(wrapper.find('[data-testid="pokemon-search-status"]').text()).toBe('1 Pokémon matches')
+  })
+
   it('still selects via keyboard Enter with the combobox wiring in place', async () => {
     const wrapper = mountSelect()
     const input = wrapper.find('input.pokemon-search')

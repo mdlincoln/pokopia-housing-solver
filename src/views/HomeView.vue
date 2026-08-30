@@ -78,6 +78,22 @@ const resultsSafeToRender = computed(() => {
 
 const selectedPokemon = ref<string[]>([])
 
+// All island pokemon as a Set, built once per selection change so every
+// HouseRecord can pass it straight to topHouseMates / PokemonSelect as the
+// exclusion set without rebuilding per card.
+const islandPokemonSet = computed(() => new Set(selectedPokemon.value))
+
+// Empty-slot flow (HouseRecord "+" cards / empty-house input): add the
+// pokemon to the island AND pin it to the requesting house BEFORE the next
+// debounced solve, so the pin-complement fill keeps the newcomer in place.
+function addPokemonToHouse({ houseId, name }: { houseId: string; name: string }) {
+  // The selection UIs exclude island residents, but guard anyway: a duplicate
+  // would double-count the pokemon in the island set.
+  if (selectedPokemon.value.includes(name)) return
+  pinStore.pinPokemon(houseId, name)
+  selectedPokemon.value = [...selectedPokemon.value, name]
+}
+
 const small = ref(0)
 const medium = ref(0)
 const large = ref(0)
@@ -581,6 +597,7 @@ defineExpose({
   deleteSaved,
   undoDelete,
   onSaveEnter,
+  addPokemonToHouse,
 })
 </script>
 
@@ -745,6 +762,10 @@ defineExpose({
         :house="house"
         :pokemon-data="pokemonData!"
         :spawn-habitats-by-name="spawnHabitatsByName"
+        :all-pokemon-names="pokemonNames"
+        :island-pokemon="islandPokemonSet"
+        :adjacency-data="adjacencyData"
+        @add-pokemon="addPokemonToHouse"
       />
     </TransitionGroup>
   </section>

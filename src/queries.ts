@@ -10,7 +10,7 @@ import {
   loadItemGraphData,
   loadPokemonCatalog,
 } from '@/data'
-import type { AdjacencyData, PokemonData } from '@/solver'
+import { getScore, type AdjacencyData, type PokemonData } from '@/solver'
 
 export interface ItemDetails {
   name: string
@@ -306,6 +306,135 @@ export async function recommendedItemsForHouseAllNeeds(
 
 export async function loadPokemonNames(): Promise<string[]> {
   return loadPokemonCatalog().names
+}
+
+export interface HouseMateMatch {
+  name: string
+  image: string
+  favorites: string[]
+  habitat?: string
+  overlapScore: number // Σ getScore vs occupants (0 when no occupants / no adjacency)
+  fulfilledCount: number // candidate favorites fulfilled by the house's cart items
+  score: number // overlapScore + fulfilledCount
+  sharedFavorites: string[] // candidate favorites shared with ≥1 occupant (display)
+  fulfilledFavorites: string[] // candidate favorites fulfilled by cart items (display)
+}
+
+/**
+ * Ranks the best-fitting pokemon to JOIN a given house — the data behind the
+ * "+" empty-slot suggestion modal on HouseRecord.
+ *
+ * Signals:
+ * - Occupant chemistry: Σ getScore(candidate, occupant) from the adjacency
+ *   matrix. A hard exclusion (getScore === null, opposite habitat axis) vs ANY
+ *   occupant drops the candidate entirely.
+ * - Stocked-wishlist bonus: +1 per candidate favorite already fulfilled by the
+ *   house's cart items (one `favoritesForItems` union pass).
+ *
+ * Tier behavior (fixed regardless of weighting):
+ * - Occupants > 0, no items: rank by overlapScore; ALL non-conflicting
+ *   candidates are eligible (score-0 candidates are neutral, not conflicting).
+ * - Items > 0, no occupants: candidates require fulfilledCount ≥ 1; if none
+ *   qualify the result is [] (the modal falls back to its search input).
+ * - Both present: all non-conflicting candidates eligible; fulfillment is a
+ *   bonus, not a gate.
+ * - Neither: callers don't invoke (totally empty houses render the inline
+ *   search input instead).
+ *
+ * Deterministic ordering: score DESC, then island affinity DESC (Σ getScore
+ * over `excludedNames`, with hard exclusions counted as 0 — cross-house
+ * conflicts never EXCLUDE a candidate from this house; occupants-only), then
+ * name via BINARY codepoint comparison (matching this module's parity
+ * convention, NOT localeCompare).
+ *
+ * @param candidateNames test-only override for the candidate universe
+ *   (production callers omit it and rank the full catalog).
+ */
+export async function topHouseMates(opts: {
+  occupants: string[]
+  cartItemNames: string[]
+  excludedNames: ReadonlySet<string>
+  adjacency: AdjacencyData
+  limit?: number
+  candidateNames?: string[]
+}): Promise<HouseMateMatch[]> {
+  const limit = opts.limit ?? 5
+  const universe = opts.candidateNames ?? loadPokemonCatalog().names
+  const candidates = universe.filter((name) => !opts.excludedNames.has(name))
+  if (candidates.length === 0) return []
+
+  // Favorites/images/habitat for candidates AND occupants come from one
+  // hydration pass (names absent from the catalog map to empty entries).
+  const hydrated = await loadPokemonData([...new Set([...candidates, ...opts.occupants])])
+
+  // Union of favorites fulfilled by the house's cart items (empty when the
+  // house has no items — the fulfilled signal then contributes nothing).
+  const fulfilledSet = new Set<string>()
+  if (opts.cartItemNames.length > 0) {
+    const cartFavs = await favoritesForItems(opts.cartItemNames)
+    for (const favorites of cartFavs.values()) {
+      for (const favorite of favorites) fulfilledSet.add(favorite)
+    }
+  }
+
+  const occupantFavorites = new Set(opts.occupants.flatMap((o) => hydrated[o]?.favorites ?? []))
+  const hasOccupants = opts.occupants.length > 0
+
+  const scored: Array<{ match: HouseMateMatch; islandAffinity: number }> = []
+  for (const name of candidates) {
+    // Hard environment filter: an opposite-axis conflict with ANY occupant
+    // excludes the candidate from this house.
+    let overlapScore = 0
+    let conflicts = false
+    for (const occupant of opts.occupants) {
+      const score = getScore(opts.adjacency, name, occupant)
+      if (score === null) {
+        conflicts = true
+        break
+      }
+      overlapScore += score
+    }
+    if (conflicts) continue
+
+    const entry = hydrated[name]
+    const favorites = entry?.favorites ?? []
+    const fulfilledFavorites = favorites.filter((f) => fulfilledSet.has(f))
+    const fulfilledCount = fulfilledFavorites.length
+
+    // Items-only tier: without occupants there is no chemistry signal, so
+    // only candidates whose wishlist is partially stocked qualify.
+    if (!hasOccupants && opts.cartItemNames.length > 0 && fulfilledCount === 0) continue
+
+    // Island-wide affinity is a pure ranking tie-break: null (cross-house
+    // conflict) contributes 0 but never excludes.
+    let islandAffinity = 0
+    for (const islandName of opts.excludedNames) {
+      islandAffinity += getScore(opts.adjacency, name, islandName) ?? 0
+    }
+
+    scored.push({
+      match: {
+        name,
+        image: entry?.image ?? '',
+        favorites,
+        habitat: entry?.habitat,
+        overlapScore,
+        fulfilledCount,
+        score: overlapScore + fulfilledCount,
+        sharedFavorites: favorites.filter((f) => occupantFavorites.has(f)),
+        fulfilledFavorites,
+      },
+      islandAffinity,
+    })
+  }
+
+  scored.sort(
+    (a, b) =>
+      b.match.score - a.match.score ||
+      b.islandAffinity - a.islandAffinity ||
+      compareCodepoints(a.match.name, b.match.name),
+  )
+  return scored.slice(0, limit).map((entry) => entry.match)
 }
 
 export async function loadPokemonData(names?: string[]): Promise<PokemonData> {

@@ -14,18 +14,22 @@ export function sameFavorites(a: Set<string>, b: Set<string>): boolean {
 <script setup lang="ts">
 import { assetPath } from '@/assetPath'
 import HabitatModal from '@/components/HabitatModal.vue'
+import HouseMateModal from '@/components/HouseMateModal.vue'
 import IconGlyph from '@/components/IconGlyph.vue'
 import PokemonCard from '@/components/PokemonCard.vue'
+import PokemonSelect from '@/components/PokemonSelect.vue'
 import { iconForFavorite } from '@/favoriteIcons'
 import {
   favoriteCoverageColumnKey,
   favoritesForItems,
   RECOMMENDED_ITEM_TAGS,
   recommendedItemsForHouseAllNeeds,
+  topHouseMates,
+  type HouseMateMatch,
   type ItemDetails,
   type SpawnHabitat,
 } from '@/queries'
-import { type HouseAssignment, type PokemonData } from '@/solver'
+import { type AdjacencyData, type HouseAssignment, type PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
 import { useProgressStore } from '@/stores/progress'
@@ -40,10 +44,31 @@ import {
 } from 'bootstrap-vue-next'
 import { computed, ref, watch, watchEffect } from 'vue'
 
-const props = defineProps<{
-  house: HouseAssignment
-  pokemonData: PokemonData
-  spawnHabitatsByName?: Record<string, SpawnHabitat[]>
+const props = withDefaults(
+  defineProps<{
+    house: HouseAssignment
+    pokemonData: PokemonData
+    spawnHabitatsByName?: Record<string, SpawnHabitat[]>
+    // Full pokemon catalog names, for the empty-house inline search and the
+    // housemate modal's fallback search.
+    allPokemonNames?: string[]
+    // All pokemon currently on the island (Set built once by HomeView): the
+    // exclusion set for suggestions so an island resident is never re-proposed.
+    islandPokemon?: ReadonlySet<string>
+    // Null/undefined until the adjacency payload lands; suggestion buttons
+    // stay disabled until then because conflict exclusion requires the matrix.
+    adjacencyData?: AdjacencyData | null
+  }>(),
+  {
+    allPokemonNames: () => [],
+    islandPokemon: () => new Set<string>(),
+  },
+)
+
+// Adding a pokemon is OWNED by HomeView (selection + auto-pin + re-solve);
+// HouseRecord only reports the intent.
+const emit = defineEmits<{
+  'add-pokemon': [payload: { houseId: string; name: string }]
 }>()
 
 const cartStore = useCartStore()
@@ -63,6 +88,62 @@ function toggleHousePin() {
 }
 
 const houseCartItems = computed(() => cartStore.itemsByHouse.get(props.house.houseId) ?? [])
+
+// --- Empty-slot "+" cards / housemate suggestions --------------------------
+// One plus-card per vacant bed. Clicking opens this house's HouseMateModal
+// and lazily runs topHouseMates (occupant chemistry + stocked-favorite bonus,
+// island residents excluded). The run counter guards against rapid
+// open/close sequences cross-populating the modal (same pattern as
+// recommendationRun below).
+const emptySlots = computed(() => Math.max(0, props.house.capacity - props.house.pokemon.length))
+
+// Plus-cards render disabled (with a tooltip) until the adjacency payload is
+// in — without it suggestions can't exclude hard habitat conflicts.
+const suggestionsReady = computed(() => props.adjacencyData != null)
+
+const houseMateModalOpen = ref(false)
+const houseMateMatches = ref<HouseMateMatch[] | null>(null)
+let houseMateRun = 0
+
+async function openHouseMateModal() {
+  const adjacency = props.adjacencyData
+  if (!adjacency) return
+  const run = ++houseMateRun
+  houseMateMatches.value = null
+  houseMateModalOpen.value = true
+  try {
+    const matches = await topHouseMates({
+      occupants: [...props.house.pokemon],
+      cartItemNames: houseCartItems.value.map((item) => item.name),
+      excludedNames: props.islandPokemon,
+      adjacency,
+    })
+    if (run !== houseMateRun) return
+    houseMateMatches.value = matches
+  } catch {
+    // A failed lookup must not strand the modal on its spinner: fall back to
+    // the empty state (note + search input), matching HabitatModal's failure
+    // path convention.
+    if (run !== houseMateRun) return
+    houseMateMatches.value = []
+  }
+}
+
+function closeHouseMateModal() {
+  houseMateRun++ // ignore any in-flight suggestions
+  houseMateModalOpen.value = false
+}
+
+function onHouseMateSelect(name: string) {
+  emit('add-pokemon', { houseId: props.house.houseId, name })
+}
+
+// Inline search on a totally empty house (no pokemon, no cart items): the
+// fixed empty model means the appended name is the last payload entry.
+function onEmptyHouseInput(names: string[]) {
+  const added = names[names.length - 1]
+  if (added) emit('add-pokemon', { houseId: props.house.houseId, name: added })
+}
 
 const fulfilledTags = computed(
   () => new Set(houseCartItems.value.map((item) => item.tag).filter((t): t is string => !!t)),
@@ -486,8 +567,58 @@ watchEffect(() => {
         @favorite-clicked="onFavoriteClick"
         @habitat-clicked="onHabitatClick"
       />
+      <button
+        v-for="slot in emptySlots"
+        :key="`empty-slot-${slot}`"
+        type="button"
+        class="house-empty-slot"
+        data-testid="house-empty-slot"
+        :disabled="!suggestionsReady"
+        :aria-label="`Add a Pokémon to house ${house.houseId}`"
+        :title="
+          suggestionsReady
+            ? `Find the best fitting Pokemon to join house ${house.houseId}`
+            : 'Compatibility data is still loading — suggestions are temporarily unavailable'
+        "
+        @click="openHouseMateModal"
+      >
+        <i class="bi bi-plus-lg" aria-hidden="true"></i>
+      </button>
     </div>
-    <p v-else data-testid="empty" class="text-muted fst-italic mb-0">Empty</p>
+
+    <!-- A house with items but no pokemon still gets plus-cards: suggestions
+         rank by fulfilled favorites alone. No PokemonCards, no inline input. -->
+    <div v-else-if="houseCartItems.length > 0 && emptySlots > 0" class="pokemon-grid">
+      <button
+        v-for="slot in emptySlots"
+        :key="`empty-slot-${slot}`"
+        type="button"
+        class="house-empty-slot"
+        data-testid="house-empty-slot"
+        :disabled="!suggestionsReady"
+        :aria-label="`Add a Pokémon to house ${house.houseId}`"
+        :title="
+          suggestionsReady
+            ? `Find the best fitting Pokemon to join house ${house.houseId}`
+            : 'Compatibility data is still loading — suggestions are temporarily unavailable'
+        "
+        @click="openHouseMateModal"
+      >
+        <i class="bi bi-plus-lg" aria-hidden="true"></i>
+      </button>
+    </div>
+
+    <!-- Totally empty house (no pokemon, no items): inline search instead of
+         the old "Empty" placeholder (data-testid="empty" is gone). -->
+    <PokemonSelect
+      v-else
+      data-testid="house-empty-input"
+      :pokemon-names="allPokemonNames"
+      :exclude-names="islandPokemon"
+      :model-value="[]"
+      placeholder="Add a Pokemon to this house..."
+      @update:model-value="onEmptyHouseInput"
+    />
 
     <details
       v-if="activeTableItems.length"
@@ -657,5 +788,18 @@ watchEffect(() => {
     </details>
 
     <HabitatModal :habitat="openHabitat" @close="openHabitat = null" />
+
+    <!-- One suggestion modal per house card, mirroring the HabitatModal
+         ownership pattern. Occupant-empty houses (items-only tier) also get
+         the manual search box. -->
+    <HouseMateModal
+      :house="houseMateModalOpen ? house : null"
+      :matches="houseMateMatches"
+      :all-pokemon-names="allPokemonNames"
+      :excluded-names="islandPokemon"
+      :show-search="house.pokemon.length === 0"
+      @select="onHouseMateSelect"
+      @close="closeHouseMateModal"
+    />
   </BListGroupItem>
 </template>

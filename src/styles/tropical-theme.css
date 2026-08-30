@@ -532,6 +532,16 @@ body {
   overflow: visible;
 }
 
+/* While a picker's dropdown is open, lift that instance's wrap above its
+   siblings. Without this, every `position: relative; z-index: 20` wrap
+   creates its own stacking context — later house cards' inline inputs paint
+   ABOVE an earlier card's open menu. Elevating only the open instance (well
+   above 20, but below modals/offcanvas at ~1040+) keeps the menu on top of
+   all page content without fighting overlay layers. */
+.pokemon-select--open .pokemon-select-wrap {
+  z-index: 900;
+}
+
 .pokemon-select {
   overflow: visible;
 }
@@ -842,6 +852,109 @@ details[open] > .details-summary::before,
   display: grid;
   gap: var(--space-2);
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+}
+
+/* Empty-slot "+" card: a muted, dashed sibling of PokemonCard inside the
+   wrapping grid. WCAG 2.5.8 24×24px floor is well exceeded (it fills a grid
+   cell), and the centered glyph stays decorative (aria-hidden on the i). */
+.house-empty-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  padding: var(--space-3);
+  border: 2px dashed rgb(43 169 190 / 40%);
+  border-radius: var(--trop-radius-card);
+  background: rgb(232 251 255 / 45%);
+  color: #2b8ea6;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.house-empty-slot:hover:not(:disabled),
+.house-empty-slot:focus-visible:not(:disabled) {
+  background: rgb(197 242 255 / 65%);
+  border-color: rgb(43 169 190 / 70%);
+}
+
+.house-empty-slot:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Housemate suggestion modal: full-width option rows with sprite + name +
+   habitat badge and "why this one" chip rows underneath. */
+.housemate-modal-state {
+  padding: var(--space-4);
+}
+
+.housemate-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.housemate-option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border: 1px solid rgb(43 169 190 / 32%);
+  border-radius: var(--trop-radius-control);
+  background: rgb(255 255 255 / 82%);
+  cursor: pointer;
+  transition: border-color 150ms ease;
+}
+
+.housemate-option:hover,
+.housemate-option:focus-visible {
+  border-color: rgb(43 169 190 / 70%);
+}
+
+.housemate-option-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.housemate-sprite {
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.housemate-option-name {
+  font-weight: 600;
+}
+
+.housemate-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.housemate-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  font-size: 0.78rem;
+  border-radius: var(--trop-radius-pill);
+  background: rgb(158 232 201 / 30%);
+  color: #20596c;
+}
+
+.housemate-chip--stocked {
+  background: rgb(255 179 168 / 32%);
 }
 
 /* Measured dense-table cell padding (deliberately sub-ramp): keeps favorite

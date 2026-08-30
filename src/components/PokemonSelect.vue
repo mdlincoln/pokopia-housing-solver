@@ -6,6 +6,13 @@ const props = defineProps<{
   pokemonNames: string[]
   modelValue: string[]
   pinnedNames?: Set<string>
+  // Names hidden from the dropdown entirely (e.g. pokemon already on the
+  // island, for single-purpose pickers inside house cards). Unlike
+  // `modelValue` they don't render as chips on this instance.
+  excludeNames?: ReadonlySet<string>
+  // Distinct placeholder text for non-primary pickers (house cards, the
+  // housemate modal) so each usage has an unambiguous accessible/locator name.
+  placeholder?: string
 }>()
 
 const emit = defineEmits<{
@@ -23,8 +30,11 @@ const listboxId = `${useId()}-listbox`
 
 const filtered = computed(() => {
   const selected = new Set(props.modelValue)
+  const excluded = props.excludeNames
   const q = query.value.toLowerCase()
-  return props.pokemonNames.filter((name) => !selected.has(name) && name.toLowerCase().includes(q))
+  return props.pokemonNames.filter(
+    (name) => !selected.has(name) && !excluded?.has(name) && name.toLowerCase().includes(q),
+  )
 })
 
 // The dropdown renders at most 50 options; activedescendant must reference one
@@ -93,12 +103,12 @@ function onBlur() {
 </script>
 
 <template>
-  <div class="pokemon-select">
+  <div class="pokemon-select" :class="{ 'pokemon-select--open': isOpen }">
     <div class="position-relative pokemon-select-wrap">
       <BFormInput
         v-model="query"
         class="pokemon-search"
-        placeholder="Add pokemon to your island..."
+        :placeholder="placeholder ?? 'Add pokemon to your island...'"
         autocomplete="off"
         aria-label="Search Pokémon to add"
         role="combobox"

@@ -105,7 +105,10 @@ test.describe('Homepage', () => {
 
     const cards = page.getByTestId('house-card')
     await expect(cards).toHaveCount(2)
-    await expect(page.getByTestId('empty')).toHaveCount(2)
+    // Totally empty houses now render the inline pokemon search instead of
+    // the old "Empty" placeholder (data-testid="empty" is gone).
+    await expect(page.getByTestId('empty')).toHaveCount(0)
+    await expect(page.getByTestId('house-empty-input')).toHaveCount(2)
   })
 
   test('displays habitat badge on pokemon card', async ({ page }) => {

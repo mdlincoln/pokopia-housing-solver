@@ -395,8 +395,44 @@ describe('HomeView', () => {
 
     const cards = wrapper.findAll('[data-testid="house-card"]')
     expect(cards).toHaveLength(2)
-    expect(cards[1]!.find('[data-testid="empty"]').exists()).toBe(true)
-    expect(cards[1]!.text()).toContain('Empty')
+    // A totally empty house (no pokemon, no cart items) renders the inline
+    // pokemon search instead of the old "Empty" placeholder.
+    const emptyCard = cards[1]!
+    expect(emptyCard.find('[data-testid="empty"]').exists()).toBe(false)
+    expect(emptyCard.find('[data-testid="house-empty-input"]').exists()).toBe(true)
+  })
+
+  it('addPokemonToHouse pins the newcomer to the house and adds it to the selection', async () => {
+    const solverResult: SolverResult = {
+      houses: [{ houseId: 'L1', size: 'large', capacity: 4, pokemon: ['AlphaOne', 'BetaOne'] }],
+      unhoused: [],
+    }
+    mockSolve.mockResolvedValue(solverResult)
+
+    const wrapper = await mountHome()
+    const pinStore = usePinStore()
+    wrapper.vm.large = 1
+    wrapper.vm.selectedPokemon = ['AlphaOne']
+    await flushPromises()
+
+    wrapper.vm.addPokemonToHouse({ houseId: 'L1', name: 'BetaOne' })
+    await flushPromises()
+
+    // Pin BEFORE selection means the re-solve saw BetaOne as a pinned
+    // assignment of L1 (jsdom falls back to the synchronous mocked solve).
+    expect(pinStore.isPokemonPinned('L1', 'BetaOne')).toBe(true)
+    expect(wrapper.vm.selectedPokemon).toContain('BetaOne')
+    const lastCall = mockSolve.mock.calls[mockSolve.mock.calls.length - 1]!
+    const pinnedAssignments = lastCall[4] as Map<string, string[]>
+    expect(pinnedAssignments).toBeInstanceOf(Map)
+    expect(pinnedAssignments.get('L1')).toContain('BetaOne')
+
+    // Duplicate adds are a no-op (selection UIs exclude island residents, but
+    // the handler guards anyway).
+    const selectedCount = wrapper.vm.selectedPokemon.length
+    wrapper.vm.addPokemonToHouse({ houseId: 'L1', name: 'BetaOne' })
+    await flushPromises()
+    expect(wrapper.vm.selectedPokemon).toHaveLength(selectedCount)
   })
 
   it('displays error when solver fails', async () => {

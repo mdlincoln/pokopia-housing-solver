@@ -24,12 +24,19 @@ export const usePinStore = defineStore('pins', () => {
     }
   }
 
+  // Unconditionally additive pin (idempotent): used by flows that ADD a
+  // pokemon to a house (the housemate suggestion modal / empty-slot input)
+  // where a toggling API could silently unpin an already-pinned entry.
+  function pinPokemon(houseId: string, name: string) {
+    pinnedPokemon.value.add(`${houseId}:${name}`)
+  }
+
   function togglePokemonPin(houseId: string, name: string) {
     const key = `${houseId}:${name}`
     if (pinnedPokemon.value.has(key)) {
       pinnedPokemon.value.delete(key)
     } else {
-      pinnedPokemon.value.add(key)
+      pinPokemon(houseId, name)
     }
   }
 
@@ -98,6 +105,7 @@ export const usePinStore = defineStore('pins', () => {
     pinHouse,
     unpinHouse,
     toggleHousePin,
+    pinPokemon,
     togglePokemonPin,
     isHousePinned,
     isPokemonPinned,

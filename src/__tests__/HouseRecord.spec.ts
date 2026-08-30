@@ -1,11 +1,54 @@
+import HouseMateModal from '@/components/HouseMateModal.vue'
 import HouseRecord, { sameFavorites } from '@/components/HouseRecord.vue'
 import { favoriteCoverageColumnKey, recommendedItemsForHouse } from '@/queries'
-import type { HouseAssignment, PokemonData } from '@/solver'
+import type { AdjacencyData, HouseAssignment, PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { useProgressStore } from '@/stores/progress'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const { topHouseMatesMock } = vi.hoisted(() => ({
+  topHouseMatesMock:
+    vi.fn<(opts: Record<string, unknown>) => Promise<import('@/queries').HouseMateMatch[]>>(),
+}))
+
+// Only the suggestion query is stubbed; every other query helper stays real
+// (cart items, recommendation rows) so the render matrix exercises the baked
+// data path like the rest of this spec file.
+vi.mock('@/queries', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...(actual as object),
+    topHouseMates: topHouseMatesMock,
+  }
+})
+
+// Tiny synthetic adjacency: any two known names score 1 (no conflicts).
+function stubAdjacency(): AdjacencyData {
+  const names = ['AlphaOne', 'AlphaTwo', 'BetaOne', 'GammaOne']
+  const indexByName = new Map(names.map((name, i) => [name, i] as const))
+  const matrix = new Int16Array(names.length * names.length).fill(1)
+  for (let i = 0; i < names.length; i++) matrix[i * names.length + i] = 0
+  return { names, indexByName, size: names.length, matrix }
+}
+
+// The new suggestion props all default to "empty catalog, nothing excluded,
+// no adjacency" so older mounts stay terse; this helper passes the full set.
+function mountWithSuggestions(house: HouseAssignment) {
+  return mount(HouseRecord, {
+    props: {
+      house,
+      pokemonData: testPokemonData,
+      allPokemonNames: ['AlphaOne', 'AlphaTwo', 'BetaOne', 'GammaOne'],
+      islandPokemon: new Set(house.pokemon),
+      adjacencyData: stubAdjacency(),
+    },
+    // BModal teleports to document.body; stubbing Teleport keeps the modal
+    // inside the test wrapper (mirrors HabitatModal.spec).
+    global: { stubs: { Teleport: true } },
+  })
+}
 
 const testPokemonData: PokemonData = {
   AlphaOne: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
@@ -43,6 +86,7 @@ async function openRecommendations(wrapper: ReturnType<typeof mount>) {
 describe('HouseRecord', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    topHouseMatesMock.mockReset()
   })
 
   it('passes habitat prop to each pokemon card', () => {
@@ -1637,6 +1681,176 @@ describe('HouseRecord', () => {
     it('renders no thumbnails without the spawnHabitatsByName prop', () => {
       const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
       expect(wrapper.find('[data-testid="habitat-thumbs"]').exists()).toBe(false)
+    })
+  })
+
+  describe('empty-slot "+" cards and housemate suggestions', () => {
+    const fixedMatches: import('@/queries').HouseMateMatch[] = [
+      {
+        name: 'BetaOne',
+        image: '',
+        favorites: ['X', 'Y', 'Z', 'W', 'V'],
+        habitat: 'Bright',
+        overlapScore: 2,
+        fulfilledCount: 0,
+        score: 2,
+        sharedFavorites: [],
+        fulfilledFavorites: [],
+      },
+      {
+        name: 'GammaOne',
+        image: '',
+        favorites: ['P', 'Q', 'R'],
+        habitat: 'Cool',
+        overlapScore: 1,
+        fulfilledCount: 1,
+        score: 2,
+        sharedFavorites: [],
+        fulfilledFavorites: ['P'],
+      },
+    ]
+
+    it('renders exactly capacity − occupants plus-cards for a partially full house', () => {
+      const house: HouseAssignment = {
+        houseId: 'L1',
+        size: 'large',
+        capacity: 4,
+        pokemon: ['AlphaOne', 'AlphaTwo'],
+      }
+      const wrapper = mountWithSuggestions(house)
+      expect(wrapper.findAll('[data-testid="house-empty-slot"]')).toHaveLength(2)
+      expect(wrapper.find('[data-testid="house-empty-input"]').exists()).toBe(false)
+    })
+
+    it('renders no plus-cards for a full house', () => {
+      const house: HouseAssignment = {
+        houseId: 'M1',
+        size: 'medium',
+        capacity: 2,
+        pokemon: ['AlphaOne', 'AlphaTwo'],
+      }
+      const wrapper = mountWithSuggestions(house)
+      expect(wrapper.findAll('[data-testid="house-empty-slot"]')).toHaveLength(0)
+    })
+
+    it('opens the suggestion modal on click and emits add-pokemon on option select', async () => {
+      topHouseMatesMock.mockResolvedValue(fixedMatches)
+      const house: HouseAssignment = {
+        houseId: 'L1',
+        size: 'large',
+        capacity: 4,
+        pokemon: ['AlphaOne'],
+      }
+      const wrapper = mountWithSuggestions(house)
+
+      await wrapper.find('[data-testid="house-empty-slot"]').trigger('click')
+      await flushPromises()
+
+      // topHouseMates ran with this house's occupants / island exclusion set
+      expect(topHouseMatesMock).toHaveBeenCalledTimes(1)
+      expect(topHouseMatesMock.mock.calls[0]![0]).toMatchObject({
+        occupants: ['AlphaOne'],
+        cartItemNames: [],
+      })
+
+      // Teleport is stubbed, so the modal renders inline in the wrapper.
+      const modal = wrapper.find('[data-testid="housemate-modal"]')
+      expect(modal.exists()).toBe(true)
+      expect(modal.text()).toContain('The best fitting Pokemon to join this house')
+      const options = wrapper.findAll('[data-testid="housemate-option"]')
+      expect(options.length).toBeGreaterThan(0)
+      expect(options.length).toBeLessThanOrEqual(5)
+      expect(options[0]!.attributes('aria-label')).toBe('Add BetaOne to house L1')
+      expect(options[1]!.text()).toContain('already stocked')
+
+      await options[0]!.trigger('click')
+      expect(wrapper.emitted('add-pokemon')).toEqual([[{ houseId: 'L1', name: 'BetaOne' }]])
+
+      // Selecting closes the modal (house prop null, matching HabitatModal's
+      // owned-ref convention).
+      await flushPromises()
+      expect(wrapper.findComponent(HouseMateModal).props('house')).toBeNull()
+    })
+
+    it('totally empty house renders the inline search input, emitting add-pokemon on pick', async () => {
+      const house: HouseAssignment = {
+        houseId: 'S1',
+        size: 'small',
+        capacity: 1,
+        pokemon: [],
+      }
+      const wrapper = mountWithSuggestions(house)
+
+      // The old "Empty" placeholder is gone; plus-cards are gone; the inline
+      // combobox is the sole picker here.
+      expect(wrapper.find('[data-testid="empty"]').exists()).toBe(false)
+      expect(wrapper.findAll('[data-testid="house-empty-slot"]')).toHaveLength(0)
+
+      const picker = wrapper.find('[data-testid="house-empty-input"]')
+      expect(picker.exists()).toBe(true)
+      const input = picker.find('input.pokemon-search')
+      expect(input.exists()).toBe(true)
+
+      await input.trigger('focus')
+      await input.setValue('beta')
+      await input.trigger('keydown', { key: 'Enter' })
+
+      expect(wrapper.emitted('add-pokemon')).toEqual([[{ houseId: 'S1', name: 'BetaOne' }]])
+      // No suggestion query for a house with no ranking inputs.
+      expect(topHouseMatesMock).not.toHaveBeenCalled()
+    })
+
+    it('items-only house shows plus-cards and the modal includes the fallback search', async () => {
+      topHouseMatesMock.mockResolvedValue([])
+      const house: HouseAssignment = {
+        houseId: 'S2',
+        size: 'small',
+        capacity: 1,
+        pokemon: [],
+      }
+      const cartStore = useCartStore()
+      await cartStore.addItem('S2', 'Punching Bag')
+
+      const wrapper = mountWithSuggestions(house)
+      await flushPromises()
+
+      const slots = wrapper.findAll('[data-testid="house-empty-slot"]')
+      expect(slots).toHaveLength(1)
+      expect(wrapper.find('[data-testid="house-empty-input"]').exists()).toBe(false)
+
+      await slots[0]!.trigger('click')
+      await flushPromises()
+
+      expect(topHouseMatesMock.mock.calls[0]![0]).toMatchObject({
+        occupants: [],
+        cartItemNames: ['Punching Bag'],
+      })
+      // Empty matches + items-only tier: the modal falls back to the search
+      // input rather than leaving the user at a dead end.
+      const modal = wrapper.find('[data-testid="housemate-modal"]')
+      expect(modal.text()).toContain('No strong matches')
+      expect(modal.find('input.pokemon-search').exists()).toBe(true)
+    })
+
+    it('plus-cards are disabled while adjacency data is unavailable', () => {
+      const house: HouseAssignment = {
+        houseId: 'L1',
+        size: 'large',
+        capacity: 4,
+        pokemon: ['AlphaOne'],
+      }
+      // Default adjacencyData is null (mountWithSuggestions overrides it).
+      const wrapper = mount(HouseRecord, {
+        props: {
+          house,
+          pokemonData: testPokemonData,
+          allPokemonNames: ['AlphaOne', 'BetaOne'],
+          islandPokemon: new Set(['AlphaOne']),
+        },
+      })
+      const slot = wrapper.find('[data-testid="house-empty-slot"]')
+      expect(slot.exists()).toBe(true)
+      expect(slot.attributes('disabled')).toBeDefined()
     })
   })
 })
