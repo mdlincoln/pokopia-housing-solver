@@ -63,12 +63,16 @@ const props = withDefaults(
     // the pointer gesture and the placement override.
     dragEnabled?: boolean
     dropOver?: boolean
+    // Whether island-wide auto-sort is on: forwarded to the housemate modal so
+    // its re-sort warning can render and undermine itself via update:autoSort.
+    autoSort?: boolean
   }>(),
   {
     allPokemonNames: () => [],
     islandPokemon: () => new Set<string>(),
     dragEnabled: false,
     dropOver: false,
+    autoSort: true,
   },
 )
 
@@ -78,6 +82,7 @@ const isFull = computed(() => props.house.pokemon.length >= props.house.capacity
 // HouseRecord only reports the intent.
 const emit = defineEmits<{
   'add-pokemon': [payload: { houseId: string; name: string }]
+  'update:autoSort': [value: boolean]
 }>()
 
 const cartStore = useCartStore()
@@ -817,8 +822,10 @@ watchEffect(() => {
       :all-pokemon-names="allPokemonNames"
       :excluded-names="islandPokemon"
       :show-search="house.pokemon.length === 0"
+      :auto-sort="autoSort"
       @select="onHouseMateSelect"
       @close="closeHouseMateModal"
+      @update:auto-sort="emit('update:autoSort', $event)"
     />
   </BListGroupItem>
 </template>

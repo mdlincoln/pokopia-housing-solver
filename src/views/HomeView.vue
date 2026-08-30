@@ -1127,7 +1127,9 @@ defineExpose({
           dragOverTarget.type === 'house' &&
           dragOverTarget.houseId === house.houseId
         "
+        :auto-sort="autoSort"
         @add-pokemon="addPokemonToHouse"
+        @update:auto-sort="autoSort = $event"
       />
     </TransitionGroup>
   </section>

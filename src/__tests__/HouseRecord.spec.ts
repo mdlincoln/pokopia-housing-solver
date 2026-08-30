@@ -35,7 +35,7 @@ function stubAdjacency(): AdjacencyData {
 
 // The new suggestion props all default to "empty catalog, nothing excluded,
 // no adjacency" so older mounts stay terse; this helper passes the full set.
-function mountWithSuggestions(house: HouseAssignment) {
+function mountWithSuggestions(house: HouseAssignment, options?: { autoSort?: boolean }) {
   return mount(HouseRecord, {
     props: {
       house,
@@ -43,6 +43,9 @@ function mountWithSuggestions(house: HouseAssignment) {
       allPokemonNames: ['AlphaOne', 'AlphaTwo', 'BetaOne', 'GammaOne'],
       islandPokemon: new Set(house.pokemon),
       adjacencyData: stubAdjacency(),
+      // Default true so the modal's re-sort warning renders, matching the
+      // "missing key restores true" convention; pass false for the negative.
+      autoSort: options?.autoSort ?? true,
     },
     // BModal teleports to document.body; stubbing Teleport keeps the modal
     // inside the test wrapper (mirrors HabitatModal.spec).
@@ -1757,6 +1760,9 @@ describe('HouseRecord', () => {
       const modal = wrapper.find('[data-testid="housemate-modal"]')
       expect(modal.exists()).toBe(true)
       expect(modal.text()).toContain('The best fitting Pokemon to join this house')
+      // AC.4: autoSort defaults true, so the re-sort warning is visible while
+      // the suggestion is being selected.
+      expect(wrapper.find('[data-testid="housemate-autosort-warning"]').exists()).toBe(true)
       const options = wrapper.findAll('[data-testid="housemate-option"]')
       expect(options.length).toBeGreaterThan(0)
       expect(options.length).toBeLessThanOrEqual(5)
@@ -1770,6 +1776,75 @@ describe('HouseRecord', () => {
       // owned-ref convention).
       await flushPromises()
       expect(wrapper.findComponent(HouseMateModal).props('house')).toBeNull()
+    })
+
+    it('renders the auto-sort warning in the housemate modal when autoSort is true', async () => {
+      topHouseMatesMock.mockResolvedValue(fixedMatches)
+      const house: HouseAssignment = {
+        houseId: 'L1',
+        size: 'large',
+        capacity: 4,
+        pokemon: ['AlphaOne'],
+      }
+      const wrapper = mountWithSuggestions(house)
+
+      await wrapper.find('[data-testid="house-empty-slot"]').trigger('click')
+      await flushPromises()
+
+      const warning = wrapper.find('[data-testid="housemate-autosort-warning"]')
+      expect(warning.exists()).toBe(true)
+      // Collapsed rendered text carries both exact copy lines (AC.5) plus the
+      // inline switch label.
+      const text = warning.text().replace(/\s+/g, ' ').trim()
+      expect(text).toContain(
+        'Because auto-sort is currently ON, adding this pokemon will trigger your entire island to re-sort.',
+      )
+      expect(text).toContain(
+        'This new pokemon will stay in this house, but auto-sort may move your other, unpinned housemates to more optimal houses.',
+      )
+      expect(text).toContain('Switch auto-sort off before you add a Pokemon?')
+      expect(warning.find('[data-testid="housemate-autosort-switch"]').exists()).toBe(true)
+    })
+
+    it('emits update:autoSort false when the warning switch is toggled', async () => {
+      topHouseMatesMock.mockResolvedValue(fixedMatches)
+      const house: HouseAssignment = {
+        houseId: 'L1',
+        size: 'large',
+        capacity: 4,
+        pokemon: ['AlphaOne'],
+      }
+      const wrapper = mountWithSuggestions(house)
+
+      await wrapper.find('[data-testid="house-empty-slot"]').trigger('click')
+      await flushPromises()
+
+      const switchEl = wrapper.find('[data-testid="housemate-autosort-switch"]')
+      expect(switchEl.exists()).toBe(true)
+      // The testid lands on the checkbox input (bootstrap-vue-next forwards
+      // non-class attrs to the <input>), so setValue flips it and fires change.
+      await switchEl.setValue(false)
+      await flushPromises()
+      // HouseMateModal re-emits through HouseRecord up to this wrapper.
+      expect(wrapper.emitted('update:autoSort')).toEqual([[false]])
+    })
+
+    it('omits the warning when autoSort is false', async () => {
+      topHouseMatesMock.mockResolvedValue(fixedMatches)
+      const house: HouseAssignment = {
+        houseId: 'L1',
+        size: 'large',
+        capacity: 4,
+        pokemon: ['AlphaOne'],
+      }
+      const wrapper = mountWithSuggestions(house, { autoSort: false })
+
+      await wrapper.find('[data-testid="house-empty-slot"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="housemate-autosort-warning"]').exists()).toBe(false)
+      // Suggestion rows still render when the warning is absent.
+      expect(wrapper.findAll('[data-testid="housemate-option"]').length).toBeGreaterThan(0)
     })
 
     it('totally empty house renders the inline search input, emitting add-pokemon on pick', async () => {

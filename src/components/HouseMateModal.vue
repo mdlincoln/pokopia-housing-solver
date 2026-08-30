@@ -10,7 +10,7 @@ import PokemonSelect from '@/components/PokemonSelect.vue'
 import { HABITAT_VARIANT } from '@/habitats'
 import type { HouseMateMatch } from '@/queries'
 import type { HouseAssignment } from '@/solver'
-import { BBadge, BModal, BSpinner } from 'bootstrap-vue-next'
+import { BAlert, BBadge, BFormCheckbox, BModal, BSpinner } from 'bootstrap-vue-next'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -21,11 +21,15 @@ const props = defineProps<{
   // True when the occupant list is empty (items-only ranking tier): the
   // search box provides the arbitrary-pick path when ranking inputs are thin.
   showSearch: boolean
+  // Whether island-wide auto-sort is on: gates the re-sort warning rendered
+  // at the top of the modal body, whose switch flips it off via emit below.
+  autoSort: boolean
 }>()
 
 const emit = defineEmits<{
   select: [name: string]
   close: []
+  'update:autoSort': [value: boolean]
 }>()
 
 // The search input renders when requested (items-only tier) OR whenever the
@@ -58,6 +62,33 @@ function onSearchUpdate(names: string[]) {
     data-testid="housemate-modal"
     @hide="emit('close')"
   >
+    <!-- Auto-sort warning: adding a pokemon (via a ranked suggestion row or the
+         manual search below) triggers an island-wide re-sort while auto-sort is
+         on. Rendered as the modal body's first child so it sits above the
+         spinner, suggestion rows, and fallback search alike. -->
+    <BAlert
+      v-if="autoSort"
+      variant="warning"
+      :model-value="true"
+      class="housemate-autosort-warning"
+      data-testid="housemate-autosort-warning"
+    >
+      <p class="mb-2">
+        Because auto-sort is currently <strong>ON</strong>, adding this pokemon will trigger your
+        entire island to re-sort. This new pokemon will stay in this house, but auto-sort may move
+        your other, unpinned housemates to more optimal houses.
+      </p>
+      <BFormCheckbox
+        switch
+        :model-value="autoSort"
+        class="autosort-switch-item mb-0"
+        data-testid="housemate-autosort-switch"
+        @update:model-value="$emit('update:autoSort', $event === true)"
+      >
+        Switch auto-sort off before you add a Pokemon?
+      </BFormCheckbox>
+    </BAlert>
+
     <div v-if="matches === null" class="d-flex justify-content-center housemate-modal-state">
       <BSpinner label="Loading house-mate suggestions..." />
     </div>
