@@ -1,5 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
 
+// Existing suites model a returning visitor: seeding the tour's seen flag keeps
+// the first-run guided tour from auto-starting (and blocking the page) mid-test.
+// Only e2e/onboarding.spec.ts exercises the auto-start path.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('pokehousing_tour_seen', '1'))
+})
+
 async function selectPokemon(page: Page, name: string) {
   const input = page.getByPlaceholder('Add pokemon to your island...')
   await expect(input).toBeVisible({ timeout: 10_000 })

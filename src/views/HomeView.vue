@@ -14,6 +14,7 @@ import { useSavedQueries } from '@/composables/useSavedQueries'
 import { useScenarioSerialization } from '@/composables/useScenarioSerialization'
 import { useSolverPipeline } from '@/composables/useSolverPipeline'
 import { useUrlStateSync } from '@/composables/useUrlStateSync'
+import { shouldAutoStart } from '@/onboarding'
 import { loadAdjacencyMap, loadItemGraph, loadPokemonNames } from '@/queries'
 import { useCartStore } from '@/stores/cart'
 import { useHouseStore } from '@/stores/houses'
@@ -21,7 +22,12 @@ import { usePinStore } from '@/stores/pins'
 import { usePlacementStore } from '@/stores/placements'
 import { useProgressStore } from '@/stores/progress'
 import { BAlert, BButton, BCol, BRow, BSpinner } from 'bootstrap-vue-next'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+
+// Lazy-loaded guided tour: `v-if="tourActive"` plus the async import keep
+// v-onboarding (and its CSS) code-split until the tour is actually initiated.
+const OnboardingTour = defineAsyncComponent(() => import('@/components/OnboardingTour.vue'))
+const tourActive = ref(false)
 
 const cartStore = useCartStore()
 const houseStore = useHouseStore()
@@ -152,13 +158,18 @@ const { result, solving } = useSolverPipeline({
 const loading = computed(() => hydratingPokemonData.value || solving.value)
 
 // --- Display model (mode-gated) ----------------------------------------------
-const {
-  displayedHouses,
-  sortedHouses,
-  showResults,
-  displayedUnhoused,
-  islandPokemonSet,
-} = useDisplayModel({ result, selectedPokemon, pokemonData, autoSort })
+const { displayedHouses, sortedHouses, showResults, displayedUnhoused, islandPokemonSet } =
+  useDisplayModel({ result, selectedPokemon, pokemonData, autoSort })
+
+// --- Guided tour (v-onboarding) ----------------------------------------------
+// Ready once the sample island's first solve has produced houses to point at;
+// the tour component self-starts the moment this flips true.
+const tourReady = computed(() => !solving.value && displayedHouses.value.length > 0)
+
+function startTour() {
+  tourActive.value = true
+  loadSample()
+}
 
 // --- Handlers -----------------------------------------------------------------
 // Empty-slot flow (HouseRecord "+" cards / empty-house input): add the
@@ -228,6 +239,9 @@ onMounted(async () => {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
     catalogReady.value = true
+    // First visit (no seen flag) and NOT arriving via a shared URL hash →
+    // auto-start the guided tour by pre-loading the sample island.
+    if (shouldAutoStart(window.location.hash.length > 0)) startTour()
   }
 })
 
@@ -265,6 +279,8 @@ defineExpose({
   </div>
 
   <div v-if="!showCatalogLoading" class="home-theme content-stack">
+    <OnboardingTour v-if="tourActive" :is-ready="tourReady" @exited="tourActive = false" />
+
     <BAlert
       variant="info"
       data-testid="sample-island-alert"
@@ -274,6 +290,9 @@ defineExpose({
       <span class="me-2">Not sure where to start?</span>
       <BButton variant="outline-secondary" class="beach-button" @click="loadSample">
         Show a sample island
+      </BButton>
+      <BButton variant="info" class="beach-button" data-testid="take-the-tour" @click="startTour">
+        Take the tour
       </BButton>
     </BAlert>
     <BRow class="g-2 g-md-3">

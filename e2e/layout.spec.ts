@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test'
 
+// Existing suites model a returning visitor: seeding the tour's seen flag keeps
+// the first-run guided tour from auto-starting (and blocking the page) mid-test.
+// Only e2e/onboarding.spec.ts exercises the auto-start path.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('pokehousing_tour_seen', '1'))
+})
+
 test.describe('Page layout', () => {
   test('AC.1: main content column extends to meet the inline cart sidebar', async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 900 })

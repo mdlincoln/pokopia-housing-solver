@@ -27,7 +27,12 @@ function makeHost(overrides: {
       const pokemonDataRef = ref<PokemonData>(overrides.pokemonData ?? mockPokemonData)
       const autoSort = ref(overrides.autoSort ?? true)
 
-      const api = useDisplayModel({ result, selectedPokemon, pokemonData: pokemonDataRef, autoSort })
+      const api = useDisplayModel({
+        result,
+        selectedPokemon,
+        pokemonData: pokemonDataRef,
+        autoSort,
+      })
       return { api, result, selectedPokemon, pokemonData: pokemonDataRef, autoSort }
     },
     template: '<div />',
@@ -244,7 +249,7 @@ describe('useDisplayModel', () => {
 
     const sorted = wrapper.vm.api.sortedHouses.value
     // S2 (pinned) should be last
-    expect(sorted[sorted.length - 1].houseId).toBe('S2')
+    expect(sorted[sorted.length - 1]!.houseId).toBe('S2')
   })
 
   it('displayedHouseOccupants: aggregates pokemon from all houses', async () => {

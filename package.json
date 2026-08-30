@@ -31,6 +31,7 @@
     "bootstrap-vue-next": "^0.45.5",
     "pinia": "^3.0.4",
     "posthog-js": "^1.384.3",
+    "v-onboarding": "^2.12.4",
     "vue": "^3.5.35",
     "vue-router": "^5.1.0"
   },

@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test'
 
+// Existing suites model a returning visitor: seeding the tour's seen flag keeps
+// the first-run guided tour from auto-starting (and blocking the page) mid-test.
+// Only e2e/onboarding.spec.ts exercises the auto-start path.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('pokehousing_tour_seen', '1'))
+})
+
 // Empty-slot "+" cards on partially-vacant house cards open the housemate
 // suggestion modal; selecting a suggestion adds the pokemon to the island and
 // auto-pins it to that house. A totally empty house (no pokemon, no cart

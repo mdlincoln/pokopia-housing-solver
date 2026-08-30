@@ -1,5 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
 
+// Existing suites model a returning visitor: seeding the tour's seen flag keeps
+// the first-run guided tour from auto-starting (and blocking the page) mid-test.
+// Only e2e/onboarding.spec.ts exercises the auto-start path.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('pokehousing_tour_seen', '1'))
+})
+
 // Auto-sort warning inside the housemate-suggestion modal: when auto-sort is
 // ON, the modal body leads with a warning alert + inline switch; flipping the
 // switch off removes the warning, unchecks the top-card toggle, and keeps the

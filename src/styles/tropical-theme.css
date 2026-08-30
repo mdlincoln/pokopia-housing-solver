@@ -1658,3 +1658,50 @@ details[open] > .details-summary::before,
   border: 1px solid rgb(228 168 30 / 40%);
   color: #6b4700;
 }
+
+/* =========================================================================
+   Guided tour (v-onboarding) — overlay + step-card theming.
+   The library's dist/style.css is code-split with OnboardingTour.vue; here we
+   only override its custom properties and style our custom step card.
+   ========================================================================= */
+
+/* The wrapper root hosts the overlay SVG + the Popper-positioned step, so the
+   library's z-index/fill vars are scoped here rather than pushed onto :root. */
+[data-v-onboarding-wrapper] {
+  /* Above app chrome (mobile cart offcanvas ≈ 1040–1045) but below Bootstrap
+     modal backdrops (1050 / modal 1055) so the tour never sits over a modal it
+     references (e.g. the Save-island modal step 5 points at). */
+  --v-onboarding-overlay-z: 1046;
+  --v-onboarding-step-z: 1047;
+  /* Fill is the theme's own --trop-night-700 (#24506b = rgb 36 80 107) — the
+     alpha lives in the opacity var so the color never drifts from the palette. */
+  --v-onboarding-overlay-fill: rgb(36 80 107);
+  --v-onboarding-overlay-opacity: 0.72;
+  /* Arrow blends with the card background below. */
+  --v-onboarding-step-arrow-background: var(--trop-sand-50);
+}
+
+/* Themed tour step card (our custom default slot for VOnboardingStep). Kept on
+   the compact token ramp; the width caps mirror the library's own 20rem default
+   and clamp to the viewport so the card never overflows at 390px. */
+.onboarding-card {
+  width: min(20rem, calc(100vw - 2 * var(--space-3)));
+  padding: var(--space-4);
+  color: var(--trop-text);
+  background: var(--trop-sand-50);
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--trop-radius-card);
+  box-shadow: var(--trop-shadow-mid);
+}
+
+.onboarding-card__title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--trop-heading-font);
+  font-size: 1.1rem;
+  color: var(--trop-night-700);
+}
+
+.onboarding-card__description {
+  margin: 0 0 var(--space-3);
+  font-size: 0.9rem;
+}

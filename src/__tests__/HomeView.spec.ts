@@ -4,6 +4,7 @@ import {
   loadPokemonNames,
   loadSpawnHabitatsByName,
 } from '@/queries'
+import { TOUR_STORAGE_KEY } from '@/onboarding'
 import type { SolverResult } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
@@ -121,6 +122,10 @@ describe('HomeView', () => {
       )
     })
     window.location.hash = ''
+    // Model a returning visitor: the guided tour's auto-start (an e2e-level
+    // behavior) would otherwise load a sample island and hydrate attributes on
+    // mount, which several of these mount asserts below do not expect.
+    localStorage.setItem(TOUR_STORAGE_KEY, '1')
   })
 
   it('renders the form with house inputs and submit button', async () => {
