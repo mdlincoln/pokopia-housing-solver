@@ -1,5 +1,6 @@
 import HouseMateModal from '@/components/HouseMateModal.vue'
-import HouseRecord, { sameFavorites } from '@/components/HouseRecord.vue'
+import HouseRecord from '@/components/HouseRecord.vue'
+import { sameFavorites } from '@/houseRecommendations'
 import { favoriteCoverageColumnKey, recommendedItemsForHouse } from '@/queries'
 import type { AdjacencyData, HouseAssignment, PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'

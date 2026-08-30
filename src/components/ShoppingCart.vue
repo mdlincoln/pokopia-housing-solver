@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { assetPath } from '@/assetPath'
+import { useMatchMedia } from '@/composables/useMatchMedia'
 import { useCartStore } from '@/stores/cart'
 import { useHouseStore } from '@/stores/houses'
 import { useProgressStore } from '@/stores/progress'
@@ -11,7 +12,7 @@ import {
   BListGroupItem,
   BOffcanvas,
 } from 'bootstrap-vue-next'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 
 const cart = useCartStore()
 const progressStore = useProgressStore()
@@ -35,33 +36,17 @@ const houseStore = useHouseStore()
 const showMobileCart = ref(false)
 
 // Query kept aligned with Bootstrap Vue Next's own smallerOrEqual('lg')
-// (max-width: 992px) to avoid a fractional-pixel boundary disagreement.
-//
-// Initialized synchronously — not in onMounted — so a below-lg page load never
-// spends a frame with isBelowLg=false: during that window the model would be
-// `true`, and the (invisible, still-closed) offcanvas would install its focus
-// trap and steal focus back from any control the user clicks, swallowing
+// (max-width: 992px) to avoid a fractional-pixel boundary disagreement. The
+// composable initializes the ref synchronously via the caller-supplied
+// `initial` value (computed here, not in onMounted) so a below-lg page load
+// never spends a frame with isBelowLg=false: during that window the model would
+// be `true`, and the (invisible, still-closed) offcanvas would install its
+// focus trap and steal focus back from any control the user clicks, swallowing
 // keyboard input on phones until the trap tears down.
-const isBelowLg = ref(
+const isBelowLg = useMatchMedia(
+  '(max-width: 992px)',
   typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 992px)').matches,
 )
-let mediaQuery: MediaQueryList | undefined
-
-function syncBreakpoint(event?: MediaQueryListEvent) {
-  isBelowLg.value = event ? event.matches : (mediaQuery?.matches ?? false)
-}
-
-onMounted(() => {
-  if (typeof window.matchMedia === 'function') {
-    mediaQuery = window.matchMedia('(max-width: 992px)')
-    syncBreakpoint()
-    mediaQuery.addEventListener('change', syncBreakpoint)
-  }
-})
-
-onBeforeUnmount(() => {
-  mediaQuery?.removeEventListener('change', syncBreakpoint)
-})
 
 const offcanvasId = 'shopping-cart-offcanvas'
 
