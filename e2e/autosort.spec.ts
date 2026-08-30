@@ -79,14 +79,19 @@ test.describe('Auto-sort toggle', () => {
     // immediately (pinned overlay), not in the warning.
     await addViaHouseInput(page, 'Bulbasaur')
     await expect(house).toContainText('Bulbasaur', { timeout: 10_000 })
-    await expect(page.getByTestId('unhoused')).toHaveCount(0)
+    // Auto-sort off → the alert stays visible (persistent drop target, empty).
+    await expect(page.getByTestId('unhoused')).toBeVisible()
+    await expect(page.getByTestId('unhoused-empty-hint')).toBeVisible()
+    await expect(
+      page.getByTestId('unhoused-pokemon-grid').getByTestId('pokemon-card'),
+    ).toHaveCount(0)
 
     // A pokemon selected only in the island search (never pinned to a house)
     // stays in the OFF warning.
     await selectPokemon(page, 'Ivysaur')
     const unhoused = page.getByTestId('unhoused')
-    await expect(unhoused).toContainText('Auto-sort is off')
-    await expect(unhoused).toContainText("Turn on 'Automatically sort Pokemon'")
+    await expect(unhoused).toContainText('Unhoused pokemon')
+    await expect(unhoused).toContainText('Drag a Pokémon from a house')
     await expect(unhoused).toContainText('Ivysaur')
     await expect(unhoused).not.toContainText('Bulbasaur')
 
@@ -110,7 +115,7 @@ test.describe('Auto-sort toggle', () => {
     // Bulbasaur's pin survives the reload via the hash → still in its house.
     await expect(restoredHouse).toContainText('Bulbasaur', { timeout: 30_000 })
     const restoredUnhoused = page.getByTestId('unhoused')
-    await expect(restoredUnhoused).toContainText('Auto-sort is off')
+    await expect(restoredUnhoused).toContainText('Unhoused pokemon')
     await expect(restoredUnhoused).toContainText('Ivysaur')
 
     // AC.6: flipping back on re-solves; both end up in the single medium house
@@ -159,7 +164,12 @@ test.describe('Auto-sort toggle', () => {
     // The prior arrangement is untouched AND the newcomer shows in its house.
     await expect(house).toContainText('Bulbasaur')
     await expect(house).toContainText(addedName, { timeout: 10_000 })
-    await expect(page.getByTestId('unhoused')).toHaveCount(0)
+    // Auto-sort off → the persistent drop target is still present, just empty.
+    await expect(page.getByTestId('unhoused')).toBeVisible()
+    await expect(page.getByTestId('unhoused-empty-hint')).toBeVisible()
+    await expect(
+      page.getByTestId('unhoused-pokemon-grid').getByTestId('pokemon-card'),
+    ).toHaveCount(0)
   })
 
   // AC.10 — the four-card row keeps the no-horizontal-overflow contract at

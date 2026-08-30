@@ -881,11 +881,50 @@ details[open] > .details-summary::before,
 
 /* Wrapping card grid: one card per row on phones (≥392px content box), flowing
    3–4 per row at desktop widths. Replaces Bootstrap's non-wrapping .card-group,
-   which squeezed four pokemon into a single squeezed row at 390px. */
+   which squeezed four pokemon into a single squeezed row at 390px. The unhoused
+   alert's card container is a *denser* variant (`.unhoused-grid`, never
+   `.pokemon-grid`) so broad `.pokemon-grid` selectors (e.g.
+   e2e/compactness.spec.ts) keep matching only house grids. Unhoused alert cards
+   omit the spawn-habitat thumbnails and live in the narrower alert body, so they
+   use a smaller 10rem minimum track — fitting 3+ per row in the same width that
+   a 15rem house card would only fit 2 of. */
 .pokemon-grid {
   display: grid;
   gap: var(--space-2);
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+}
+
+.unhoused-grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+}
+
+/* BAlert wraps the default slot in a `.d-flex.gap-2 > .alert-body`. The body is
+   a flex item with `flex: 0 1 auto`, so it shrinks to its content instead of
+   filling the row — the card grid was capping out at ~529px inside a full-width
+   alert. Let the body grow (and shrink within the flex line) so the grid uses
+   the whole alert width. Scoped to the unhoused alert so other BAlerts are
+   unaffected. */
+[data-testid='unhoused'] .alert-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Empty-state placeholder for the persistent OFF-mode drop target: keeps the
+   "Unhoused pokemon" area visibly sized (and droppable) even before any pokemon
+   are dragged into it, instead of collapsing to zero height. */
+.unhoused-empty-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--space-4) var(--space-3);
+  color: var(--trop-text);
+  font-size: 0.85rem;
+  text-align: center;
+  opacity: 0.75;
+  border: 1.5px dashed var(--trop-coral-300);
+  border-radius: var(--trop-radius-pill);
+  background: rgb(255 255 255 / 55%);
 }
 
 /* Empty-slot "+" card: a muted, dashed sibling of PokemonCard inside the
@@ -1397,6 +1436,124 @@ details[open] > .details-summary::before,
 .pin-icon:hover {
   color: inherit;
   opacity: 0.75;
+}
+
+/* ── Drag & drop ─────────────────────────────────────── */
+/*
+ * Pointer-only enhancement: while auto-sort is OFF pokemon cards can be
+ * dragged between houses and the unhoused warning. Drags are session-only and
+ * never written to pins or the URL/saved islands. The keyboard path (lock +
+ * add/remove flows) is untouched.
+ */
+
+/* Decorative drag handle next to the lock button. The glyph is aria-hidden; the
+   card's accessible-name surface stays the pokemon name + lock button. */
+.pokemon-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px; /* WCAG 2.5.8 visual-domain affordance floor */
+  min-height: 24px;
+  margin-left: var(--space-1);
+  color: #3d7d93;
+  opacity: 0.72;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: grab;
+}
+
+/* The card root no longer paints a pointer cursor: the grab/denied affordance
+   lives on the move-arrow handle alone, so hovering the card body stays the
+   default arrow even when auto-sort is off. `.pokemon-card--draggable` is still
+   applied to the root (tests + future hooks) but is cursor-inert. */
+.pokemon-card--draggable {
+  cursor: default;
+}
+
+/* While auto-sort is ON the handle is still shown as a visual affordance but
+   reads as unavailable: faded, non-grab cursor, and a tooltip explains that
+   manual moves require auto-sort to be off. */
+.pokemon-drag-handle--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Fixed tooltip anchored above the disabled move-arrow handle. `position: fixed`
+   escapes the card's overflow-hidden so the wrapping explanation always displays
+   instead of being clipped like a native `title` would be. The handle is
+   aria-hidden, so this is a visual affordance only; drag stays pointer-only. */
+.pokemon-drag-tooltip {
+  position: fixed;
+  transform: translate(-50%, calc(-100% - 8px));
+  z-index: 1100;
+  pointer-events: none;
+  max-width: 14rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--trop-radius-pill);
+  background: var(--trop-night-700);
+  color: var(--trop-sand-50);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  box-shadow: var(--trop-shadow-mid);
+}
+
+/* The dragged source is hidden from hit-testing (so elementsFromPoint skips it)
+   while pointer capture keeps move/up flowing to it. */
+.pokemon-card--dragging {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Drop zones (houses + the unhoused alert). `.drop-zone` itself is hit-testing
+   only; the --over modifier paints the live target while a drag hovers it. */
+.drop-zone--over {
+  border-color: var(--trop-ocean-500) !important;
+  box-shadow:
+    inset 0 0 0 2px var(--trop-ocean-500),
+    var(--trop-shadow-soft);
+  background-color: rgb(197 242 255 / 38%);
+}
+
+/* A full house is a valid drop-target width but rejects placements; the denied
+   cursor is intentionally NOT set here — it would cascade over every pokemon card
+   in the (full) house. The move-arrow handle already shows `not-allowed` while
+   auto-sort is ON, which is the only place that cursor belongs. The coral reject
+   highlight below is the only full-house visual. */
+
+/* A full house is still hit-testable while a drag hovers it, but it must read
+   as an invalid target (coral reject) rather than the valid --over highlight. */
+.drop-zone--full.drop-zone--over {
+  border-color: var(--trop-coral-500) !important;
+  box-shadow:
+    inset 0 0 0 2px var(--trop-coral-500),
+    var(--trop-shadow-soft);
+  background-color: rgb(255 179 168 / 30%);
+}
+
+/* Fixed ghost label that follows the pointer during a drag. pointer-events:none
+   so it never interferes with hit-testing or blocks the drop. */
+.pokemon-drag-ghost {
+  position: fixed;
+  z-index: 1090;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--trop-ocean-500);
+  border-radius: var(--trop-radius-pill);
+  background: rgb(255 255 255 / 96%);
+  box-shadow: var(--trop-shadow-mid);
+  color: #1f657b;
+  font-weight: 700;
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drop-zone--over {
+    transition: none;
+  }
 }
 
 /* ── Progress Action Checkboxes ──────────────────────── */

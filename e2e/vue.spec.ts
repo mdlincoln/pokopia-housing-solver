@@ -91,8 +91,7 @@ test.describe('Homepage', () => {
     // Wait for the solve that includes all selected pokemon; 1 small house can only hold 1
     const unhoused = page.getByTestId('unhoused')
     await expect(unhoused).toBeVisible({ timeout: 30_000 })
-    const unhousedItems = unhoused.locator('li')
-    await expect(unhousedItems).toHaveCount(2)
+    await expect(unhoused.getByTestId('pokemon-card')).toHaveCount(2)
   })
 
   test('solves with no pokemon selected', async ({ page }) => {
@@ -160,7 +159,11 @@ test.describe('Homepage', () => {
     // Wait for the solve including all 3 pokemon to complete
     await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
 
-    const habitatBadges = page.getByTestId('habitat-badge')
+    // Two housed pokemon render their shared habitat badge on the house card;
+    // the unhoused member's card (in the warning) is counted separately.
+    const habitatBadges = page
+      .getByTestId('house-card')
+      .getByTestId('habitat-badge')
     await expect(habitatBadges).toHaveCount(2)
   })
 

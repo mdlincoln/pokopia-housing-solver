@@ -317,4 +317,136 @@ describe('PokemonCard', () => {
       expect(thumbs.element.previousElementSibling!.contains(badge.element)).toBe(true)
     })
   })
+
+  describe('drag awareness', () => {
+    const baseProps = { name: 'Bulbasaur', image: 'test.png', favorites: [] }
+
+    it('shows the drag handle when dragEnabled and unlocked (house context)', () => {
+      const wrapper = mount(PokemonCard, {
+        props: { ...baseProps, dragEnabled: true, checked: false, context: 'house' },
+      })
+      const handle = wrapper.find('.pokemon-drag-handle')
+      expect(handle.exists()).toBe(true)
+      expect(handle.attributes('aria-hidden')).toBe('true')
+      expect(handle.find('i.bi-arrows-move').exists()).toBe(true)
+    })
+
+    it('shows the drag handle in the unhoused context when dragEnabled', () => {
+      const wrapper = mount(PokemonCard, {
+        props: { ...baseProps, dragEnabled: true, context: 'unhoused' },
+      })
+      expect(wrapper.find('.pokemon-drag-handle').exists()).toBe(true)
+    })
+
+    it('shows a disabled handle that reveals a tooltip on hover when auto-sort is on', async () => {
+      const wrapper = mount(PokemonCard, {
+        props: { ...baseProps, dragEnabled: false, checked: false, context: 'house' },
+      })
+      const handle = wrapper.find('.pokemon-drag-handle')
+      expect(handle.exists()).toBe(true)
+      expect(handle.classes()).toContain('pokemon-drag-handle--disabled')
+      // Tooltip only appears once the disabled handle is hovered, and no native
+      // `title` is used (it could be cut off by the card's clipping).
+      expect(handle.attributes('title')).toBeUndefined()
+      expect(wrapper.find('.pokemon-drag-tooltip').exists()).toBe(false)
+      await handle.trigger('mouseenter')
+      const tip = wrapper.find('.pokemon-drag-tooltip')
+      expect(tip.exists()).toBe(true)
+      expect(tip.text()).toContain('only be moved manually when Auto-sort is off')
+      await handle.trigger('mouseleave')
+      expect(wrapper.find('.pokemon-drag-tooltip').exists()).toBe(false)
+      // Not draggable, so the gesture is inert in HomeView.
+      expect(wrapper.attributes('data-draggable')).toBe('false')
+      expect(wrapper.classes()).not.toContain('pokemon-card--draggable')
+    })
+
+    it('shows an enabled handle with no tooltip and the grab affordance while off', async () => {
+      const wrapper = mount(PokemonCard, {
+        props: { ...baseProps, dragEnabled: true, checked: false, context: 'house' },
+      })
+      const handle = wrapper.find('.pokemon-drag-handle')
+      expect(handle.exists()).toBe(true)
+      expect(handle.classes()).not.toContain('pokemon-drag-handle--disabled')
+      await handle.trigger('mouseenter')
+      expect(wrapper.find('.pokemon-drag-tooltip').exists()).toBe(false)
+      expect(wrapper.attributes('data-draggable')).toBe('true')
+      expect(wrapper.classes()).toContain('pokemon-card--draggable')
+    })
+
+    it('hides the drag handle for a locked (checked) card', () => {
+      const wrapper = mount(PokemonCard, {
+        props: { ...baseProps, dragEnabled: true, checked: true, context: 'house' },
+      })
+      expect(wrapper.find('.pokemon-drag-handle').exists()).toBe(false)
+      // The card root still carries the source attrs but reports non-draggable.
+      expect(wrapper.attributes('data-draggable')).toBe('false')
+    })
+
+    it('marks the card root as a drag source with the expected attributes (house context)', () => {
+      const wrapper = mount(PokemonCard, {
+        props: {
+          ...baseProps,
+          dragEnabled: true,
+          checked: false,
+          context: 'house',
+          houseId: 'M1',
+        },
+      })
+      expect(wrapper.attributes('data-drag-source')).toBeDefined()
+      expect(wrapper.attributes('data-drag-name')).toBe('Bulbasaur')
+      expect(wrapper.attributes('data-from-house')).toBe('M1')
+      expect(wrapper.attributes('data-draggable')).toBe('true')
+      expect(wrapper.attributes('data-testid')).toBe('pokemon-card')
+      expect(wrapper.classes()).toContain('pokemon-card--draggable')
+    })
+
+    it('sets data-from-house empty and draggable true in the unhoused context', () => {
+      const wrapper = mount(PokemonCard, {
+        props: { ...baseProps, dragEnabled: true, context: 'unhoused', houseId: null },
+      })
+      expect(wrapper.attributes('data-from-house')).toBe('')
+      expect(wrapper.attributes('data-draggable')).toBe('true')
+    })
+
+    it('keeps the lock button in house context but drops it in the unhoused context', () => {
+      const house = mount(PokemonCard, {
+        props: { ...baseProps, context: 'house' },
+      })
+      expect(house.find('[data-testid="progress-checkbox-pokemon"]').exists()).toBe(true)
+
+      const unhoused = mount(PokemonCard, {
+        props: { ...baseProps, context: 'unhoused' },
+      })
+      expect(unhoused.find('[data-testid="progress-checkbox-pokemon"]').exists()).toBe(false)
+    })
+
+    it('renders favorites as non-buttons in the unhoused context', () => {
+      const house = mount(PokemonCard, {
+        props: { ...baseProps, favorites: ['exercise'], context: 'house' },
+      })
+      expect(house.find('[data-testid="fave-badge"]').element.tagName).toBe('BUTTON')
+
+      const unhoused = mount(PokemonCard, {
+        props: { ...baseProps, favorites: ['exercise'], context: 'unhoused' },
+      })
+      expect(unhoused.find('[data-testid="fave-badge"]').exists()).toBe(false)
+      const span = unhoused.find('td .favorite-need')
+      expect(span.exists()).toBe(true)
+      expect(span.element.tagName).toBe('SPAN')
+      expect(span.text()).toBe('exercise')
+    })
+
+    it('omits spawn-habitat thumbnails in the unhoused context', () => {
+      const spawnHabitats = [{ id: 1, name: 'Tall Grass', image: 'images/habitats/1.png' }]
+      const unhoused = mount(PokemonCard, {
+        props: { ...baseProps, context: 'unhoused', spawnHabitats },
+      })
+      expect(unhoused.find('[data-testid="habitat-thumbs"]').exists()).toBe(false)
+
+      const house = mount(PokemonCard, {
+        props: { ...baseProps, context: 'house', spawnHabitats },
+      })
+      expect(house.find('[data-testid="habitat-thumbs"]').exists()).toBe(true)
+    })
+  })
 })

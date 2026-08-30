@@ -7,6 +7,7 @@ import {
 import type { SolverResult } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
+import { usePlacementStore } from '@/stores/placements'
 import { useProgressStore } from '@/stores/progress'
 import HomeView from '@/views/HomeView.vue'
 import { flushPromises, mount } from '@vue/test-utils'
@@ -738,7 +739,7 @@ describe('HomeView', () => {
     expect(banner.exists()).toBe(true)
     expect(banner.text()).toContain('Not enough housing')
     expect(banner.text()).toContain('Add houses above')
-    expect(banner.findAll('li')).toHaveLength(2)
+    expect(banner.findAll('[data-testid="pokemon-card"]')).toHaveLength(2)
   })
 
   it('uses island vocabulary for the save/restore UI', async () => {
@@ -991,8 +992,28 @@ describe('HomeView', () => {
       expect(card.exists()).toBe(true)
       expect(card.text()).toContain('AlphaOne')
 
-      // All selected pokemon are housed — no unassigned warning.
-      expect(wrapper.find('[data-testid="unhoused"]').exists()).toBe(false)
+      // Auto-sort off → the "Unhoused pokemon" area stays visible (persistent
+      // drop target) even when every pokemon is housed, showing the empty hint.
+      const unhoused = wrapper.find('[data-testid="unhoused"]')
+      expect(unhoused.exists()).toBe(true)
+      expect(unhoused.text()).toContain('Unhoused pokemon')
+      expect(unhoused.find('[data-testid="unhoused-empty-hint"]').exists()).toBe(true)
+      expect(unhoused.findAll('[data-testid="pokemon-card"]')).toHaveLength(0)
+    })
+
+    // The OFF "Unhoused pokemon" area renders even when there is nothing to
+    // unhouse (no houses, no selection) — so it is always a visible drop target
+    // while auto-sort is off.
+    it('keeps the unhoused area visible as a drop target while off, even empty', async () => {
+      const wrapper = await mountHome()
+      wrapper.vm.autoSort = false
+      await flushPromises()
+
+      const unhoused = wrapper.find('[data-testid="unhoused"]')
+      expect(unhoused.exists()).toBe(true)
+      expect(unhoused.text()).toContain('Unhoused pokemon')
+      expect(unhoused.find('[data-testid="unhoused-empty-hint"]').exists()).toBe(true)
+      expect(unhoused.findAll('[data-testid="pokemon-card"]')).toHaveLength(0)
     })
 
     // A pokemon selected only in the island search (never pinned to a house)
@@ -1016,7 +1037,7 @@ describe('HomeView', () => {
       expect(house.text()).not.toContain('BetaOne')
       const unhoused = wrapper.find('[data-testid="unhoused"]')
       expect(unhoused.exists()).toBe(true)
-      expect(unhoused.text()).toContain('Auto-sort is off')
+      expect(unhoused.text()).toContain('Unhoused pokemon')
       expect(unhoused.text()).toContain('BetaOne')
       expect(unhoused.text()).not.toContain('AlphaOne')
     })
@@ -1196,8 +1217,12 @@ describe('HomeView', () => {
       // The explicitly-added newcomer shows in its house immediately.
       expect(card.text()).toContain('BetaOne')
 
-      // All three are placed — no unassigned warning.
-      expect(wrapper.find('[data-testid="unhoused"]').exists()).toBe(false)
+      // Auto-sort off → the persistent "Unhoused pokemon" area is still present
+      // (empty hint), just containing none of the placed pokemon.
+      const unhoused = wrapper.find('[data-testid="unhoused"]')
+      expect(unhoused.exists()).toBe(true)
+      expect(unhoused.find('[data-testid="unhoused-empty-hint"]').exists()).toBe(true)
+      expect(unhoused.findAll('[data-testid="pokemon-card"]')).toHaveLength(0)
     })
 
     // AC.12 — count changes while OFF (with a prior solve) mutate the
@@ -1273,8 +1298,114 @@ describe('HomeView', () => {
       // Pinned houses sort last (S2 is pinned via pinHouse).
       expect(cards[0]!.text()).toContain('AlphaOne')
       expect(cards[1]!.text()).toContain('AlphaTwo')
-      // Both selected/assigned pokemon are covered by houses; no warning.
-      expect(wrapper.find('[data-testid="unhoused"]').exists()).toBe(false)
+      // Both selected/assigned pokemon are covered by houses; the persistent
+      // OFF "Unhoused pokemon" area is present but empty (drop target).
+      const unhoused = wrapper.find('[data-testid="unhoused"]')
+      expect(unhoused.exists()).toBe(true)
+      expect(unhoused.find('[data-testid="unhoused-empty-hint"]').exists()).toBe(true)
+      expect(unhoused.findAll('[data-testid="pokemon-card"]')).toHaveLength(0)
+    })
+
+    // AC.2 — the placement override relocates a pokemon between houses while
+    // OFF without dispatching a solve.
+    it('relocates a dragged pokemon between houses via the placement store while off', async () => {
+      mockSolve.mockResolvedValue({
+        houses: [
+          { houseId: 'M1', size: 'medium', capacity: 2, pokemon: ['AlphaOne'] },
+          { houseId: 'L1', size: 'large', capacity: 4, pokemon: ['AlphaTwo'] },
+        ],
+        unhoused: [],
+      })
+
+      const wrapper = await mountHome()
+      wrapper.vm.medium = 1
+      wrapper.vm.large = 1
+      wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo']
+      await flushPromises()
+      expect(mockSolve).toHaveBeenCalledTimes(1)
+
+      wrapper.vm.autoSort = false
+      await flushPromises()
+
+      usePlacementStore().set('AlphaTwo', 'M1')
+      await flushPromises()
+
+      expect(mockSolve).toHaveBeenCalledTimes(1)
+      const cards = wrapper.findAll('[data-testid="house-card"]')
+      const m1 = cards.find((c) => c.text().includes('medium house M1'))!
+      const l1 = cards.find((c) => c.text().includes('large house L1'))!
+      expect(m1.text()).toContain('AlphaTwo')
+      expect(m1.text()).toContain('AlphaOne')
+      expect(l1.text()).not.toContain('AlphaTwo')
+      // No pokemon are unhoused, but the persistent OFF area is still present.
+      const unhoused = wrapper.find('[data-testid="unhoused"]')
+      expect(unhoused.exists()).toBe(true)
+      expect(unhoused.find('[data-testid="unhoused-empty-hint"]').exists()).toBe(true)
+      expect(unhoused.findAll('[data-testid="pokemon-card"]')).toHaveLength(0)
+    })
+
+    // AC.3 — set(name, null) moves a housed pokemon into the warning while OFF.
+    it('moves a housed pokemon into the warning via set(name, null) while off', async () => {
+      mockSolve.mockResolvedValue({
+        houses: [
+          { houseId: 'S1', size: 'small', capacity: 1, pokemon: ['AlphaOne'] },
+          { houseId: 'S2', size: 'small', capacity: 1, pokemon: ['AlphaTwo'] },
+        ],
+        unhoused: [],
+      })
+
+      const wrapper = await mountHome()
+      wrapper.vm.small = 2
+      wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo']
+      await flushPromises()
+      wrapper.vm.autoSort = false
+      await flushPromises()
+
+      usePlacementStore().set('AlphaOne', null)
+      await flushPromises()
+
+      expect(mockSolve).toHaveBeenCalledTimes(1)
+      const unhoused = wrapper.find('[data-testid="unhoused"]')
+      expect(unhoused.exists()).toBe(true)
+      expect(unhoused.text()).toContain('AlphaOne')
+      expect(unhoused.text()).not.toContain('AlphaTwo')
+      // S1 is now empty; S2 still holds AlphaTwo.
+      const cards = wrapper.findAll('[data-testid="house-card"]')
+      expect(cards.find((c) => c.text().includes('small house S2'))!.text()).toContain('AlphaTwo')
+    })
+
+    // AC.6 — flipping back on clears the session-only placement override.
+    it('clears the placement override when auto-sort flips back on', async () => {
+      const wrapper = await mountHome()
+      const placementStore = usePlacementStore()
+
+      wrapper.vm.autoSort = false
+      await nextTick()
+      placementStore.set('AlphaOne', 'M1')
+      expect(placementStore.placements.size).toBe(1)
+
+      wrapper.vm.autoSort = true
+      await nextTick()
+      await flushPromises()
+      expect(placementStore.placements.size).toBe(0)
+    })
+
+    // AC.4 — the unhoused warning renders one PokemonCard per member.
+    it('renders unhoused members as pokemon cards', async () => {
+      const wrapper = await mountHome()
+      wrapper.vm.autoSort = false
+      wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo']
+      await flushPromises()
+
+      const unhoused = wrapper.find('[data-testid="unhoused"]')
+      expect(unhoused.exists()).toBe(true)
+      expect(unhoused.find('[data-testid="unhoused-pokemon-grid"]').exists()).toBe(true)
+      const cards = unhoused.findAll('[data-testid="pokemon-card"]')
+      expect(cards).toHaveLength(2)
+      expect(cards[0]!.text()).toContain('AlphaOne')
+      expect(cards[1]!.text()).toContain('AlphaTwo')
+      // The unhoused variant has no pin button.
+      expect(unhoused.find('[data-testid="progress-checkbox-pokemon"]').exists()).toBe(false)
     })
   })
 })

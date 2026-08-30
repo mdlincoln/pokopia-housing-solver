@@ -1791,7 +1791,7 @@ describe('HouseRecord', () => {
       const input = picker.find('input.pokemon-search')
       expect(input.exists()).toBe(true)
 
-      await input.trigger('focus')
+      await input.trigger('click')
       await input.setValue('beta')
       await input.trigger('keydown', { key: 'Enter' })
 

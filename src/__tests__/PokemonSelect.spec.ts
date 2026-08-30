@@ -31,7 +31,7 @@ describe('PokemonSelect combobox semantics (AC.6)', () => {
 
     expect(input.attributes('aria-expanded')).toBe('false')
 
-    await input.trigger('focus')
+    await input.trigger('click')
     expect(input.attributes('aria-expanded')).toBe('true')
     expect(wrapper.find('[role="listbox"]').exists()).toBe(true)
 
@@ -47,7 +47,7 @@ describe('PokemonSelect combobox semantics (AC.6)', () => {
     const wrapper = mountSelect()
     const input = wrapper.find('input.pokemon-search')
 
-    await input.trigger('focus')
+    await input.trigger('click')
     expect(input.attributes('aria-expanded')).toBe('true')
 
     await input.setValue('zzz')
@@ -59,7 +59,7 @@ describe('PokemonSelect combobox semantics (AC.6)', () => {
     const wrapper = mountSelect()
     const input = wrapper.find('input.pokemon-search')
 
-    await input.trigger('focus')
+    await input.trigger('click')
     const listbox = wrapper.find('[role="listbox"]')
     expect(listbox.exists()).toBe(true)
     expect(listbox.attributes('id')).toBe(input.attributes('aria-controls'))
@@ -91,7 +91,7 @@ describe('PokemonSelect combobox semantics (AC.6)', () => {
     expect(status.text()).toBe('')
 
     const input = wrapper.find('input.pokemon-search')
-    await input.trigger('focus')
+    await input.trigger('click')
     expect(status.text()).toBe('3 Pokémon match')
 
     await input.setValue('ab')
@@ -107,7 +107,7 @@ describe('PokemonSelect combobox semantics (AC.6)', () => {
     })
     const input = wrapper.find('input.pokemon-search')
 
-    await input.trigger('focus')
+    await input.trigger('click')
     expect(wrapper.findAll('[role="option"]').map((o) => o.text())).toEqual(['Absol', 'Bulbasaur'])
 
     // Excluded names stay hidden even when the query would match them, and
@@ -121,7 +121,7 @@ describe('PokemonSelect combobox semantics (AC.6)', () => {
     const wrapper = mountSelect()
     const input = wrapper.find('input.pokemon-search')
 
-    await input.trigger('focus')
+    await input.trigger('click')
     await input.trigger('keydown', { key: 'ArrowDown' })
     await input.trigger('keydown', { key: 'ArrowDown' })
     await input.trigger('keydown', { key: 'Enter' })

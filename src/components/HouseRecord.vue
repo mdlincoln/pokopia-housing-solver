@@ -58,12 +58,21 @@ const props = withDefaults(
     // Null/undefined until the adjacency payload lands; suggestion buttons
     // stay disabled until then because conflict exclusion requires the matrix.
     adjacencyData?: AdjacencyData | null
+    // Drag awareness: marks the card root as a house drop zone and forwards the
+    // drag affordance to its PokemonCards. Purely presentational — HomeView owns
+    // the pointer gesture and the placement override.
+    dragEnabled?: boolean
+    dropOver?: boolean
   }>(),
   {
     allPokemonNames: () => [],
     islandPokemon: () => new Set<string>(),
+    dragEnabled: false,
+    dropOver: false,
   },
 )
+
+const isFull = computed(() => props.house.pokemon.length >= props.house.capacity)
 
 // Adding a pokemon is OWNED by HomeView (selection + auto-pin + re-solve);
 // HouseRecord only reports the intent.
@@ -526,10 +535,17 @@ watchEffect(() => {
 
 <template>
   <BListGroupItem
-    class="house-card"
+    class="house-card drop-zone"
     data-testid="house-card"
+    data-drop-zone="house"
+    :data-drop-house="house.houseId"
     :class="[
-      { 'checked-off': pinStore.isHousePinned(house.houseId), 'fully-fulfilled': allFulfilled },
+      {
+        'checked-off': pinStore.isHousePinned(house.houseId),
+        'fully-fulfilled': allFulfilled,
+        'drop-zone--over': dropOver,
+        'drop-zone--full': isFull,
+      },
     ]"
   >
     <h3 class="mb-1 house-title">
@@ -563,6 +579,9 @@ watchEffect(() => {
         :checked="pinStore.isPokemonPinned(house.houseId, name)"
         :fulfilled-favorites="fulfilledFavorites"
         :spawn-habitats="spawnHabitatsByName?.[name] ?? []"
+        :drag-enabled="dragEnabled"
+        :house-id="house.houseId"
+        context="house"
         @toggle="pinStore.togglePokemonPin(house.houseId, name)"
         @favorite-clicked="onFavoriteClick"
         @habitat-clicked="onHabitatClick"

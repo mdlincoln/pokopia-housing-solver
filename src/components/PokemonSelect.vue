@@ -91,7 +91,11 @@ function onInput() {
   highlightIndex.value = 0
 }
 
-function onFocus() {
+// The dropdown expands only on deliberate user interaction — clicking the field
+// (or typing / pressing ArrowDown). It must NOT open on mere focus: during a
+// drag that sweeps across an empty house's inline picker, focus transfer would
+// otherwise expand the list when the user only meant to move a Pokemon.
+function onOpen() {
   isOpen.value = true
 }
 
@@ -118,7 +122,7 @@ function onBlur() {
         :aria-activedescendant="activeDescendantId"
         @input="onInput"
         @keydown="onKeydown"
-        @focus="onFocus"
+        @click="onOpen"
         @blur="onBlur"
       />
       <span class="visually-hidden" aria-live="polite" data-testid="pokemon-search-status">{{
