@@ -117,9 +117,10 @@ body {
   }
 }
 
-/* Unified card header for the three configuration cards: title on the left,
-   the card's primary action button on the right, identical padding and a
-   soft divider from the body. All three cards carry `.config-card-header`. */
+/* Unified card header for the four configuration cards: title on the left,
+   the card's primary action button on the right (the auto-sort card has none —
+   its switch is the control, rendered in the body), identical padding and a
+   soft divider from the body. All four cards carry `.config-card-header`. */
 .card-header.config-card-header {
   display: flex;
   align-items: center;
@@ -147,7 +148,7 @@ body {
 }
 
 /* Cards have no intrinsic margins — the row gutters (g-2/g-md-3) provide
-   identical spacing for all three. */
+   identical spacing for all four. */
 .config-card {
   margin: 0;
 }
@@ -159,6 +160,39 @@ body {
    button out beyond the rounded capsule (it looked clipped/too narrow). */
 .house-count-input {
   width: 8.5rem;
+}
+
+/* AutoSort card switch: the card's only control, so it is scaled up from
+   Bootstrap's default and pinned at/above the WCAG 2.5.8 24px tap-target floor
+   (1.5em at the 1rem body font). */
+.autosort-switch-item .form-check-input {
+  width: 2.75em;
+  height: 1.5em;
+  min-width: 24px;
+  min-height: 24px;
+  margin-top: 0;
+  cursor: pointer;
+}
+
+.autosort-switch-item .form-check-label {
+  cursor: pointer;
+}
+
+.autosort-switch-item .form-check-input:focus-visible {
+  border-color: var(--trop-ocean-500);
+  box-shadow: 0 0 0 var(--space-1) rgb(43 169 190 / 35%);
+}
+
+/* Off-state accent: the card reads as deliberately paused — a coral border on
+   the card plus a coral-tinted unchecked switch. Only the card root carries
+   the `.autosort-card--off` toggle (template structural :class). */
+.autosort-card--off {
+  border-color: rgb(255 127 114 / 60%);
+}
+
+.autosort-card--off .autosort-switch-item .form-check-input:not(:checked) {
+  border-color: var(--trop-coral-500);
+  background-color: rgb(255 127 114 / 25%);
 }
 
 /* Cart list rows collapse their default Bootstrap .list-group-item block

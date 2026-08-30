@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AutoSortCard from '@/components/AutoSortCard.vue'
 import HouseRecord from '@/components/HouseRecord.vue'
 import HousesConfigCard from '@/components/HousesConfigCard.vue'
 import PokemonConfigCard from '@/components/PokemonConfigCard.vue'
@@ -59,24 +60,14 @@ const hydratedPokemonReady = computed(() => {
 
   return true
 })
-// Guard: only render results when all pokemon referenced by the result
-// actually exist in pokemonData. This prevents a race condition where Vue's
-// async DOM update batch causes the old <section> to briefly re-render with
-// stale house assignments against pruned pokemonData (e.g. during deselection,
-// URL restore, or clearAll). The solver validates names at solve-time but the
-// template accesses them at render-time — between those two moments,
-// pokemonData can be pruned by hydration while the result is still displayed.
-const resultsSafeToRender = computed(() => {
-  if (!result.value) return false
-  for (const house of result.value.houses) {
-    for (const name of house.pokemon) {
-      if (!pokemonData.value[name]) return false
-    }
-  }
-  return true
-})
-
 const selectedPokemon = ref<string[]>([])
+
+// "Automatically sort Pokemon" toggle (AutoSortCard). While ON the reactive
+// solve watch behaves exactly as before; while OFF the watch gates the worker
+// dispatch (structural house clamp/reconcile still run) and the display model
+// below switches to a registry-authoritative stale view. Persisted in the URL
+// hash and saved islands via SharedState.autoSort (missing key restores true).
+const autoSort = ref(true)
 
 // All island pokemon as a Set, built once per selection change so every
 // HouseRecord can pass it straight to topHouseMates / PokemonSelect as the
@@ -125,14 +116,93 @@ const restoringQuery = ref(false)
 const showCatalogLoading = computed(() => !catalogReady.value || restoringQuery.value)
 const error = ref('')
 const result = ref<SolverResult | null>(null)
+
+// Display model (mode-gated):
+//   ON  — exactly the solver-result view: the previous result stays visible
+//         across solves (fading via results-pending) and any registry drift is
+//         reconciled by the solve that lands.
+//   OFF — registry-authoritative: house adds/removes apply live from the
+//         registry. Occupants come from explicit pinned placements (a pokemon
+//         added to a house while OFF is pinned to it and shows there
+//         immediately) overlaid on the last solved arrangement, then filtered
+//         to still-selected-or-pinned and hydrated names so deselection and
+//         unhydrated newcomers never reference pruned pokemonData entries.
+const displayedHouses = computed(() => {
+  if (autoSort.value) {
+    return result.value?.houses ?? []
+  }
+  const pinnedAssignments = pinStore.getPinnedAssignments()
+  return houseStore.orderedHouses.map((entry) => {
+    const hydrated = (name: string) => !!pokemonData.value[name]
+    const shown = (name: string) =>
+      (islandPokemonSet.value.has(name) || pinStore.allPinnedPokemonNames.has(name)) &&
+      hydrated(name)
+    // Pinned names first (they are the authoritative explicit placements, and
+    // pinned occupants survive deselection — mirroring prunePokemonData's
+    // pinned-pokemon survival rule), then the last solve's occupants.
+    const pinnedNames = (pinnedAssignments.get(entry.id) ?? []).filter(hydrated)
+    const leftover = (
+      result.value?.houses.find((h) => h.houseId === entry.id)?.pokemon ?? []
+    ).filter(shown)
+    const seen = new Set<string>()
+    const pokemon: string[] = []
+    for (const name of [...pinnedNames, ...leftover]) {
+      if (seen.has(name)) continue
+      seen.add(name)
+      pokemon.push(name)
+    }
+    return { houseId: entry.id, size: entry.size, capacity: entry.capacity, pokemon }
+  })
+})
+
 const sortedHouses = computed(() => {
-  if (!result.value) return []
-  return [...result.value.houses].sort((a, b) => {
+  return [...displayedHouses.value].sort((a, b) => {
     const aPinned = pinStore.isHousePinned(a.houseId) ? 1 : 0
     const bPinned = pinStore.isHousePinned(b.houseId) ? 1 : 0
     return aPinned - bPinned
   })
 })
+
+// Guard: only render results when all pokemon referenced by the rendered
+// houses actually exist in pokemonData. This prevents a race condition where
+// Vue's async DOM update batch causes the old <section> to briefly re-render
+// with stale house assignments against pruned pokemonData (e.g. during
+// deselection, URL restore, or clearAll). Iterates displayedHouses rather than
+// result.houses: while ON the two are identical; while OFF the grafted
+// occupants are already filtered to selected + hydrated names above.
+const resultsSafeToRender = computed(() => {
+  if (!result.value) return false
+  for (const house of displayedHouses.value) {
+    for (const name of house.pokemon) {
+      if (!pokemonData.value[name]) return false
+    }
+  }
+  return true
+})
+
+// Section visibility. ON keeps today's behavior exactly: hidden until a result
+// lands (the fresh empty page renders no results section). OFF renders the
+// section whenever there is something to show — registry houses and/or
+// selected pokemon — even before any solve has run (empty house cards rendered
+// from the registry plus the unassigned warning).
+const showResults = computed(() =>
+  result.value
+    ? resultsSafeToRender.value
+    : !autoSort.value && (totalHouses.value > 0 || selectedPokemon.value.length > 0),
+)
+
+const displayedHouseOccupants = computed(
+  () => new Set(displayedHouses.value.flatMap((house) => house.pokemon)),
+)
+
+// Mode-gated unhoused list. ON keeps the solver-derived order/timing (and the
+// pending-window fade); OFF is selection-derived so every not-yet-solved
+// pokemon lands in the warning.
+const displayedUnhoused = computed(() =>
+  autoSort.value
+    ? (result.value?.unhoused ?? [])
+    : selectedPokemon.value.filter((name) => !displayedHouseOccupants.value.has(name)),
+)
 
 interface SavedQuery {
   title: string
@@ -141,6 +211,7 @@ interface SavedQuery {
   medium: number
   large: number
   pokemon: string[]
+  autoSort?: boolean
   cart?: Array<{ houseId?: string; houseIndex?: number; name: string; quantity?: number }>
   checkedHouses?: number[]
   checkedPokemon?: string[]
@@ -280,6 +351,7 @@ function encodeState(): string {
     medium: medium.value,
     large: large.value,
     pokemon: [...selectedPokemon.value],
+    autoSort: autoSort.value,
     cart: cartStore.serializedCart,
     ...progressStore.toSerializable(),
     ...pinStore.toSerializable(),
@@ -377,6 +449,7 @@ function confirmSave() {
     medium: medium.value,
     large: large.value,
     pokemon: [...selectedPokemon.value],
+    autoSort: autoSort.value,
     cart: cartStore.serializedCart,
     ...progressStore.toSerializable(),
     ...pinStore.toSerializable(),
@@ -399,6 +472,10 @@ function onSaveEnter() {
 }
 
 async function restoreState(query: SharedState) {
+  // FIRST: an off-state restore must be in place before the pokemon hydration
+  // below completes — the solve watch is not suppressed during restore (unlike
+  // the hash watch) and would otherwise dispatch an initial solve.
+  autoSort.value = query.autoSort ?? true
   small.value = query.small
   medium.value = query.medium
   large.value = query.large
@@ -476,6 +553,7 @@ watch(
     medium,
     large,
     selectedPokemon,
+    autoSort,
     () => cartStore.serializedCart,
     () => progressStore.checkedCartItems,
     () => progressStore.placedItems,
@@ -518,15 +596,29 @@ function clearPokemon() {
 async function runSolve() {
   error.value = ''
   try {
-    result.value = await solveInWorker({
+    const res = await solveInWorker({
       pokemonNames: selectedPokemon.value,
       houses: houseStore.orderedHouses,
       pokemonData: pokemonData.value,
       adjacencyData: adjacencyData.value ?? undefined,
       pinnedAssignments: pinStore.getPinnedAssignments(),
     })
+    // Late guard: the toggle may have flipped OFF while this worker run was in
+    // flight — drop the result so the stale display stays consistent instead
+    // of re-sorting once, transiently.
+    if (!autoSort.value) {
+      solving.value = false
+      return
+    }
+    result.value = res
     solving.value = false
   } catch (e) {
+    // Same late guard on the failure path: a late-failing solve must not
+    // surface an error banner for a run the user already discarded by pausing.
+    if (!autoSort.value) {
+      solving.value = false
+      return
+    }
     // Superseded means a newer solve is already in flight; keep the spinner
     // on and let that newer run settle solving.value.
     if (e instanceof SupersededError) return
@@ -548,6 +640,7 @@ watch(
     large,
     hydratedPokemonReady,
     adjacencyData,
+    autoSort,
     () => pinStore.pinnedPokemon,
     () => pinStore.pinnedHouses,
   ],
@@ -558,7 +651,13 @@ watch(
       (totalHouses.value === 0 && selectedPokemon.value.length === 0)
     ) {
       debouncedSolve.cancel()
-      result.value = null
+      // The null exists to prevent stale-render races against pruned
+      // pokemonData while auto-sort is ON. While OFF, keep the stale
+      // arrangement: the displayedHouses graft filters occupants to selected +
+      // hydrated names and the warning only shows names, so rendering stays
+      // safe — and the toggle gate below means no fresh solve is coming to
+      // replace a wiped result.
+      if (autoSort.value) result.value = null
       solving.value = false
       return
     }
@@ -568,11 +667,20 @@ watch(
     if (medium.value < minMedium.value) medium.value = minMedium.value
     if (large.value < minLarge.value) large.value = minLarge.value
 
-    // Reconcile house registry
+    // Reconcile house registry (structural bookkeeping — runs while OFF too
+    // so the registry-authoritative display stays live).
     houseStore.reconcileHouses(
       { small: small.value, medium: medium.value, large: large.value },
       pinStore.effectivelyPinnedHouseIds,
     )
+
+    // Auto-sort gate: while OFF, never dispatch the worker. House cards keep
+    // showing the last solved arrangement (or registry-derived empty houses).
+    if (!autoSort.value) {
+      debouncedSolve.cancel()
+      solving.value = false
+      return
+    }
 
     // Flip the spinner on immediately so the UI feels responsive while the
     // debounce window collapses bursts of rapid interactions.
@@ -587,6 +695,8 @@ defineExpose({
   medium,
   large,
   selectedPokemon,
+  autoSort,
+  solving,
   spawnHabitatsByName,
   queryTitle,
   confirmSave,
@@ -626,6 +736,9 @@ defineExpose({
       </BButton>
     </BAlert>
     <BRow class="g-2 g-md-3">
+      <BCol cols="12" xl="2">
+        <AutoSortCard v-model="autoSort" />
+      </BCol>
       <BCol cols="12" xl="3">
         <HousesConfigCard
           :small="small"
@@ -640,7 +753,7 @@ defineExpose({
           @clear-all="clearHouses"
         />
       </BCol>
-      <BCol cols="12" xl="4">
+      <BCol cols="12" xl="3">
         <PokemonConfigCard
           :selected-pokemon="selectedPokemon"
           :pokemon-names="pokemonNames"
@@ -649,7 +762,7 @@ defineExpose({
           @clear-all="clearPokemon"
         />
       </BCol>
-      <BCol cols="12" xl="5">
+      <BCol cols="12" xl="4">
         <SavedIslandsCard
           :saved-queries="savedQueries"
           :selected-timestamp="selectedTimestamp"
@@ -729,24 +842,26 @@ defineExpose({
     {{ error }}
   </BAlert>
 
-  <section
-    v-if="resultsSafeToRender && !showCatalogLoading"
-    data-testid="results"
-    class="results-section"
-  >
+  <section v-if="showResults && !showCatalogLoading" data-testid="results" class="results-section">
     <h2 class="section-heading">Results</h2>
 
     <BAlert
-      v-if="result!.unhoused.length"
+      v-if="displayedUnhoused.length"
       variant="warning"
       :model-value="true"
       data-testid="unhoused"
       class="mt-3"
     >
-      <h3 class="alert-heading">Not enough housing</h3>
-      <p class="mb-1">Add houses above to place these Pokémon:</p>
+      <template v-if="autoSort">
+        <h3 class="alert-heading">Not enough housing</h3>
+        <p class="mb-1">Add houses above to place these Pokémon:</p>
+      </template>
+      <template v-else>
+        <h3 class="alert-heading">Auto-sort is off</h3>
+        <p class="mb-1">Turn on 'Automatically sort Pokemon' to assign these Pokémon to houses:</p>
+      </template>
       <ul class="mb-0">
-        <li v-for="name in result!.unhoused" :key="name">{{ name }}</li>
+        <li v-for="name in displayedUnhoused" :key="name">{{ name }}</li>
       </ul>
     </BAlert>
 

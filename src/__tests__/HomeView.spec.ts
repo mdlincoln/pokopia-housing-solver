@@ -887,10 +887,11 @@ describe('HomeView', () => {
     expect(wrapper.vm.showSaveModal).toBe(false)
   })
 
-  it('renders the three config-card titles as h2 (h1 hero → h2 section titles)', async () => {
+  it('renders the four config-card titles as h2 (h1 hero → h2 section titles)', async () => {
     const wrapper = await mountHome()
 
     const h2Texts = wrapper.findAll('h2.section-heading').map((h2) => h2.text())
+    expect(h2Texts).toContain('Automatically sort Pokemon')
     expect(h2Texts).toContain('Houses')
     expect(h2Texts).toContain('Pokémon')
     expect(h2Texts).toContain('Saved islands')
@@ -913,5 +914,367 @@ describe('HomeView', () => {
 
     wrapper.vm.showManageModal = false
     await flushPromises()
+  })
+
+  describe('autoSort toggle', () => {
+    it('is ON by default on a fresh load', async () => {
+      const wrapper = await mountHome()
+      expect(wrapper.vm.autoSort).toBe(true)
+      const card = wrapper.find('[data-testid="autosort-card"]')
+      expect(card.exists()).toBe(true)
+      const switchInput = card.find('[data-testid="autosort-switch"]')
+      expect(switchInput.attributes('aria-label')).toBe('Automatically sort Pokemon')
+      expect((switchInput.element as HTMLInputElement).checked).toBe(true)
+    })
+
+    // AC.3 — while OFF, mutating selection/houses/pins dispatches no solve.
+    it('dispatches no solve while off when selection, counts, or pins change', async () => {
+      const wrapper = await mountHome()
+      const pinStore = usePinStore()
+
+      wrapper.vm.autoSort = false
+      wrapper.vm.small = 2
+      wrapper.vm.medium = 1
+      wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo']
+      await flushPromises()
+      pinStore.pinHouse('S1', ['AlphaOne'])
+      await flushPromises()
+
+      expect(mockSolve).not.toHaveBeenCalled()
+      expect(wrapper.vm.solving).toBe(false)
+      // Pinning S1 moves AlphaOne into that house card (pinned overlay), so it
+      // leaves the warning; the unpinned house + AlphaTwo stay unassigned.
+      const results = wrapper.find('[data-testid="results"]')
+      expect(results.text()).toContain('AlphaOne')
+      const unhoused = wrapper.find('[data-testid="unhoused"]')
+      expect(unhoused.exists()).toBe(true)
+      expect(unhoused.text()).toContain('AlphaTwo')
+      expect(unhoused.text()).not.toContain('AlphaOne')
+    })
+
+    // AC.5 — with OFF and no prior solve, registry-derived houses still render.
+    it('renders registry-derived houses while off before any solve runs', async () => {
+      const wrapper = await mountHome()
+
+      wrapper.vm.autoSort = false
+      wrapper.vm.small = 2
+      wrapper.vm.medium = 1
+      await flushPromises()
+
+      const cards = wrapper.findAll('[data-testid="house-card"]')
+      expect(cards).toHaveLength(3)
+      // Totally empty houses render the inline input, and partially-empty
+      // bookkeeping is simply absent (no slots without occupants/cart items).
+      expect(wrapper.findAll('[data-testid="house-empty-input"]')).toHaveLength(3)
+      expect(mockSolve).not.toHaveBeenCalled()
+    })
+
+    // AC.4 — add-while-off pins and selects the pokemon AND shows it in its
+    // target house immediately (pinned placements overlay the OFF view); no
+    // solve runs. A pokemon not pinned to a house still lands in the warning.
+    it('shows a pokemon added to a house in that house while off, no solve', async () => {
+      const wrapper = await mountHome()
+      const pinStore = usePinStore()
+
+      wrapper.vm.autoSort = false
+      wrapper.vm.medium = 1
+      await flushPromises()
+
+      wrapper.vm.addPokemonToHouse({ houseId: 'M1', name: 'AlphaOne' })
+      await flushPromises()
+
+      expect(pinStore.isPokemonPinned('M1', 'AlphaOne')).toBe(true)
+      expect(wrapper.vm.selectedPokemon).toContain('AlphaOne')
+      expect(mockSolve).not.toHaveBeenCalled()
+
+      const card = wrapper.find('[data-testid="house-card"]')
+      expect(card.exists()).toBe(true)
+      expect(card.text()).toContain('AlphaOne')
+
+      // All selected pokemon are housed — no unassigned warning.
+      expect(wrapper.find('[data-testid="unhoused"]').exists()).toBe(false)
+    })
+
+    // A pokemon selected only in the island search (never pinned to a house)
+    // stays in the OFF warning, even while a different house holds a pinned
+    // resident.
+    it('keeps an unpinned island-only pokemon in the OFF warning', async () => {
+      const wrapper = await mountHome()
+      wrapper.vm.autoSort = false
+      wrapper.vm.medium = 1
+      await flushPromises()
+      wrapper.vm.addPokemonToHouse({ houseId: 'M1', name: 'AlphaOne' })
+      await flushPromises()
+
+      // BetaOne is added via the island search only — no house pin.
+      wrapper.vm.selectedPokemon = ['AlphaOne', 'BetaOne']
+      await flushPromises()
+
+      expect(mockSolve).not.toHaveBeenCalled()
+      const house = wrapper.find('[data-testid="house-card"]')
+      expect(house.text()).toContain('AlphaOne')
+      expect(house.text()).not.toContain('BetaOne')
+      const unhoused = wrapper.find('[data-testid="unhoused"]')
+      expect(unhoused.exists()).toBe(true)
+      expect(unhoused.text()).toContain('Auto-sort is off')
+      expect(unhoused.text()).toContain('BetaOne')
+      expect(unhoused.text()).not.toContain('AlphaOne')
+    })
+
+    // AC.6 — flipping back ON re-solves immediately with pinned assignments.
+    it('re-solves immediately on flip-on with pinned newcomers', async () => {
+      const wrapper = await mountHome()
+
+      wrapper.vm.autoSort = false
+      wrapper.vm.medium = 1
+      await flushPromises()
+      wrapper.vm.addPokemonToHouse({ houseId: 'M1', name: 'AlphaOne' })
+      await flushPromises()
+      expect(mockSolve).not.toHaveBeenCalled()
+      // The newcomer already shows in its house while OFF (pinned overlay).
+      expect(wrapper.find('[data-testid="house-card"]').text()).toContain('AlphaOne')
+
+      mockSolve.mockResolvedValueOnce({
+        houses: [{ houseId: 'M1', size: 'medium', capacity: 2, pokemon: ['AlphaOne'] }],
+        unhoused: [],
+      })
+      wrapper.vm.autoSort = true
+      await flushPromises()
+
+      expect(mockSolve).toHaveBeenCalledTimes(1)
+      const pinnedAssignments = mockSolve.mock.calls[0]![4] as Map<string, string[]>
+      expect(pinnedAssignments.get('M1')).toContain('AlphaOne')
+
+      const card = wrapper.find('[data-testid="house-card"]')
+      expect(card.text()).toContain('AlphaOne')
+      expect(wrapper.find('[data-testid="unhoused"]').exists()).toBe(false)
+    })
+
+    // AC.7 — the toggle persists into the URL hash.
+    it('serializes autoSort into the URL hash', async () => {
+      const wrapper = await mountHome()
+      wrapper.vm.autoSort = false
+      await flushPromises()
+
+      const decoded = JSON.parse(atob(window.location.hash.slice(1))) as Record<string, unknown>
+      expect(decoded.autoSort).toBe(false)
+    })
+
+    // AC.7 — the toggle persists into saved islands.
+    it('serializes autoSort into the saved-query payload', async () => {
+      const setItem = vi.spyOn(Storage.prototype, 'setItem')
+
+      const wrapper = await mountHome()
+      wrapper.vm.autoSort = false
+      wrapper.vm.confirmSave()
+
+      const call = setItem.mock.calls.find(([key]) => key === 'pokehousing_saved_queries')
+      expect(call).toBeDefined()
+      const saved = JSON.parse(call![1] as string) as Array<{ autoSort?: boolean }>
+      expect(saved[0]!.autoSort).toBe(false)
+    })
+
+    // AC.7 — restoring an off-state saved entry: toggle off, no initial solve,
+    // synthesized houses + the warning.
+    it('restores an off-state saved island without dispatching an initial solve', async () => {
+      const entry = {
+        title: 'Paused island',
+        timestamp: 1700000000030,
+        small: 1,
+        medium: 0,
+        large: 0,
+        pokemon: ['AlphaOne'],
+        autoSort: false,
+      }
+      vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify([entry]))
+
+      const wrapper = await mountHome()
+      const cartStore = useCartStore()
+      vi.spyOn(cartStore, 'restoreItems').mockResolvedValue(undefined)
+
+      wrapper.vm.selectedTimestamp = entry.timestamp
+      await flushPromises()
+
+      expect(wrapper.vm.autoSort).toBe(false)
+      expect(mockSolve).not.toHaveBeenCalled()
+      expect(wrapper.findAll('[data-testid="house-card"]')).toHaveLength(1)
+      const unhoused = wrapper.find('[data-testid="unhoused"]')
+      expect(unhoused.exists()).toBe(true)
+      expect(unhoused.text()).toContain('AlphaOne')
+    })
+
+    // AC.7 — same for the URL-hash path.
+    it('restores an off-state URL hash with synthesized houses and no initial solve', async () => {
+      const shared = { small: 1, medium: 0, large: 0, pokemon: ['AlphaOne'], autoSort: false }
+      window.location.hash = `#${btoa(JSON.stringify(shared))}`
+
+      const wrapper = await mountHome()
+
+      expect(wrapper.vm.autoSort).toBe(false)
+      expect(mockSolve).not.toHaveBeenCalled()
+      expect(wrapper.findAll('[data-testid="house-card"]')).toHaveLength(1)
+      expect(wrapper.find('[data-testid="unhoused"]').text()).toContain('AlphaOne')
+    })
+
+    // AC.8 — hashes/saved entries WITHOUT the autoSort key restore with
+    // sorting ON (legacy default).
+    it('restores a legacy hash without the autoSort key with sorting ON', async () => {
+      const shared = { small: 1, medium: 0, large: 0, pokemon: ['AlphaOne'] }
+      window.location.hash = `#${btoa(JSON.stringify(shared))}`
+      mockSolve.mockResolvedValue({
+        houses: [{ houseId: 'S1', size: 'small', capacity: 1, pokemon: ['AlphaOne'] }],
+        unhoused: [],
+      })
+
+      const wrapper = await mountHome()
+
+      expect(wrapper.vm.autoSort).toBe(true)
+      expect(mockSolve).toHaveBeenCalled()
+    })
+
+    // AC.9 — an in-flight solve resolving after flip-off is dropped.
+    it('drops an in-flight solve that resolves after the toggle flips off', async () => {
+      let resolveSolve!: (r: SolverResult) => void
+      mockSolve.mockReturnValue(
+        new Promise((res) => {
+          resolveSolve = res
+        }),
+      )
+
+      const wrapper = await mountHome()
+      wrapper.vm.small = 1
+      wrapper.vm.selectedPokemon = ['AlphaOne']
+      await flushPromises()
+      expect(mockSolve).toHaveBeenCalledTimes(1)
+      expect(wrapper.vm.solving).toBe(true)
+
+      wrapper.vm.autoSort = false
+      await flushPromises()
+      expect(wrapper.vm.solving).toBe(false)
+
+      resolveSolve({
+        houses: [{ houseId: 'S1', size: 'small', capacity: 1, pokemon: ['AlphaOne'] }],
+        unhoused: [],
+      })
+      await flushPromises()
+
+      // The late result is dropped: the registry-authoritative view shows an
+      // empty house and AlphaOne in the warning — no transient re-sort.
+      const card = wrapper.find('[data-testid="house-card"]')
+      expect(card.exists()).toBe(true)
+      expect(card.text()).not.toContain('AlphaOne')
+      expect(wrapper.find('[data-testid="unhoused"]').text()).toContain('AlphaOne')
+      expect(wrapper.vm.solving).toBe(false)
+    })
+
+    // AC.11 — stale arrangement retention: adding while off after a real solve
+    // keeps the previous occupants in their house cards AND shows the newcomer
+    // in its house (pinned overlay) without dispatching a solve. Pins the
+    // hydration-race fix (result stays intact while the newcomer hydrates).
+    it('adds to a house while off after a prior solve without wiping the arrangement', async () => {
+      mockSolve.mockResolvedValue({
+        houses: [{ houseId: 'L1', size: 'large', capacity: 4, pokemon: ['AlphaOne', 'AlphaTwo'] }],
+        unhoused: [],
+      })
+
+      const wrapper = await mountHome()
+      wrapper.vm.large = 1
+      wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo']
+      await flushPromises()
+      expect(mockSolve).toHaveBeenCalledTimes(1)
+
+      wrapper.vm.autoSort = false
+      await flushPromises()
+      wrapper.vm.addPokemonToHouse({ houseId: 'L1', name: 'BetaOne' })
+      await flushPromises()
+
+      expect(mockSolve).toHaveBeenCalledTimes(1)
+
+      const card = wrapper.find('[data-testid="house-card"]')
+      expect(card.text()).toContain('AlphaOne')
+      expect(card.text()).toContain('AlphaTwo')
+      // The explicitly-added newcomer shows in its house immediately.
+      expect(card.text()).toContain('BetaOne')
+
+      // All three are placed — no unassigned warning.
+      expect(wrapper.find('[data-testid="unhoused"]').exists()).toBe(false)
+    })
+
+    // AC.12 — count changes while OFF (with a prior solve) mutate the
+    // registry-authoritative display: removing vanishes unpinned houses and
+    // their occupants flow to the warning; adding renders empty houses
+    // immediately. No solve is dispatched.
+    it('updates the registry-authoritative display on count changes while off', async () => {
+      mockSolve.mockResolvedValue({
+        houses: [
+          { houseId: 'S1', size: 'small', capacity: 1, pokemon: ['AlphaOne'] },
+          { houseId: 'S2', size: 'small', capacity: 1, pokemon: ['AlphaTwo'] },
+        ],
+        unhoused: [],
+      })
+
+      const wrapper = await mountHome()
+      wrapper.vm.small = 2
+      wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo']
+      await flushPromises()
+      expect(mockSolve).toHaveBeenCalledTimes(1)
+      expect(wrapper.findAll('[data-testid="house-card"]')).toHaveLength(2)
+
+      wrapper.vm.autoSort = false
+      await flushPromises()
+
+      // Reduce: S2 (highest counter, unpinned) is removed; its occupant flows
+      // into the warning without a solve.
+      wrapper.vm.small = 1
+      await flushPromises()
+      expect(wrapper.findAll('[data-testid="house-card"]')).toHaveLength(1)
+      let unhoused = wrapper.find('[data-testid="unhoused"]')
+      expect(unhoused.exists()).toBe(true)
+      expect(unhoused.text()).toContain('AlphaTwo')
+      expect(unhoused.text()).not.toContain('AlphaOne')
+      expect(mockSolve).toHaveBeenCalledTimes(1)
+
+      // Increase: a new empty medium house renders immediately.
+      wrapper.vm.medium = 1
+      await flushPromises()
+      expect(wrapper.findAll('[data-testid="house-card"]')).toHaveLength(2)
+      expect(mockSolve).toHaveBeenCalledTimes(1)
+      unhoused = wrapper.find('[data-testid="unhoused"]')
+      expect(unhoused.text()).toContain('AlphaTwo')
+    })
+
+    // Pinned occupants survive deselection in the OFF graft too — mirroring
+    // prunePokemonData's pinned-pokemon survival rule, so a pinned pokemon
+    // removed from the island search stays visible in its house card.
+    it('keeps pinned deselected occupants in their house cards while off', async () => {
+      mockSolve.mockResolvedValue({
+        houses: [
+          { houseId: 'S1', size: 'small', capacity: 1, pokemon: ['AlphaOne'] },
+          { houseId: 'S2', size: 'small', capacity: 1, pokemon: ['AlphaTwo'] },
+        ],
+        unhoused: [],
+      })
+
+      const wrapper = await mountHome()
+      const pinStore = usePinStore()
+      wrapper.vm.small = 2
+      wrapper.vm.selectedPokemon = ['AlphaOne', 'AlphaTwo']
+      await flushPromises()
+
+      pinStore.pinHouse('S2', ['AlphaTwo'])
+      wrapper.vm.selectedPokemon = ['AlphaOne']
+      await flushPromises()
+
+      wrapper.vm.autoSort = false
+      await flushPromises()
+
+      const cards = wrapper.findAll('[data-testid="house-card"]')
+      expect(cards).toHaveLength(2)
+      // Pinned houses sort last (S2 is pinned via pinHouse).
+      expect(cards[0]!.text()).toContain('AlphaOne')
+      expect(cards[1]!.text()).toContain('AlphaTwo')
+      // Both selected/assigned pokemon are covered by houses; no warning.
+      expect(wrapper.find('[data-testid="unhoused"]').exists()).toBe(false)
+    })
   })
 })
