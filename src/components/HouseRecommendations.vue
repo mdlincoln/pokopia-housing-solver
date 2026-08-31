@@ -20,7 +20,14 @@ import { type HouseAssignment, type PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { useProgressStore } from '@/stores/progress'
 import type { BTableSortBy } from 'bootstrap-vue-next'
-import { BBadge, BButton, BCloseButton, BFormCheckbox, BTable } from 'bootstrap-vue-next'
+import {
+  BBadge,
+  BButton,
+  BButtonGroup,
+  BCloseButton,
+  BFormCheckbox,
+  BTable,
+} from 'bootstrap-vue-next'
 import { computed, ref, watch, watchEffect } from 'vue'
 
 const props = defineProps<{
@@ -171,6 +178,17 @@ watch(
   { deep: true, flush: 'sync' },
 )
 
+// Explicit auto-sort on/off control. The button group reads and writes
+// `sortIsAuto` directly; the watchEffect above already re-aims the sort to the
+// highest-priority unfulfilled favorite whenever it is `true`, so flipping it
+// back on re-triggers the auto-rank without extra wiring.
+function useAutoSort() {
+  sortIsAuto.value = true
+}
+function useManualSort() {
+  sortIsAuto.value = false
+}
+
 const recsDetails = ref<HTMLDetailsElement | null>(null)
 
 // Favorite-badge clicks (re-emitted by PokemonCard) route the user to the
@@ -289,6 +307,24 @@ watchEffect(() => {
     @toggle="onRecsToggle"
   >
     <summary>House items</summary>
+    <div v-if="hasOpenedRecs" class="auto-sort-group" role="group" data-testid="auto-sort-group">
+      <BButtonGroup vertical class="w-100 auto-sort-buttons" aria-label="Recommendation sort mode">
+        <BButton
+          :pressed="sortIsAuto"
+          variant="outline-secondary"
+          data-testid="auto-sort-auto"
+          @click="useAutoSort"
+          >Auto sort</BButton
+        >
+        <BButton
+          :pressed="!sortIsAuto"
+          variant="outline-secondary"
+          data-testid="auto-sort-manual"
+          @click="useManualSort"
+          >Manual sort</BButton
+        >
+      </BButtonGroup>
+    </div>
     <div v-if="hasOpenedRecs" class="craftable-only-toggle" data-testid="craftable-only-toggle">
       <BFormCheckbox
         v-model="showCraftableOnly"

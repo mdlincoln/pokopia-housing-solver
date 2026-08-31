@@ -1580,6 +1580,175 @@ describe('HouseRecord', () => {
     expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_metal stuff"]').exists()).toBe(true)
   })
 
+  it('auto-sort group renders as mutually-exclusive buttons (AC.1)', async () => {
+    const pokemonData: PokemonData = {
+      Solo: { image: '', favorites: ['metal stuff', 'stone stuff'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Solo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const group = wrapper.find('[data-testid="auto-sort-group"]')
+    expect(group.exists()).toBe(true)
+    expect(group.attributes('role')).toBe('group')
+
+    const autoBtn = wrapper.find('[data-testid="auto-sort-auto"]')
+    const manualBtn = wrapper.find('[data-testid="auto-sort-manual"]')
+    expect(autoBtn.exists()).toBe(true)
+    expect(manualBtn.exists()).toBe(true)
+
+    // Default state: auto owns the sort, so exactly one button is pressed.
+    expect(autoBtn.attributes('aria-pressed')).toBe('true')
+    expect(manualBtn.attributes('aria-pressed')).toBe('false')
+  })
+
+  it('header sort flips the group to Manual sort (AC.3)', async () => {
+    const pokemonData: PokemonData = {
+      Solo: { image: '', favorites: ['metal stuff', 'stone stuff'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Solo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const autoBtn = () => wrapper.find('[data-testid="auto-sort-auto"]')
+    const manualBtn = () => wrapper.find('[data-testid="auto-sort-manual"]')
+    expect(autoBtn().attributes('aria-pressed')).toBe('true')
+
+    // Click a non-favorite sortable column header ('Craftability').
+    const craftHeader = wrapper
+      .findAll('[data-testid="recommended-items-list"] th')
+      .find((h) => h.text().includes('Craftability'))
+    expect(craftHeader).toBeDefined()
+    await craftHeader!.trigger('click')
+    await flushPromises()
+
+    // User-driven sort hands control to manual.
+    expect(manualBtn().attributes('aria-pressed')).toBe('true')
+    expect(autoBtn().attributes('aria-pressed')).toBe('false')
+  })
+
+  it('clicking Manual sort freezes auto-rank; clicking Auto sort re-aims to first unfulfilled favorite (AC.2)', async () => {
+    const pokemonData: PokemonData = {
+      Solo: { image: '', favorites: ['metal stuff', 'stone stuff'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Solo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    const descHeaders = () =>
+      wrapper.findAll('[data-testid="recommended-items-list"] th[aria-sort="descending"]')
+
+    // Move sortBy off the auto target: click the non-favorite 'Craftability'
+    // header. This flips the group to Manual.
+    const craftHeader = wrapper
+      .findAll('[data-testid="recommended-items-list"] th')
+      .find((h) => h.text().includes('Craftability'))
+    await craftHeader!.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="auto-sort-manual"]').attributes('aria-pressed')).toBe('true')
+
+    // Re-aim: click Auto sort. The auto-ranker must target 'metal stuff' (the
+    // first unfulfilled favorite), proving the re-aim is real, not a no-op.
+    await wrapper.find('[data-testid="auto-sort-auto"]').trigger('click')
+    await flushPromises()
+
+    expect(descHeaders().length).toBe(1)
+    expect(descHeaders()[0]!.find('[data-testid="fav-header-fav_metal stuff"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="auto-sort-auto"]').attributes('aria-pressed')).toBe('true')
+  })
+
+  it('favorite-badge click flips the group to Manual sort (AC.3)', async () => {
+    const pokemonData: PokemonData = {
+      Solo: { image: '', favorites: ['metal stuff', 'stone stuff'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Solo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    expect(wrapper.find('[data-testid="auto-sort-auto"]').attributes('aria-pressed')).toBe('true')
+
+    const badge = wrapper
+      .findAll('[data-testid="fave-badge"]')
+      .find((b) => b.text().includes('metal stuff'))
+    expect(badge).toBeDefined()
+    await badge!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="auto-sort-manual"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.find('[data-testid="auto-sort-auto"]').attributes('aria-pressed')).toBe('false')
+  })
+
+  it('manual sort persists across cart changes (AC.2)', async () => {
+    const pokemonData: PokemonData = {
+      Solo: { image: '', favorites: ['metal stuff', 'stone stuff'] },
+    }
+    const house: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['Solo'],
+    }
+
+    const wrapper = mount(HouseRecord, { props: { house, pokemonData } })
+    await flushPromises()
+    await openRecommendations(wrapper)
+
+    // Flip to Manual via a non-favorite header sort.
+    const craftHeader = wrapper
+      .findAll('[data-testid="recommended-items-list"] th')
+      .find((h) => h.text().includes('Craftability'))
+    await craftHeader!.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="auto-sort-manual"]').attributes('aria-pressed')).toBe('true')
+
+    const descHeaders = () =>
+      wrapper.findAll(
+        '[data-testid="recommended-items-list"] th[aria-sort="ascending"], [data-testid="recommended-items-list"] th[aria-sort="descending"]',
+      )
+    // After sorting by the non-favorite Craftability column, the sorted header
+    // is that column (no fav-header child).
+    expect(descHeaders()[0]!.text()).toContain('Craftability')
+
+    // Adding a cart item (which would normally re-rank the auto sort) must not
+    // override the user's manual choice.
+    const cartStore = useCartStore()
+    await cartStore.addItem('S1', 'Shower')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="auto-sort-manual"]').attributes('aria-pressed')).toBe('true')
+    const afterKey = descHeaders()[0]!.text()
+    expect(afterKey).toContain('Craftability')
+    expect(descHeaders()[0]!.find('[data-testid^="fav-header-"]').exists()).toBe(false)
+  })
+
   it('recommendation favorite column headers render a decorative svg glyph (AC.4)', async () => {
     // Both pokemon share real catalog favorites (lowercase, mapped) so every
     // visible fav_* header resolves to a bundled glyph.

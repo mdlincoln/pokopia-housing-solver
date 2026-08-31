@@ -14,7 +14,9 @@ async function selectPokemon(page: import('@playwright/test').Page, name: string
   const option = page.locator('.tropical-dropdown').getByRole('option', { name, exact: true })
   await expect(option).toBeVisible({ timeout: 10_000 })
   await input.press('Enter')
-  await expect(page.locator('.pokemon-select .favorite-pill', { hasText: name }).first()).toBeVisible({ timeout: 5_000 })
+  await expect(
+    page.locator('.pokemon-select .favorite-pill', { hasText: name }).first(),
+  ).toBeVisible({ timeout: 5_000 })
 }
 
 /**
@@ -168,9 +170,7 @@ test.describe('Homepage', () => {
 
     // Two housed pokemon render their shared habitat badge on the house card;
     // the unhoused member's card (in the warning) is counted separately.
-    const habitatBadges = page
-      .getByTestId('house-card')
-      .getByTestId('habitat-badge')
+    const habitatBadges = page.getByTestId('house-card').getByTestId('habitat-badge')
     await expect(habitatBadges).toHaveCount(2)
   })
 
@@ -237,7 +237,9 @@ test.describe('Homepage', () => {
     expect(text?.trim()).toMatch(/^Craftable \(\S/)
   })
 
-  test('page body does not have overflow:hidden on fresh load at desktop width', async ({ page }) => {
+  test('page body does not have overflow:hidden on fresh load at desktop width', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1200, height: 800 })
     await page.goto('/')
     await expect(
@@ -288,8 +290,12 @@ test.describe('Progress Tracking', () => {
     // by attribute selector rather than position.
     // Note: pinning a house also auto-pins all its pokemon occupants.
     await page.getByTestId('progress-checkbox-house').first().click()
-    await expect(page.locator('[data-testid="progress-checkbox-house"][aria-checked="true"]')).not.toHaveCount(0)
-    await expect(page.locator('[data-testid="progress-checkbox-pokemon"][aria-checked="true"]')).not.toHaveCount(0)
+    await expect(
+      page.locator('[data-testid="progress-checkbox-house"][aria-checked="true"]'),
+    ).not.toHaveCount(0)
+    await expect(
+      page.locator('[data-testid="progress-checkbox-pokemon"][aria-checked="true"]'),
+    ).not.toHaveCount(0)
 
     // Load a new sample — progress should be cleared
     await page.getByRole('button', { name: 'Show a sample island' }).click()
@@ -365,7 +371,9 @@ test.describe('Shopping Cart', () => {
   })
 
   // @lat: [[ui#House#House items#Paginates at 50 rows]]
-  test('recommendations paginate at 50 rows and appends without recreating rows', async ({ page }) => {
+  test('recommendations paginate at 50 rows and appends without recreating rows', async ({
+    page,
+  }) => {
     test.setTimeout(40_000)
     await page.goto('/')
 
@@ -547,16 +555,50 @@ test.describe('Shopping Cart', () => {
 
     // Panel opens, table mounts, and the favorite's column sorts descending
     expect(await details.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(true)
-    const header = houseCard.locator(
-      `th:has([data-testid="fav-header-fav_${favorite}"])`,
-    )
+    const header = houseCard.locator(`th:has([data-testid="fav-header-fav_${favorite}"])`)
     await expect(header).toHaveAttribute('aria-sort', 'descending')
   })
 
-  // @lat: [[ui#House#Favorite control keyboard activation opens recommendations]]
-  test('pressing Enter on a focused favorite control opens recommendations', async ({
+  // @lat: [[ui#House#Auto-sort button group toggles manual/auto recommendation sort]]
+  test('auto-sort button group toggles between Manual and Auto recommendation sort', async ({
     page,
   }) => {
+    test.setTimeout(60_000)
+    await page.goto('/')
+    await setSpinbutton(page, 'house-medium', 1)
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Ivysaur')
+    await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
+
+    const houseCard = page.getByTestId('house-card').first()
+    const details = houseCard.getByTestId('recommended-items')
+    await expect(details).toBeVisible()
+    await details.locator('summary').click()
+
+    const autoBtn = houseCard.getByTestId('auto-sort-auto')
+    const manualBtn = houseCard.getByTestId('auto-sort-manual')
+
+    // Default: auto owns the sort (exactly one button pressed).
+    await expect(autoBtn).toHaveAttribute('aria-pressed', 'true')
+    await expect(manualBtn).toHaveAttribute('aria-pressed', 'false')
+
+    // Click Manual: sort hands to the user; the group flips.
+    await manualBtn.click()
+    await expect(manualBtn).toHaveAttribute('aria-pressed', 'true')
+    await expect(autoBtn).toHaveAttribute('aria-pressed', 'false')
+
+    // Click Auto: the auto-ranker re-aims the sort to a favorite column.
+    await autoBtn.click()
+    await expect(autoBtn).toHaveAttribute('aria-pressed', 'true')
+    await expect(manualBtn).toHaveAttribute('aria-pressed', 'false')
+    const descHeader = houseCard.locator(
+      'th[aria-sort="descending"]:has([data-testid^="fav-header-fav_"])',
+    )
+    await expect(descHeader.first()).toBeVisible()
+  })
+
+  // @lat: [[ui#House#Favorite control keyboard activation opens recommendations]]
+  test('pressing Enter on a focused favorite control opens recommendations', async ({ page }) => {
     test.setTimeout(60_000)
     await page.goto('/')
     await page.getByRole('button', { name: 'Show a sample island' }).click()
@@ -620,9 +662,7 @@ test.describe('Shopping Cart', () => {
     const headerCount = await favHeaders.count()
     expect(headerCount).toBeGreaterThan(0)
     for (let i = 0; i < headerCount; i++) {
-      await expect(
-        favHeaders.nth(i).locator('.icon-glyph[aria-hidden="true"] svg'),
-      ).toHaveCount(1)
+      await expect(favHeaders.nth(i).locator('.icon-glyph[aria-hidden="true"] svg')).toHaveCount(1)
     }
   })
 
@@ -859,7 +899,9 @@ test.describe('Usability (P2 audit fixes)', () => {
 
   // @lat: [[ui#HomeView#Accessibility#Pin and favorite controls meet 24px tap target]]
   // @lat: [[ui#HomeView#Accessibility#Cart remove controls meet 24px tap target]]
-  test('pin toggles, cart removes and favorite badges meet the 24px minimum tap target', async ({ page }) => {
+  test('pin toggles, cart removes and favorite badges meet the 24px minimum tap target', async ({
+    page,
+  }) => {
     test.setTimeout(90_000)
 
     async function assertTapTarget(
@@ -893,7 +935,11 @@ test.describe('Usability (P2 audit fixes)', () => {
     await expect(page.getByTestId('cart-item')).toHaveCount(1, { timeout: 2000 })
 
     await assertTapTarget(page, 'house pin', page.getByTestId('progress-checkbox-house').first())
-    await assertTapTarget(page, 'pokemon pin', page.getByTestId('progress-checkbox-pokemon').first())
+    await assertTapTarget(
+      page,
+      'pokemon pin',
+      page.getByTestId('progress-checkbox-pokemon').first(),
+    )
     await assertTapTarget(page, 'favorite badge', page.getByTestId('fave-badge').first())
     // Spawn-habitat thumbnails (small image buttons) must keep the 24px floor.
     await assertTapTarget(page, 'habitat thumb', page.getByTestId('habitat-thumb').first())
@@ -909,12 +955,19 @@ test.describe('Usability (P2 audit fixes)', () => {
       'cart progress row',
       page.locator('[data-testid="cart-items"] .progress-action').first(),
     )
-    await assertTapTarget(page, 'recommendation-remove', page.getByTestId('recommendation-remove').first())
+    await assertTapTarget(
+      page,
+      'recommendation-remove',
+      page.getByTestId('recommendation-remove').first(),
+    )
     await assertTapTarget(
       page,
       'recommendation-placed',
       page.locator('.recommended-items-table .progress-action--placed').first(),
     )
+    // Auto-sort on/off buttons — hero-sized control must keep the 24px floor.
+    await assertTapTarget(page, 'auto-sort-auto', page.getByTestId('auto-sort-auto').first())
+    await assertTapTarget(page, 'auto-sort-manual', page.getByTestId('auto-sort-manual').first())
 
     // Mobile width — resize, state persists (no re-setup). House cards stay in
     // main content; the cart sidebar is behind the overlay, so open it first.
@@ -925,7 +978,11 @@ test.describe('Usability (P2 audit fixes)', () => {
     await expect(page.getByTestId('shopping-cart')).toBeVisible()
 
     await assertTapTarget(page, 'cart-remove', page.getByTestId('cart-remove').first())
-    await assertTapTarget(page, 'recommendation-remove', page.getByTestId('recommendation-remove').first())
+    await assertTapTarget(
+      page,
+      'recommendation-remove',
+      page.getByTestId('recommendation-remove').first(),
+    )
     await assertTapTarget(
       page,
       'cart progress row',
@@ -1008,9 +1065,9 @@ test.describe('Usability (P2 audit fixes)', () => {
       level: 3,
     })
     await expect(houseTitle.first()).toBeVisible()
-    const afterContent = await houseTitle.first().evaluate(
-      (el) => getComputedStyle(el, '::after').content,
-    )
+    const afterContent = await houseTitle
+      .first()
+      .evaluate((el) => getComputedStyle(el, '::after').content)
     expect(afterContent).toContain('~')
   })
 })

@@ -701,6 +701,27 @@ details[open] > .details-summary::before,
   margin: var(--space-3) var(--space-2) var(--space-2);
 }
 
+/* Auto-sort on/off control: a hero-sized, vertically-stacked, mutually-exclusive
+   button group replacing the old bare switch. Full-width so both buttons line
+   up; text centered so the two labels align; generous padding for a
+   comfortable touch target. */
+.auto-sort-group {
+  margin: var(--space-3) var(--space-2) var(--space-2);
+}
+
+.auto-sort-buttons {
+  gap: var(--space-1);
+}
+
+.auto-sort-buttons .btn {
+  min-width: 24px;
+  min-height: 24px;
+  padding: var(--space-2) var(--space-3);
+  font-weight: 700;
+  text-align: center;
+  width: 100%;
+}
+
 .pokemon-card .card-title {
   font-family: var(--trop-heading-font);
   color: #2b6e88;
