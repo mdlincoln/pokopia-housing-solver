@@ -23,7 +23,7 @@ const KNOWN_TESTIDS = new Set([
   'recommended-items',
   'recommended-items-list',
   'add-to-cart',
-  'autosort-switch',
+  'auto-sort-group',
   'islands-card',
 ])
 

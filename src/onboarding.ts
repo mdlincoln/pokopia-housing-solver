@@ -73,7 +73,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
       'rest of the table has recalculated to the items still needed.',
   },
   {
-    attachTo: '[data-testid="autosort-switch"]',
+    attachTo: '[data-testid="auto-sort-group"]',
     title: 'Auto-sort vs. manual',
     description:
       'Leave this ON for automatic assignments. Switch it OFF to arrange Pokémon yourself: ' +

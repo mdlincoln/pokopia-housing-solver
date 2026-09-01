@@ -90,7 +90,7 @@ test.describe('Housemate modal auto-sort warning', () => {
     // top-card toggle, and leaves the modal open.
     await modal.getByTestId('housemate-autosort-switch').click()
     await expect(warning).toBeHidden()
-    await expect(page.getByTestId('autosort-switch')).not.toBeChecked()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
     await expect(modal).toBeVisible()
 
     // AC.4: the normal suggestion flow still works — the newcomer appears in
@@ -129,7 +129,7 @@ test.describe('Housemate modal auto-sort warning', () => {
 
     // Auto-sort stayed on, so the re-solve keeps the newcomer pinned in THIS
     // house without wiping the prior occupant.
-    await expect(page.getByTestId('autosort-switch')).toBeChecked()
+    await expect(page.getByTestId('auto-sort-auto')).toHaveAttribute('aria-pressed', 'true')
     await expect(house).toContainText('Bulbasaur', { timeout: 30_000 })
     await expect(house).toContainText(addedName, { timeout: 30_000 })
     await expect(
@@ -143,8 +143,8 @@ test.describe('Housemate modal auto-sort warning', () => {
     await selectPokemon(page, 'Bulbasaur')
     await expect(page.getByTestId('results')).toContainText('Bulbasaur', { timeout: 30_000 })
 
-    await page.getByTestId('autosort-switch').click()
-    await expect(page.getByTestId('autosort-switch')).not.toBeChecked()
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
 
     const house = page.getByTestId('house-card').filter({
       has: page.locator('.house-title', { hasText: /large house L\d/ }),
