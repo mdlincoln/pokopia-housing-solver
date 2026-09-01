@@ -59,7 +59,27 @@ test.describe('Auto-sort toggle', () => {
     // Same row at xl (stacking starts below xl).
     expect(autosortBox!.y).toBe(housesBox!.y)
 
-    await expect(page.getByTestId('autosort-switch')).toBeChecked()
+    await expect(page.getByTestId('auto-sort-auto')).toHaveAttribute('aria-pressed', 'true')
+    // Exactly one button is pressed with a visible .btn.active at all times.
+    await expect(autosort.locator('[aria-pressed="true"]')).toHaveCount(1)
+    await expect(autosort.locator('.btn.active')).toHaveCount(1)
+
+    // AC.4 — the group is vertically stacked and full-width within its card, and
+    // both buttons clear the 24×24 CSS px tap-target floor.
+    const autoBox = await page.getByTestId('auto-sort-auto').boundingBox()
+    const manualBox = await page.getByTestId('auto-sort-manual').boundingBox()
+    expect(autoBox!.y).toBeLessThan(manualBox!.y)
+    // Full-width within the card: the button spans the group's full width, and
+    // the group spans the card body's content width (the body adds its own
+    // padding on top of the group, so compare against the group itself).
+    const groupWidth = await autosort
+      .locator('.auto-sort-group')
+      .evaluate((el: HTMLElement) => el.clientWidth)
+    expect(autoBox!.width).toBeGreaterThanOrEqual(groupWidth * 0.9)
+    for (const box of [autoBox, manualBox]) {
+      expect(box!.width).toBeGreaterThanOrEqual(24)
+      expect(box!.height).toBeGreaterThanOrEqual(24)
+    }
   })
 
   // AC.4 + AC.5 + AC.6 + AC.7 — full flow with hash round-trip.
@@ -69,10 +89,12 @@ test.describe('Auto-sort toggle', () => {
     test.setTimeout(90_000)
     await page.goto('/')
 
-    const switchEl = page.getByTestId('autosort-switch')
-    await expect(switchEl).toBeChecked({ timeout: 10_000 })
-    await switchEl.click()
-    await expect(switchEl).not.toBeChecked()
+    const manualBtn = page.getByTestId('auto-sort-manual')
+    await expect(page.getByTestId('auto-sort-auto')).toHaveAttribute('aria-pressed', 'true', {
+      timeout: 10_000,
+    })
+    await manualBtn.click()
+    await expect(manualBtn).toHaveAttribute('aria-pressed', 'true')
 
     // AC.5: a registry-derived empty house renders with no solve having run.
     await setSpinbutton(page, 'house-medium', 1)
@@ -89,9 +111,9 @@ test.describe('Auto-sort toggle', () => {
     // Auto-sort off → the alert stays visible (persistent drop target, empty).
     await expect(page.getByTestId('unhoused')).toBeVisible()
     await expect(page.getByTestId('unhoused-empty-hint')).toBeVisible()
-    await expect(
-      page.getByTestId('unhoused-pokemon-grid').getByTestId('pokemon-card'),
-    ).toHaveCount(0)
+    await expect(page.getByTestId('unhoused-pokemon-grid').getByTestId('pokemon-card')).toHaveCount(
+      0,
+    )
 
     // A pokemon selected only in the island search (never pinned to a house)
     // stays in the OFF warning.
@@ -113,9 +135,9 @@ test.describe('Auto-sort toggle', () => {
       .toBe(false)
     await page.reload()
 
-    const restoredSwitch = page.getByTestId('autosort-switch')
-    await expect(restoredSwitch).toBeVisible({ timeout: 10_000 })
-    await expect(restoredSwitch).not.toBeChecked()
+    const restoredManual = page.getByTestId('auto-sort-manual')
+    await expect(restoredManual).toBeVisible({ timeout: 10_000 })
+    await expect(restoredManual).toHaveAttribute('aria-pressed', 'true')
     const restoredHouse = page.getByTestId('house-card').filter({
       has: page.locator('.house-title', { hasText: /medium house M\d/ }),
     })
@@ -127,7 +149,7 @@ test.describe('Auto-sort toggle', () => {
 
     // AC.6: flipping back on re-solves; both end up in the single medium house
     // and the warning clears.
-    await restoredSwitch.click()
+    await page.getByTestId('auto-sort-auto').click()
     const solvedHouse = page.getByTestId('house-card').filter({
       has: page.locator('.house-title', { hasText: /medium house M\d/ }),
     })
@@ -156,8 +178,8 @@ test.describe('Auto-sort toggle', () => {
     await expect(house).toContainText('Bulbasaur', { timeout: 30_000 })
 
     // Flip off, then add via a plus-card's housemate modal.
-    await page.getByTestId('autosort-switch').click()
-    await expect(page.getByTestId('autosort-switch')).not.toBeChecked()
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
 
     await house.getByTestId('house-empty-slot').first().click()
     const modal = page.getByTestId('housemate-modal')
@@ -174,9 +196,9 @@ test.describe('Auto-sort toggle', () => {
     // Auto-sort off → the persistent drop target is still present, just empty.
     await expect(page.getByTestId('unhoused')).toBeVisible()
     await expect(page.getByTestId('unhoused-empty-hint')).toBeVisible()
-    await expect(
-      page.getByTestId('unhoused-pokemon-grid').getByTestId('pokemon-card'),
-    ).toHaveCount(0)
+    await expect(page.getByTestId('unhoused-pokemon-grid').getByTestId('pokemon-card')).toHaveCount(
+      0,
+    )
   })
 
   // AC.10 — the four-card row keeps the no-horizontal-overflow contract at
@@ -192,8 +214,6 @@ test.describe('Auto-sort toggle', () => {
     const housesBox = await page.getByTestId('houses-card').boundingBox()
     expect(autosortBox!.y).toBeLessThan(housesBox!.y)
 
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth),
-    ).toBeLessThanOrEqual(390)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   })
 })

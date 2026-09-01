@@ -99,8 +99,8 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     await page.mouse.move(5, 5) // move the pointer off the handle to dismiss it
 
     // OFF → enabled (no disabled handles, no tooltip, grab handle cursor).
-    await page.getByTestId('autosort-switch').click()
-    await expect(page.getByTestId('autosort-switch')).not.toBeChecked()
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
     await expect(handles).toHaveCount(2)
     await expect(page.locator('.pokemon-drag-handle--disabled')).toHaveCount(0)
     await handles.first().hover()
@@ -115,8 +115,8 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     ).not.toBe('grab')
 
     // Back on → disabled again.
-    await page.getByTestId('autosort-switch').click()
-    await expect(page.getByTestId('autosort-switch')).toBeChecked()
+    await page.getByTestId('auto-sort-auto').click()
+    await expect(page.getByTestId('auto-sort-auto')).toHaveAttribute('aria-pressed', 'true')
     await expect(page.locator('.pokemon-drag-handle--disabled')).toHaveCount(2, { timeout: 30_000 })
   })
 
@@ -130,8 +130,8 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     await selectPokemon(page, 'Venusaur')
     await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
 
-    await page.getByTestId('autosort-switch').click()
-    await expect(page.getByTestId('autosort-switch')).not.toBeChecked()
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
 
     const houses = page.getByTestId('house-card')
     await expect(houses).toHaveCount(2)
@@ -164,8 +164,8 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     await selectPokemon(page, 'Venusaur')
     await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
 
-    await page.getByTestId('autosort-switch').click()
-    await expect(page.getByTestId('autosort-switch')).not.toBeChecked()
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
 
     const houses = page.getByTestId('house-card')
     await expect(houses).toHaveCount(2)
@@ -196,8 +196,8 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     await selectPokemon(page, 'Bulbasaur')
     await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
 
-    await page.getByTestId('autosort-switch').click()
-    await expect(page.getByTestId('autosort-switch')).not.toBeChecked()
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
 
     // A pokemon selected island-only lands in the warning so the alert renders
     // and acts as the drop zone.
@@ -224,8 +224,8 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     await selectPokemon(page, 'Bulbasaur')
     await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
 
-    await page.getByTestId('autosort-switch').click()
-    await expect(page.getByTestId('autosort-switch')).not.toBeChecked()
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
 
     await selectPokemon(page, 'Ivysaur')
     const unhousedGrid = page.getByTestId('unhoused-pokemon-grid')
@@ -255,8 +255,8 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     await selectPokemon(page, 'Ivysaur')
     await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
 
-    await page.getByTestId('autosort-switch').click()
-    await expect(page.getByTestId('autosort-switch')).not.toBeChecked()
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
 
     const houses = page.getByTestId('house-card')
     await expect(houses).toHaveCount(2)
@@ -287,8 +287,8 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     await selectPokemon(page, 'Venusaur')
     await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
 
-    await page.getByTestId('autosort-switch').click()
-    await expect(page.getByTestId('autosort-switch')).not.toBeChecked()
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
 
     const houses = page.getByTestId('house-card')
     await expect(houses).toHaveCount(2)
@@ -329,8 +329,8 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     // into M1 and leaves M2 empty — the re-solve target below relies on that.
     await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
 
-    await page.getByTestId('autosort-switch').click()
-    await expect(page.getByTestId('autosort-switch')).not.toBeChecked()
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
 
     const m1 = page
       .getByTestId('house-card')
@@ -354,8 +354,8 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
 
     // Flip back on: Bulbasaur's pin keeps it in M1; Ivysaur is re-solved next
     // to it (pin-complement fill), not pinned — the temporary M2 drag is gone.
-    await page.getByTestId('autosort-switch').click()
-    await expect(page.getByTestId('autosort-switch')).toBeChecked()
+    await page.getByTestId('auto-sort-auto').click()
+    await expect(page.getByTestId('auto-sort-auto')).toHaveAttribute('aria-pressed', 'true')
     await expect(m1).toContainText('Bulbasaur', { timeout: 30_000 })
     await expect(m1).toContainText('Ivysaur', { timeout: 30_000 })
     await expect(m1.locator('[data-testid="progress-checkbox-pokemon"][aria-checked="true"]')).toHaveCount(
@@ -373,8 +373,8 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     await selectPokemon(page, 'Ivysaur')
     await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
 
-    await page.getByTestId('autosort-switch').click()
-    await expect(page.getByTestId('autosort-switch')).not.toBeChecked()
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
 
     const m1 = page
       .getByTestId('house-card')
@@ -392,9 +392,9 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     await expect(m2).toContainText('Ivysaur', { timeout: 10_000 })
 
     await page.reload()
-    const restoredSwitch = page.getByTestId('autosort-switch')
-    await expect(restoredSwitch).toBeVisible({ timeout: 10_000 })
-    await expect(restoredSwitch).not.toBeChecked()
+    const restoredManual = page.getByTestId('auto-sort-manual')
+    await expect(restoredManual).toBeVisible({ timeout: 10_000 })
+    await expect(restoredManual).toHaveAttribute('aria-pressed', 'true')
 
     const rm1 = page
       .getByTestId('house-card')
@@ -420,8 +420,8 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     await selectPokemon(page, 'Ivysaur')
     await expect(page.getByTestId('unhoused')).toBeVisible({ timeout: 30_000 })
 
-    await page.getByTestId('autosort-switch').click()
-    await expect(page.getByTestId('autosort-switch')).not.toBeChecked()
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
     await expect(page.locator('.pokemon-drag-handle').first()).toBeVisible({ timeout: 10_000 })
     await expect(page.locator('.pokemon-drag-handle')).toHaveCount(2)
 

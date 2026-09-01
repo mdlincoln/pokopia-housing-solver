@@ -928,9 +928,9 @@ describe('HomeView', () => {
       expect(wrapper.vm.autoSort).toBe(true)
       const card = wrapper.find('[data-testid="autosort-card"]')
       expect(card.exists()).toBe(true)
-      const switchInput = card.find('[data-testid="autosort-switch"]')
-      expect(switchInput.attributes('aria-label')).toBe('Automatically sort Pokemon')
-      expect((switchInput.element as HTMLInputElement).checked).toBe(true)
+      const group = card.find('[aria-label="Automatically sort Pokemon"]')
+      expect(group.exists()).toBe(true)
+      expect(card.find('[data-testid="auto-sort-auto"]').attributes('aria-pressed')).toBe('true')
     })
 
     // AC.3 — while OFF, mutating selection/houses/pins dispatches no solve.

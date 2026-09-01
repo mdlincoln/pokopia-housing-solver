@@ -162,9 +162,11 @@ body {
   width: 8.5rem;
 }
 
-/* AutoSort card switch: the card's only control, so it is scaled up from
-   Bootstrap's default and pinned at/above the WCAG 2.5.8 24px tap-target floor
-   (1.5em at the 1rem body font). */
+/* Housemate-modal auto-sort switch (HouseMateModal.vue). This was once the
+   AutoSort card's control but now only styles the retained modal switch; it is
+   scaled up from Bootstrap's default and pinned at/above the WCAG 2.5.8 24px
+   tap-target floor (1.5em at the 1rem body font). Do not delete — the modal
+   switch depends on it. */
 .autosort-switch-item .form-check-input {
   width: 2.75em;
   height: 1.5em;
@@ -183,16 +185,60 @@ body {
   box-shadow: 0 0 0 var(--space-1) rgb(43 169 190 / 35%);
 }
 
-/* Off-state accent: the card reads as deliberately paused — a coral border on
-   the card plus a coral-tinted unchecked switch. Only the card root carries
-   the `.autosort-card--off` toggle (template structural :class). */
+/* Off-state accent: the card reads as deliberately paused with a coral border.
+   Only the card root carries the `.autosort-card--off` toggle (template
+   structural :class). */
 .autosort-card--off {
   border-color: rgb(255 127 114 / 60%);
 }
 
-.autosort-card--off .autosort-switch-item .form-check-input:not(:checked) {
+/* Hero-sized Auto sort / Manual sort button group (AutoSortCard.vue). The
+   card's single control is now a full-width, vertically-stacked two-button
+   group, so it is bumped to a prominent hero size and pinned at/above the
+   WCAG 2.5.8 24px tap-target floor. Spacing flows from the --space-* ramp and
+   radii from the --trop-radius-* tokens (no one-off rem spacing). */
+.auto-sort-group {
+  width: 100%;
+}
+
+.auto-sort-group .btn {
+  min-width: 24px;
+  min-height: 40px;
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  border-radius: var(--trop-radius-control);
+  font-weight: 700;
+}
+
+.auto-sort-group .btn:focus-visible {
+  border-color: var(--trop-ocean-500);
+  box-shadow: 0 0 0 var(--space-1) rgb(43 169 190 / 35%);
+  outline: none;
+}
+
+.auto-sort-group .btn-group-vertical > .btn:not(:first-child) {
+  margin-top: var(--space-2);
+}
+
+/* The pressed button is always visibly distinct so the two never read as
+   identical: "Auto sort" fills ocean, "Manual sort" fills coral. */
+.auto-sort-group .btn.active {
+  color: #fff;
+  border-color: var(--trop-ocean-500);
+  background-color: var(--trop-ocean-500);
+}
+
+.auto-sort-group .btn-group-vertical > .btn:nth-child(2).active {
   border-color: var(--trop-coral-500);
-  background-color: rgb(255 127 114 / 25%);
+  background-color: var(--trop-coral-500);
+}
+
+.auto-sort-help {
+  margin-top: var(--space-3);
+  margin-bottom: 0;
+  color: var(--trop-text);
+  opacity: 0.85;
+  text-align: left;
 }
 
 /* Cart list rows collapse their default Bootstrap .list-group-item block
