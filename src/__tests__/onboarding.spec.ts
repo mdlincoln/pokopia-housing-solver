@@ -17,6 +17,7 @@ import {
 // Compound selectors (e.g. `[data-testid="X"] summary`) register their
 // `[data-testid="X"]` ancestor here.
 const KNOWN_TESTIDS = new Set([
+  'page-hero',
   'houses-card',
   'pokemon-search-card',
   'house-card',
@@ -67,9 +68,13 @@ describe('onboarding gate helpers', () => {
 })
 
 describe('onboarding step metadata', () => {
-  it('defines exactly the nine steps in walkthrough order', () => {
-    expect(ONBOARDING_STEPS).toHaveLength(9)
-    expect(ONBOARDING_STEPS.map((s) => s.title)).toEqual([
+  // The walkthrough opens with a text-only welcome step (no element highlighted)
+  // before introducing the individual UI features, so it is now ten steps.
+  // Both the titles AND the exact description copy are pinned so the intro copy
+  // (AC.3) and the original nine steps can't drift silently.
+  it('defines exactly the ten steps in walkthrough order', () => {
+    const titles = [
+      'Welcome to the Pokopia Housing Solver',
       'Set up your houses',
       'Add Pokémon',
       'Meet your house',
@@ -79,7 +84,41 @@ describe('onboarding step metadata', () => {
       'Needs fulfilled',
       'Auto-sort vs. manual',
       'Save & share your island',
-    ])
+    ]
+    const descriptions = [
+      'The Pokopia Housing Solver can help you figure out the right roommates for all the ' +
+        'Pokemon on your island, and how to give them the best decor to fulfill all their favorites!',
+      'Choose how many small (1-slot), medium (2-slot), and large (4-slot) houses you need ' +
+        'with each card’s +/− buttons. Clear all resets them to zero.',
+      'Type a Pokémon name (e.g. Bulbasaur) in the search box and press Enter to add it to ' +
+        'your island. Added Pokémon appear as chips — use ✕ to remove one, or Clear all to ' +
+        'start over.',
+      'Each house card lists the Pokémon the solver grouped together. Inside, every Pokémon ' +
+        'card shows the items that Pokémon loves — the ✓ marks are favorites already covered by ' +
+        'items in this house’s cart.',
+      'The “House items” button is where you go to see compatible items for this house — ' +
+        'things that match the favorites these Pokémon share.',
+      'The table header rolls up the favorite items of every Pokémon in this house. Red ' +
+        'columns are needs still open; green means a favorite is already covered.',
+      'Click + to stock the first recommended item for this house. It will show up in the ' +
+        'Shopping Cart on the right.',
+      'The item’s ✓ cells show which of the house’s combined favorites it fulfills, and the ' +
+        'rest of the table has recalculated to the items still needed.',
+      'Leave this ON for automatic assignments. Switch it OFF to arrange Pokémon yourself: ' +
+        'drag a Pokémon card onto a house, or use a house’s + button. Turn it back ON to re-sort.',
+      'Save current island keeps your setup in this browser. Share island as a link copies a ' +
+        'URL you can send to anyone or reopen later.',
+    ]
+    expect(ONBOARDING_STEPS).toHaveLength(10)
+    expect(ONBOARDING_STEPS.map((s) => s.title)).toEqual(titles)
+    expect(ONBOARDING_STEPS.map((s) => s.description)).toEqual(descriptions)
+  })
+
+  it('only the welcome (intro) step is text-only (highlight === false)', () => {
+    expect(ONBOARDING_STEPS[0]!.highlight).toBe(false)
+    for (const step of ONBOARDING_STEPS.slice(1)) {
+      expect(step.highlight).toBeUndefined()
+    }
   })
 
   it('every step has a unique, non-empty, inventory-listed attachTo selector', () => {

@@ -13,6 +13,15 @@ export interface OnboardingStep {
   attachTo: string
   title: string
   description: string
+  /**
+   * `true`/omitted = normal highlighted step (v-onboarding draws a cutout around
+   * the target). `false` = text-only step: v-onboarding has no "content-only"
+   * mode and its `attachTo` is required, so a non-highlighted step still anchors
+   * to a real element but pads the overlay cutout out past the viewport so no
+   * element is visibly highlighted (see the `INTRO_OVERLAY_PADDING` rationale in
+   * `OnboardingTour.vue`).
+   */
+  highlight?: boolean
 }
 
 // The attachTo selector is a CSS selector resolved via `document.querySelector`,
@@ -21,6 +30,17 @@ export interface OnboardingStep {
 
 /** The island-building walkthrough, in display order. */
 export const ONBOARDING_STEPS: OnboardingStep[] = [
+  {
+    attachTo: '[data-testid="page-hero"]',
+    title: 'Welcome to the Pokopia Housing Solver',
+    description:
+      'The Pokopia Housing Solver can help you figure out the right roommates for all the ' +
+      'Pokemon on your island, and how to give them the best decor to fulfill all their favorites!',
+    // Text-only intro: no element is highlighted (the overlay cutout is padded
+    // out past the viewport in OnboardingTour.vue), so the tour introduces the
+    // site before it starts calling out individual UI elements.
+    highlight: false,
+  },
   {
     attachTo: '[data-testid="houses-card"]',
     title: 'Set up your houses',
