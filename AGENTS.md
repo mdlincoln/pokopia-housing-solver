@@ -239,6 +239,8 @@ HomeView's script is decomposed into single-responsibility composables (`src/com
 - Unit: `src/__tests__/*.spec.ts` under Vitest + jsdom, using `@vue/test-utils`.
 - E2E: `e2e/*.spec.ts` under Playwright (Chromium only). `playwright.config.ts` runs `npm run dev` locally (port 5173) or `npm run preview` on CI (port 4173). Timeout 5s per test, 2s per expect.
 
+**Accessibility testing.** `e2e/accessibility.spec.ts` is an axe scanning suite (`@axe-core/playwright`) that enumerates the app's meaningful UI states (initial/populated home, save/manage/habitat/housemate modals, cart, changelog, guided tour) plus an `axe-gate-fires` harness self-test. `npm run test:a11y` runs it. **It is not yet a CI gate.** Per POK-5's plan, the suite is authored but deliberately not run to record the app's violations; running it to enumerate them (`RUN_AXE_REPORT_ONLY=1 npx playwright test e2e/accessibility.spec.ts`) and building the remediation document are a pending later phase — "suite exists" does not mean "app is audited."
+
 When inspecting the running app with Playwright, always clean up any screenshots you capture (e.g. `page.screenshot(...)` output) before finishing — delete them along with any `.playwright-mcp/` artifacts so they never get committed or left behind.
 
 ## Deployment
