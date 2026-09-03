@@ -39,7 +39,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="d-flex align-items-start app-layout">
     <BContainer fluid class="app-shell flex-fill min-w-0">
-      <header class="page-hero">
+      <header class="page-hero" data-testid="page-hero">
         <h1 class="page-title">Pokopia Housing Solver</h1>
         <p>
           Optimize your Pokopia roommate assignments by matching likeminded Pokémon together and

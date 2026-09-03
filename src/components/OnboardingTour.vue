@@ -91,13 +91,15 @@ async function addFirstSuggestedItem() {
 }
 
 // Zero-based index → preparation to run just before that step is shown.
-//  3 = "House items" button: exists, but NOT expanded yet.
-//  4 = "Combined favorites" header: expand the panel so the thead renders.
-//  6 = "Needs fulfilled" row: stock the first recommended item.
+//  4 = "House items" button: exists, but NOT expanded yet.
+//  5 = "Combined favorites" header: expand the panel so the thead renders.
+//  7 = "Needs fulfilled" row: stock the first recommended item.
+// (Step 0 is the text-only welcome step, so the house-items steps below are
+// shifted one slot later than they were before the intro was prepended.)
 const STEP_PREPARE: Record<number, () => Promise<void>> = {
-  3: ensureFirstHouseItemsExists,
-  4: ensureFirstHouseItemsOpen,
-  6: addFirstSuggestedItem,
+  4: ensureFirstHouseItemsExists,
+  5: ensureFirstHouseItemsOpen,
+  7: addFirstSuggestedItem,
 }
 
 // v-onboarding resolves and positions its popper (and the SVG highlight cutout)
@@ -116,12 +118,27 @@ function forceReattach() {
   preparedTick.value++
 }
 
+// v-onboarding has no "content-only" step mode: `attachTo` is required and the
+// SVG dimming overlay is always enabled. For the text-only welcome step we keep
+// the overlay enabled (so `useSvgOverlay`'s `updatePath` runs on EVERY step
+// transition, Next and Back alike, resetting its retained `currentTarget`) but
+// pad the single cutout hole far past the viewport, so the whole viewport is
+// the un-dimmed "hole" and no specific element is highlighted. This also avoids
+// the stale-cutout pitfall of `overlay.enabled = false`, which skips `updatePath`
+// on entry and would leave the previous step's `currentTarget` in place, letting
+// the overlay's scroll/resize `refresh()` re-draw step 2's cutout during Back-nav
+// (exactly the "go Back from 'Set up your houses' to the intro" path).
+const INTRO_OVERLAY_PADDING = 100_000 // cutout hole larger than any viewport → no visible dim
+
 const steps = computed<StepEntity[]>(() => {
   // Reading preparedTick makes the recompute reactive to forceReattach().
   void preparedTick.value
   return ONBOARDING_STEPS.map((step, index) => ({
     attachTo: { element: step.attachTo },
     content: { title: step.title, description: step.description },
+    ...(step.highlight === false
+      ? { options: { overlay: { padding: INTRO_OVERLAY_PADDING } } }
+      : {}),
     ...(STEP_PREPARE[index] ? { on: { beforeStep: STEP_PREPARE[index]! } } : {}),
   }))
 })
