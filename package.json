@@ -12,6 +12,7 @@
     "test:unit": "vitest",
     "pretest:unit": "npm run build:data",
     "test:e2e": "playwright test",
+    "test:a11y": "playwright test e2e/accessibility.spec.ts",
     "harvest:pokemon": "node scripts/harvest_pokemon.js",
     "harvest:items": "node scripts/harvest_items.js",
     "harvest:habitats": "node scripts/harvest_habitats.js",
@@ -36,6 +37,7 @@
     "vue-router": "^5.1.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.60.0",
     "@tsconfig/node24": "^24.0.4",
     "@types/jsdom": "^28.0.3",
