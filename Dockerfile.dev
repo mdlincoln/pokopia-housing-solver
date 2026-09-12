@@ -1,0 +1,50 @@
+# pt-factory agent container for pokopia-housing-solver.
+#
+# Contract (docs/REPO-CONTRACT.md):
+#   1. Builds for linux/arm64 (Graviton).    -> node:22-slim has arm64 manifests.
+#   2. Installs the repo toolchain + deps.    -> npm ci at build time (runtime root is read-only).
+#   3. polytoken on PATH, pinned + checksum-verified (0.8.6, matches the installed polytoken).
+#   4. Provides POSIX sh.                     -> Debian slim base.
+#   5. Tolerates a read-only root FS.         -> npm caches redirected under /tmp; no runtime writes to the image.
+
+# NODE_VERSION pinned to the repo's .nvmrc (22.22.2) so the agent uses the exact pinned toolchain.
+ARG NODE_VERSION=22.22.2
+FROM node:${NODE_VERSION}-slim
+
+# Prereqs for the polytoken install block below (curl, unzip, ca-certificates, sha256sum).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      curl ca-certificates unzip coreutils \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG POLYTOKEN_VERSION=0.8.6
+RUN curl -fsSL "https://dl.polytoken.dev/${POLYTOKEN_VERSION}/linux-arm64/polytoken.zip" -o /tmp/polytoken.zip && \
+    curl -fsSL "https://dl.polytoken.dev/${POLYTOKEN_VERSION}/SHA256SUMS.linux" -o /tmp/SHA256SUMS && \
+    grep "linux-arm64/polytoken.zip" /tmp/SHA256SUMS | awk '{print $1 "  /tmp/polytoken.zip"}' > /tmp/polytoken.sha256sum && \
+    sha256sum -c /tmp/polytoken.sha256sum && \
+    unzip /tmp/polytoken.zip -d /usr/local/bin && chmod +x /usr/local/bin/polytoken && \
+    rm /tmp/polytoken.sha256sum /tmp/polytoken.zip /tmp/SHA256SUMS
+
+# Runtime writes (npm cache/global) go under /tmp so the read-only root FS tolerates them.
+# HUSKY=0 suppresses the npm `prepare` git-hook installer, which is a no-op build-time side effect.
+ENV NPM_CONFIG_CACHE=/tmp/npm \
+    NPM_CONFIG_PREFIX=/tmp/npm-global \
+    HUSKY=0
+
+WORKDIR /app
+
+# Bake repo dependencies at build time. node:22 already ships a uid-1000 user (`node`),
+# so we reuse it (no useradd, avoids UID collisions).
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Full source last so dependency layers cache.
+COPY . .
+
+# The agent operates as the uid-1000 `node` user; make the baked checkout writable so
+# build steps (e.g. build:data writing gitignored json into src/data/) succeed in place.
+RUN chown -R node:node /app
+
+USER node
+
+# Survivable smoke check.
+RUN polytoken --version

@@ -1,0 +1,14 @@
+# Keep the Docker build context lean and, crucially, do NOT let a stale host
+# checkout overwrite the Linux deps baked by `npm ci` in Dockerfile.dev.
+# These mirror the entries in .gitignore that must never land in the image.
+node_modules
+dist
+dist-ssr
+coverage
+
+.git
+.gitignore
+*.tsbuildinfo
+.eslintcache
+*.log
+.DS_Store
