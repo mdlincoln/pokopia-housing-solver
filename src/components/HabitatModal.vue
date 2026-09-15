@@ -84,6 +84,7 @@ watch(
     ok-only
     ok-title="Close"
     scrollable
+    :body-attrs="{ tabindex: 0 }"
     data-testid="habitat-modal"
     @hide="emit('close')"
   >

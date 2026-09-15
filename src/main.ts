@@ -24,7 +24,12 @@ const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
-app.use(createBootstrap())
+// The `rtl: { localeInitial: 'en' }` config matters for accessibility:
+// bootstrap-vue-next's useRtl composable (mounted by every BFormSpinbutton)
+// mirrors its locale onto <html lang>. Without a registered locale it writes
+// lang="" — blanking the static lang="en" from index.html and failing axe's
+// `html-has-lang` rule. 'en' + non-RTL is the app's actual posture.
+app.use(createBootstrap({ rtl: { localeInitial: 'en', rtlInitial: false } }))
 
 app.config.errorHandler = (err, _instance, _info) => {
   posthog.captureException(err)

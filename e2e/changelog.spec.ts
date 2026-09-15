@@ -9,9 +9,23 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('pokehousing_tour_seen', '1'))
 })
 
+// Navigate to the changelog via the footer link (client-side router
+// navigation). A direct `page.goto('/changelog')` only works on the dev
+// server (base '/'): on the preview/production server the bundle is served
+// under base `/pokopia-housing-solver/` and the bare path hits Vite's 404
+// hint page instead of the SPA. The footer link resolves the base correctly
+// in both modes.
+async function gotoChangelog(page: import('@playwright/test').Page) {
+  await page.goto('/')
+  const link = page.getByTestId('changelog-link')
+  await expect(link).toBeVisible()
+  await link.click()
+  await expect(page).toHaveURL(/\/changelog$/)
+}
+
 test.describe('changelog page', () => {
   test('renders the changelog on /changelog with the themed shell', async ({ page }) => {
-    await page.goto('/changelog')
+    await gotoChangelog(page)
 
     // Shared shell from App.vue (hero header + footer).
     await expect(
@@ -37,7 +51,7 @@ test.describe('changelog page', () => {
 
   test('no horizontal overflow at 390px viewport width', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto('/changelog')
+    await gotoChangelog(page)
     await expect(page.getByTestId('changelog')).toBeVisible()
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth)
     expect(scrollWidth).toBeLessThanOrEqual(390)

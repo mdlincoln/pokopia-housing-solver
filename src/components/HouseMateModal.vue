@@ -59,6 +59,7 @@ function onSearchUpdate(names: string[]) {
     ok-only
     ok-title="Close"
     scrollable
+    :body-attrs="{ tabindex: 0 }"
     data-testid="housemate-modal"
     @hide="emit('close')"
   >

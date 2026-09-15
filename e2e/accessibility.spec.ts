@@ -1,17 +1,5 @@
 // Accessibility scanner (axe) — a per-state scanning suite for the app's
 // meaningful UI states, built on @axe-core/playwright (AxeBuilder).
-//
-// The suite enumerates each state and runs axe against it, applying a
-// fail-on-critical/serious gate. Per the POK-5 plan this suite is *authored*
-// here, but it is deliberately NOT run to enumerate/record the app's real
-// violations — that enumeration plus the remediation document belong to a
-// later plan phase. The only axe execution in this change is the controlled
-// `axe-gate-fires` self-test, which proves the harness actually detects a real
-// problem rather than vacantly passing.
-//
-// Run the whole suite (enumeration or gate):
-//   npm run test:a11y
-//   RUN_AXE_REPORT_ONLY=1 npx playwright test e2e/accessibility.spec.ts  # log-only, no assertions.
 
 import { AxeBuilder } from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
@@ -42,12 +30,12 @@ function failOnCriticalSerious(violations: AxeViolation[]): void {
   expect(
     serious,
     `axe found ${serious.length} critical/serious violation(s):\n` +
-      serious
-        .map(
-          (v) =>
-            `- ${v.id} (${v.impact})\n  ${v.nodes.map((n) => JSON.stringify(n.target)).join('\n  ')}`,
-        )
-        .join('\n'),
+    serious
+      .map(
+        (v) =>
+          `- ${v.id} (${v.impact})\n  ${v.nodes.map((n) => JSON.stringify(n.target)).join('\n  ')}`,
+      )
+      .join('\n'),
   ).toEqual([])
 }
 
@@ -55,6 +43,32 @@ function failOnCriticalSerious(violations: AxeViolation[]): void {
 // violation and never asserts — the enumeration path for the deferred phase.
 // Otherwise it applies the critical/serious gate.
 async function runAxe(page: Page): Promise<AxeViolation[]> {
+  // Settle before scanning: Bootstrap's `.fade` transitions (modals, alerts)
+  // animate opacity 0 → 1 over ~150ms, and axe reads the page's *computed*
+  // styles at scan time. Analyzing mid-transition makes every fg/bg pair
+  // read as a washed-out mid-fade composite, fabricating contrast failures
+  // (verified: an immediate second analyze of the same DOM reports the true,
+  // passing colors). Wait for every shown fade to reach its settled opacity —
+  // bounded, and skipped when nothing is transitioning. Note the modal
+  // backdrop fades to `--bs-backdrop-opacity` (0.5), not 1; without that
+  // special case every open-modal scan would dead-wait the full timeout.
+  await page
+    .waitForFunction(
+      () =>
+        Array.from(document.querySelectorAll('.fade.show')).every((el) => {
+          const cs = getComputedStyle(el)
+          // The backdrop fades to `--bs-backdrop-opacity` (Bootstrap declares
+          // `.5`, which computes to opacity `0.5` — compare numerically, the
+          // serializations differ). Everything else settles at 1.
+          const target = el.classList.contains('modal-backdrop')
+            ? cs.getPropertyValue('--bs-backdrop-opacity') || '0.5'
+            : '1'
+          return Number.parseFloat(cs.opacity) === Number.parseFloat(target)
+        }),
+      undefined,
+      { timeout: 5_000, polling: 50 },
+    )
+    .catch(() => undefined)
   const violations = await analyze(page)
   if (process.env.RUN_AXE_REPORT_ONLY) {
     for (const v of violations) {
@@ -123,9 +137,28 @@ test('axe-modals-save', async ({ page }) => {
   await runAxe(page)
 })
 
-// Manage-islands modal.
+// Manage-islands modal. `saved-queries-manage` only renders once at least one
+// saved island exists (SavedIslandsCard gates the select + manage group behind
+// `savedQueries.length`), so seed one entry directly in localStorage. The
+// seeded entry is a minimal-but-valid SavedQuery; restoring it is not needed —
+// only the card rendering the manage button (and the restore select) matters.
 test('axe-modals-manage', async ({ page }) => {
   test.setTimeout(90_000)
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'pokehousing_saved_queries',
+      JSON.stringify([
+        {
+          title: 'Axe scan island',
+          timestamp: 1715000000000,
+          small: 1,
+          medium: 3,
+          large: 2,
+          pokemon: ['Bulbasaur'],
+        },
+      ]),
+    ),
+  )
   await page.goto('/')
   await expect(page.getByTestId('houses-card')).toBeVisible({ timeout: 30_000 })
   await page.getByTestId('saved-queries-manage').click()
@@ -184,10 +217,17 @@ test('axe-cart', async ({ page }) => {
   await runAxe(page)
 })
 
-// Static changelog route.
+// Static changelog route. Navigate via the footer link (client-side router
+// navigation) instead of `page.goto('/changelog')`: the preview server serves
+// the production bundle under base `/pokopia-housing-solver/`, where a direct
+// `/changelog` URL hits Vite's 404 hint page instead of the SPA fallback. The
+// footer link resolves the base correctly in both dev and preview modes.
 test('axe-changelog', async ({ page }) => {
   test.setTimeout(90_000)
-  await page.goto('/changelog')
+  await page.goto('/')
+  await expect(page.getByTestId('houses-card')).toBeVisible({ timeout: 30_000 })
+  await page.getByTestId('changelog-link').click()
+  await expect(page).toHaveURL(/\/changelog$/)
   await expect(page.getByTestId('changelog')).toBeVisible({ timeout: 10_000 })
   await runAxe(page)
 })

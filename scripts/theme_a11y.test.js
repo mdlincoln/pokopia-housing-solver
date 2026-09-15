@@ -128,3 +128,76 @@ test('checked-off rows keep text above the 4.5:1 floor at 0.8 opacity', () => {
     'guard: opacity 0.6 over the sand row is known to fail the floor',
   )
 })
+
+// --- POK-8 remediation pins -------------------------------------------------
+// The axe suite (e2e/accessibility.spec.ts) gates live scans; these static
+// pins keep the remediated color pairs from regressing between axe runs.
+// Colors are RESOLVED from the stylesheet (tokens dereferenced), so a future
+// tweak that drops any pair under the 4.5:1 floor fails here immediately.
+
+function hexToRgb(hex) {
+  const n = Number.parseInt(hex.replace('#', ''), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+function tokenValue(name) {
+  const m = css.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`))
+  assert.ok(m, `token ${name} must be defined as #rrggbb in :root`)
+  return hexToRgb(m[1])
+}
+
+// Resolve a `prop: #rrggbb` or `prop: var(--token)` declaration inside a rule
+// body to [r,g,b].
+function resolveColor(body, prop) {
+  const m = body.match(new RegExp(`${prop}:\\s*(#[0-9a-fA-F]{6}|var\\((--[a-z0-9-]+)\\))`))
+  assert.ok(m, `${prop} (#hex or var(--token)) not found in rule body`)
+  return m[2] ? tokenValue(m[2]) : hexToRgb(m[1])
+}
+
+function assertContrast(fg, bg, label, floor = 4.5) {
+  const ratio = contrastRatio(fg, bg)
+  assert.ok(
+    ratio >= floor,
+    `${label} must be ≥${floor}:1, got ${ratio.toFixed(2)}:1 (fg #${fg.map((c) => c.toString(16).padStart(2, '0')).join('')} / bg #${bg.map((c) => c.toString(16).padStart(2, '0')).join('')})`,
+  )
+}
+
+test('pressed auto-sort toggle fills keep white text above 4.5:1', () => {
+  const ocean = ruleBody(/\.auto-sort-group \.btn\.active\s*\{/)
+  assertContrast([255, 255, 255], resolveColor(ocean, 'background-color'), 'auto-sort active fill')
+  const coral = ruleBody(/\.btn-group-vertical > \.btn:nth-child\(2\)\.active\s*\{/)
+  assertContrast(
+    [255, 255, 255],
+    resolveColor(coral, 'background-color'),
+    'manual-sort active fill',
+  )
+})
+
+test('badge variant tint/text pairs meet the 4.5:1 floor', () => {
+  const variants = ['success', 'warning', 'info', 'danger', 'secondary']
+  for (const variant of variants) {
+    const body = ruleBody(new RegExp(`\\.badge\\.text-bg-${variant}\\s*\\{`))
+    assertContrast(
+      resolveColor(body, 'color'),
+      resolveColor(body, 'background-color'),
+      `text-bg-${variant} badge`,
+    )
+  }
+})
+
+test('btn-outline-danger link text clears 4.5:1 on the sand surface', () => {
+  const body = ruleBody(/\.btn-outline-danger\s*\{/)
+  assertContrast(resolveColor(body, '--bs-btn-color'), SAND, 'btn-outline-danger at rest')
+})
+
+test('recommendations-more link color clears 4.5:1 on the sand surface', () => {
+  const body = ruleBody(/\.recommendations-more-btn\s*\{/)
+  assertContrast(resolveColor(body, '--bs-btn-color'), SAND, 'recommendations-more-btn at rest')
+})
+
+test('housemate auto-sort warning alert text clears 4.5:1 on its background', () => {
+  const body = ruleBody(/\.housemate-autosort-warning\s*\{/)
+  const TEXT = resolveColor(body, '--bs-alert-color') // #3d2d01
+  const WARNING_BG_HEX = [255, 243, 205] // Bootstrap --bs-warning-bg-subtle
+  assertContrast(TEXT, WARNING_BG_HEX, 'housemate-autosort-warning text')
+})

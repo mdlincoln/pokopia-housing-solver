@@ -114,6 +114,7 @@ function optionText(q: SavedQuery): string {
         <BInputGroup>
           <BFormSelect
             id="saved-queries-select"
+            aria-label="Select a saved island to restore"
             :model-value="selectedTimestamp"
             :options="[
               { value: null, text: 'Select a saved island…' },

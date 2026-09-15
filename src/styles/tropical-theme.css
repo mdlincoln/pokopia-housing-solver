@@ -7,10 +7,16 @@
   --trop-sky-200: #c5f2ff;
   --trop-ocean-300: #7cd8e8;
   --trop-ocean-500: #2ba9be;
+  /* Deep ocean fill for the pressed auto-sort toggle: keeps white button text
+     at ≥4.5:1 (pinned by scripts/theme_a11y.test.js). */
+  --trop-ocean-600: #14707f;
   --trop-mint-300: #9ee8c9;
   --trop-palm-600: #2f8f6f;
   --trop-coral-300: #ffb3a8;
   --trop-coral-500: #ff7f72;
+  /* Deep coral fill for the pressed "Manual sort" toggle: keeps white button
+     text at ≥4.5:1 (pinned by scripts/theme_a11y.test.js). */
+  --trop-coral-600: #c94033;
   --trop-sun-300: #ffd97a;
   --trop-night-700: #24506b;
   --trop-text: #2a4c5b;
@@ -221,16 +227,17 @@ body {
 }
 
 /* The pressed button is always visibly distinct so the two never read as
-   identical: "Auto sort" fills ocean, "Manual sort" fills coral. */
+   identical: "Auto sort" fills deep ocean, "Manual sort" fills deep coral.
+   Both fills keep white text at ≥4.5:1 contrast (WCAG AA). */
 .auto-sort-group .btn.active {
   color: #fff;
-  border-color: var(--trop-ocean-500);
-  background-color: var(--trop-ocean-500);
+  border-color: var(--trop-ocean-600);
+  background-color: var(--trop-ocean-600);
 }
 
 .auto-sort-group .btn-group-vertical > .btn:nth-child(2).active {
-  border-color: var(--trop-coral-500);
-  background-color: var(--trop-coral-500);
+  border-color: var(--trop-coral-600);
+  background-color: var(--trop-coral-600);
 }
 
 .auto-sort-help {
@@ -1062,6 +1069,13 @@ details[open] > .details-summary::before,
   transition: border-color 150ms ease;
 }
 
+/* The auto-sort warning alert sits on the frosted modal surface; Bootstrap's
+   default `--bs-alert-color` (#664d03 on #fff3cd) does not hold 4.5:1 once the
+   translucent layers composite, so use a deeper warm brown. */
+.housemate-autosort-warning {
+  --bs-alert-color: #3d2d01;
+}
+
 .housemate-option:hover,
 .housemate-option:focus-visible {
   border-color: rgb(43 169 190 / 70%);
@@ -1122,35 +1136,66 @@ details[open] > .details-summary::before,
   padding: 0.3rem 0.45rem;
 }
 
-.badge.bg-success,
-.badge.bg-warning,
-.badge.bg-info,
-.badge.bg-danger,
-.badge.text-bg-success,
-.badge.text-bg-warning,
-.badge.text-bg-info,
-.badge.text-bg-danger {
-  color: inherit;
+/* The "Show 50 more" table-foot link: Bootstrap's link blue on the card tint
+   misses 4.5:1, so pin the link-family colors to deep night ocean. */
+.recommendations-more-btn {
+  --bs-btn-color: var(--trop-night-700);
+  --bs-btn-hover-color: var(--trop-night-700);
+  --bs-btn-active-color: var(--trop-night-700);
+  --bs-btn-focus-shadow-rgb: 36, 80, 107;
 }
 
+/* Badge variants: Bootstrap's `.text-bg-*` rules force white text with
+   !important over the pastel token backgrounds (--bs-success etc.), which
+   lands far below 4.5:1. Rework the family into light pastel tints with dark
+   text instead — the contrast floor for every pair is pinned by
+   scripts/theme_a11y.test.js. !important is required to beat Bootstrap's own
+   !important on `.text-bg-*` color/background-color. */
 .badge.bg-success,
 .badge.text-bg-success {
-  color: #1a4a35;
+  color: #123a2a !important;
+  background-color: #d9f2e4 !important;
 }
 
 .badge.bg-warning,
 .badge.text-bg-warning {
-  color: #624e1f;
+  color: #4a3a0c !important;
+  background-color: #fff3cd !important;
 }
 
 .badge.bg-info,
 .badge.text-bg-info {
-  color: #1e5568;
+  color: #123c47 !important;
+  background-color: #d6f1f7 !important;
 }
 
 .badge.bg-danger,
 .badge.text-bg-danger {
-  color: #7c2f26;
+  color: #5c231c !important;
+  background-color: #ffe0db !important;
+}
+
+.badge.bg-secondary,
+.badge.text-bg-secondary {
+  color: #123845 !important;
+  background-color: #d6edf4 !important;
+}
+
+/* Bootstrap compiles `.btn-outline-danger`'s palette to the literal default
+   (#dc3545), bypassing the theme's --bs-danger coral. The panel uses BOffcanvas/BModal
+   surfaces over sand cards where #dc3545 reads 4.25:1; deep coral clears 4.5:1. */
+.btn-outline-danger {
+  --bs-btn-color: var(--trop-coral-600);
+  --bs-btn-border-color: var(--trop-coral-600);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--trop-coral-600);
+  --bs-btn-hover-border-color: var(--trop-coral-600);
+  --bs-btn-focus-shadow-rgb: 201, 64, 51;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: var(--trop-coral-600);
+  --bs-btn-active-border-color: var(--trop-coral-600);
+  --bs-btn-disabled-color: var(--trop-coral-600);
+  --bs-btn-disabled-border-color: var(--trop-coral-600);
 }
 
 .modal-content {
