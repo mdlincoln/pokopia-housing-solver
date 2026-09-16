@@ -11,14 +11,19 @@ import './styles/tropical-theme.css'
 import App from './App.vue'
 import router from './router'
 
-posthog.init(
-  import.meta.env.VITE_POSTHOG_TOKEN || 'phc_tOVguqjWzuJaJmpxvho8ifms2nxCnypWeJD5Dd9bSoW',
-  {
+// PostHog is initialized ONLY when a real token is present at build time.
+// `import.meta.env.VITE_*` is statically replaced during `npm run build`, so
+// local dev and CI `npm run preview` (which serve builds without the token)
+// never initialize PostHog and never send analytics. The production deploy
+// injects the repository secret `VITE_POSTHOG_TOKEN` into its build step.
+const POSTHOG_TOKEN = import.meta.env.VITE_POSTHOG_TOKEN
+if (POSTHOG_TOKEN) {
+  posthog.init(POSTHOG_TOKEN, {
     api_host: 'https://b.matthewlincoln.net',
     ui_host: 'https://us.posthog.com',
     defaults: '2026-01-30',
-  },
-)
+  })
+}
 
 const app = createApp(App)
 

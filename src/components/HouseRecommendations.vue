@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { trackRecommendationsExpanded } from '@/analytics'
 import { assetPath } from '@/assetPath'
 import IconGlyph from '@/components/IconGlyph.vue'
 import { iconForFavorite } from '@/favoriteIcons'
@@ -231,6 +232,16 @@ const hasMore = computed(() => visibleCount.value < sortedRows.value.length)
 
 const remainingCount = computed(() => sortedRows.value.length - visibleCount.value)
 
+// "Show 50 more" pagination: grow the window, then record the post-increment
+// visible count so dashboards see the total shown rather than the increment.
+function onLoadMore() {
+  visibleCount.value += RECOMMENDATIONS_PAGE_SIZE
+  trackRecommendationsExpanded({
+    house_id: props.house.houseId,
+    visible_count: visibleCount.value,
+  })
+}
+
 // Reset the expanded window on a new pokemon set and on the craftable-only
 // toggle. Cart add/remove reorders the same list, so user expansion persists.
 watch(
@@ -439,7 +450,7 @@ watchEffect(() => {
               class="recommendations-more-btn"
               data-testid="recommendations-more"
               :aria-label="`Show ${Math.min(RECOMMENDATIONS_PAGE_SIZE, remainingCount)} more recommended items`"
-              @click="visibleCount += RECOMMENDATIONS_PAGE_SIZE"
+              @click="onLoadMore"
               >Show 50 more</BButton
             >
           </td>

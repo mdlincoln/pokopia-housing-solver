@@ -31,6 +31,15 @@ jobs:
 
       - name: Build production bundle
         run: npm run build
+        env:
+          # Only production builds that receive the repo secret initialize
+          # PostHog (src/main.ts guards on VITE_POSTHOG_TOKEN presence). Local
+          # dev / CI preview builds leave it unset and never send analytics, so
+          # feature-usage dashboards stay free of dev/e2e noise.
+          # ACTION REQUIRED: create the `VITE_POSTHOG_TOKEN` GitHub Actions
+          # repository secret before the next deploy — until it exists, the
+          # live site's PostHog analytics are disabled.
+          VITE_POSTHOG_TOKEN: ${{ secrets.VITE_POSTHOG_TOKEN }}
 
       - name: Publish site to web branch
         uses: JamesIves/github-pages-deploy-action@v4

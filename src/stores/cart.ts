@@ -1,3 +1,4 @@
+import { trackItemAdded, trackItemRemoved } from '@/analytics'
 import {
   getAggregatedIngredients,
   getItemMetadata,
@@ -161,6 +162,10 @@ export const useCartStore = defineStore('cart', () => {
         flavorText: metadata.flavorText,
         tag: metadata.tag,
       })
+      // Post-guard: an idempotent re-add of an existing item returns above and
+      // never fires a duplicate event. Restore paths use a direct map mutation
+      // (not addItem), so island restores don't emit item_added.
+      trackItemAdded({ house_id: houseId, item: name })
       if (!recipes.value.has(name)) {
         recipes.value.set(name, await getRecipeForItem(name))
       }
@@ -210,7 +215,12 @@ export const useCartStore = defineStore('cart', () => {
 
   async function removeItem(houseId: string, name: string) {
     await withBusy(async () => {
-      items.value.delete(cartKey(houseId, name))
+      const key = cartKey(houseId, name)
+      // Guard so a remove of an item never added (or already removed) does not
+      // fire a spurious item_removed or re-run progress/aggregate side effects.
+      if (!items.value.has(key)) return
+      items.value.delete(key)
+      trackItemRemoved({ house_id: houseId, item: name })
       progressStore.clearItemProgress(houseId, name)
       await recomputeAggregated()
     })

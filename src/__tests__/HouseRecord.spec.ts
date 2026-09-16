@@ -2,6 +2,7 @@ import HouseMateModal from '@/components/HouseMateModal.vue'
 import HouseRecord from '@/components/HouseRecord.vue'
 import { sameFavorites } from '@/houseRecommendations'
 import { favoriteCoverageColumnKey, recommendedItemsForHouse } from '@/queries'
+import posthog from 'posthog-js'
 import type { AdjacencyData, HouseAssignment, PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { useProgressStore } from '@/stores/progress'
@@ -1927,6 +1928,33 @@ describe('HouseRecord', () => {
       const slot = wrapper.find('[data-testid="house-empty-slot"]')
       expect(slot.exists()).toBe(true)
       expect(slot.attributes('disabled')).toBeDefined()
+    })
+
+    it('AC.9 toggling a pokemon pin tracks pokemon_pinned / pokemon_unpinned', async () => {
+      const house: HouseAssignment = {
+        houseId: 'M1',
+        size: 'medium',
+        capacity: 2,
+        pokemon: ['AlphaOne', 'AlphaTwo'],
+      }
+      const wrapper = mountWithSuggestions(house)
+      await flushPromises()
+
+      const lock = wrapper.find('[data-testid="progress-checkbox-pokemon"]')
+      expect(lock.exists()).toBe(true)
+
+      await lock.trigger('click')
+      expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('pokemon_pinned', {
+        house_id: 'M1',
+        name: 'AlphaOne',
+      })
+
+      vi.mocked(posthog.capture).mockClear()
+      await wrapper.find('[data-testid="progress-checkbox-pokemon"]').trigger('click')
+      expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('pokemon_unpinned', {
+        house_id: 'M1',
+        name: 'AlphaOne',
+      })
     })
   })
 })

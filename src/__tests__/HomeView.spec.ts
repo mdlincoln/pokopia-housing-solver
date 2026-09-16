@@ -4,7 +4,10 @@ import {
   loadPokemonNames,
   loadSpawnHabitatsByName,
 } from '@/queries'
+import HousesConfigCard from '@/components/HousesConfigCard.vue'
+import PokemonConfigCard from '@/components/PokemonConfigCard.vue'
 import { TOUR_STORAGE_KEY } from '@/onboarding'
+import posthog from 'posthog-js'
 import type { SolverResult } from '@/solver'
 import { useCartStore } from '@/stores/cart'
 import { usePinStore } from '@/stores/pins'
@@ -48,6 +51,16 @@ vi.mock('@/queries', async (importOriginal) => {
       vi.fn<() => Promise<Record<string, import('@/queries').SpawnHabitat[]>>>(),
   }
 })
+
+// The guided tour is an async component; when a test clicks "Take the tour" it
+// would load v-onboarding's real Popper stack. Stub it so OnboardingTour
+// renders inertly in jsdom (its analytics wiring is unit-tested separately in
+// OnboardingTour.spec.ts).
+vi.mock('v-onboarding', () => ({
+  VOnboardingWrapper: { template: '<div><slot /></div>' },
+  VOnboardingStep: { template: '<div><slot /></div>' },
+  useVOnboarding: () => ({ start: vi.fn<() => void>(), finish: vi.fn<() => void>() }),
+}))
 
 const testPokemonData = {
   AlphaOne: { image: '', favorites: ['A', 'B', 'C', 'D', 'E'], habitat: 'Dark' },
@@ -1412,5 +1425,165 @@ describe('HomeView', () => {
       // The unhoused variant has no pin button.
       expect(unhoused.find('[data-testid="progress-checkbox-pokemon"]').exists()).toBe(false)
     })
+  })
+
+  // --- Analytics ---
+  // The beforeEach above (query mocks, empty hash, tour-seen flag) applies
+  // here too, so mountHome() behaves identically to the rest of the file.
+
+  it('AC.1 fires app_landed with arrival_source direct on a plain mount', async () => {
+    window.location.hash = ''
+    await mountHome()
+    expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('app_landed', {
+      arrival_source: 'direct',
+    })
+    expect(vi.mocked(posthog.capture)).not.toHaveBeenCalledWith(
+      'shared_link_opened',
+      expect.anything(),
+    )
+  })
+
+  it('AC.1 fires app_landed shared_link + shared_link_opened on a hashed mount', async () => {
+    const shared = { small: 1, medium: 0, large: 0, pokemon: ['AlphaOne'] }
+    window.location.hash = `#${btoa(JSON.stringify(shared))}`
+    await mountHome()
+    expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('app_landed', {
+      arrival_source: 'shared_link',
+    })
+    expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('shared_link_opened', {
+      pokemon_count: 1,
+      small: 1,
+      medium: 0,
+      large: 0,
+    })
+  })
+
+  it('AC.2 fires tour_started when the guided tour starts', async () => {
+    const wrapper = await mountHome()
+    vi.mocked(posthog.capture).mockClear()
+    await wrapper.find('[data-testid="take-the-tour"]').trigger('click')
+    expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('tour_started', undefined)
+  })
+
+  it('AC.3 fires house_count_changed with size/value on a house count change', async () => {
+    const wrapper = await mountHome()
+    vi.mocked(posthog.capture).mockClear()
+    await wrapper.findComponent(HousesConfigCard).vm.$emit('update:small', 2)
+    await flushPromises()
+    expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('house_count_changed', {
+      size: 'small',
+      value: 2,
+    })
+  })
+
+  it('AC.4 fires pokemon_added source=search via the search card', async () => {
+    const wrapper = await mountHome()
+    vi.mocked(posthog.capture).mockClear()
+    await wrapper
+      .findComponent(PokemonConfigCard)
+      .vm.$emit('update:selectedPokemon', ['AlphaOne', 'BetaOne'])
+    await flushPromises()
+    expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('pokemon_added', {
+      source: 'search',
+      name: 'BetaOne',
+    })
+  })
+
+  it('AC.4 fires pokemon_added source=house via addPokemonToHouse', async () => {
+    const wrapper = await mountHome()
+    vi.mocked(posthog.capture).mockClear()
+    wrapper.vm.addPokemonToHouse({ houseId: 'L1', name: 'BetaOne' })
+    await flushPromises()
+    expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('pokemon_added', {
+      source: 'house',
+      name: 'BetaOne',
+    })
+  })
+
+  it('AC.4 does not fire pokemon_added for a duplicate house add', async () => {
+    const wrapper = await mountHome()
+    wrapper.vm.addPokemonToHouse({ houseId: 'L1', name: 'BetaOne' })
+    await flushPromises()
+    vi.mocked(posthog.capture).mockClear()
+    wrapper.vm.addPokemonToHouse({ houseId: 'L1', name: 'BetaOne' })
+    await flushPromises()
+    expect(vi.mocked(posthog.capture)).not.toHaveBeenCalledWith('pokemon_added', expect.anything())
+  })
+
+  it('AC.8 fires auto_sort_toggled via the AutoSortCard buttons', async () => {
+    const wrapper = await mountHome()
+    vi.mocked(posthog.capture).mockClear()
+    await wrapper.find('[data-testid="auto-sort-manual"]').trigger('click')
+    expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('auto_sort_toggled', {
+      enabled: false,
+    })
+    vi.mocked(posthog.capture).mockClear()
+    await wrapper.find('[data-testid="auto-sort-auto"]').trigger('click')
+    expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('auto_sort_toggled', {
+      enabled: true,
+    })
+  })
+
+  it('AC.10 restores from a hash without emitting feature events', async () => {
+    const shared = {
+      small: 2,
+      medium: 1,
+      large: 0,
+      pokemon: ['AlphaOne', 'AlphaTwo'],
+      autoSort: false,
+    }
+    window.location.hash = `#${btoa(JSON.stringify(shared))}`
+    await mountHome()
+    await flushPromises()
+
+    const events = vi.mocked(posthog.capture).mock.calls.map((call) => call[0] as string)
+    expect(events).toEqual(expect.arrayContaining(['app_landed', 'shared_link_opened']))
+    const forbidden = [
+      'house_count_changed',
+      'pokemon_added',
+      'auto_sort_toggled',
+      'item_added',
+      'item_removed',
+      'pokemon_pinned',
+      'pokemon_unpinned',
+      'island_saved',
+      'island_loaded',
+      'tour_started',
+      'tour_completed',
+      'recommendations_expanded',
+    ]
+    for (const name of forbidden) {
+      expect(events).not.toContain(name)
+    }
+  })
+
+  it('AC.10 loading a saved query fires island_loaded and no feature events', async () => {
+    // Seed through the Storage.prototype mock (the convention used elsewhere in
+    // this file) rather than localStorage.setItem: earlier tests spy on
+    // getItem/setItem and vi.clearAllMocks does not restore spies, so a real
+    // write would be shadowed by the leftover mock implementation.
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(
+      JSON.stringify([
+        {
+          title: 'Q',
+          timestamp: 1000,
+          small: 1,
+          medium: 0,
+          large: 0,
+          pokemon: ['AlphaOne'],
+          version: 2,
+        },
+      ]),
+    )
+    const wrapper = await mountHome()
+    vi.mocked(posthog.capture).mockClear()
+    wrapper.vm.selectedTimestamp = 1000
+    await flushPromises()
+
+    expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('island_loaded', {
+      source: 'saved_query',
+    })
+    const events = vi.mocked(posthog.capture).mock.calls.map((call) => call[0] as string)
+    expect(events).toEqual(['island_loaded'])
   })
 })

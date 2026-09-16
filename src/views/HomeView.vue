@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import {
+  trackAppLanded,
+  trackAutoSortToggled,
+  trackHouseCountChanged,
+  trackPokemonAdded,
+  trackSharedLinkOpened,
+  trackTourStarted,
+} from '@/analytics'
 import AutoSortCard from '@/components/AutoSortCard.vue'
 import HouseRecord from '@/components/HouseRecord.vue'
 import HousesConfigCard from '@/components/HousesConfigCard.vue'
@@ -167,6 +175,7 @@ const { displayedHouses, sortedHouses, showResults, displayedUnhoused, islandPok
 const tourReady = computed(() => !solving.value && displayedHouses.value.length > 0)
 
 function startTour() {
+  trackTourStarted()
   tourActive.value = true
   loadSample()
 }
@@ -179,6 +188,7 @@ function addPokemonToHouse({ houseId, name }: { houseId: string; name: string })
   // The selection UIs exclude island residents, but guard anyway: a duplicate
   // would double-count the pokemon in the island set.
   if (selectedPokemon.value.includes(name)) return
+  trackPokemonAdded({ source: 'house', name })
   pinStore.pinPokemon(houseId, name)
   selectedPokemon.value = [...selectedPokemon.value, name]
 }
@@ -210,6 +220,34 @@ function clearPokemon() {
   placementStore.clear()
 }
 
+// --- Analytics-routed handlers ---------------------------------------------
+// These are the tracked user-action choke points: every feature event flows
+// through one of these (or the cart store / child components), and the
+// restore/load-sample paths below bypass them by design so they never emit.
+function onHouseCountChange(size: 'small' | 'medium' | 'large', value: number) {
+  trackHouseCountChanged(size, value)
+  if (size === 'small') small.value = value
+  else if (size === 'medium') medium.value = value
+  else large.value = value
+}
+
+function onSelectedPokemonChange(names: string[]) {
+  if (names.length > selectedPokemon.value.length) {
+    // Track every newly-added name (not just the last array element), so a
+    // future multi-add emit still records each addition correctly.
+    const previous = new Set(selectedPokemon.value)
+    for (const name of names) {
+      if (!previous.has(name)) trackPokemonAdded({ source: 'search', name })
+    }
+  }
+  selectedPokemon.value = names
+}
+
+function setAutoSort(value: boolean) {
+  if (value !== autoSort.value) trackAutoSortToggled(value)
+  autoSort.value = value
+}
+
 // --- Drag & drop (pointer events) --------------------------------------------
 const {
   dragOverTarget,
@@ -226,6 +264,11 @@ const {
 })
 
 onMounted(async () => {
+  // Record the landing before any catalog/restore work so a visit is captured
+  // even if a later load or a malformed hash throws. A landing counts as via
+  // shared link whenever a hash is present (decode success is not required).
+  const hasSharedLink = window.location.hash.length > 0
+  trackAppLanded(hasSharedLink ? 'shared_link' : 'direct')
   try {
     // Fire-and-forget: preload the item graph so the first cart interaction is
     // pure in-memory (the cached promise means every item helper shares this load).
@@ -235,6 +278,16 @@ onMounted(async () => {
     adjacencyData.value = adjacency
 
     await restoreFromHash()
+    if (hasSharedLink) {
+      // Counts reflect the decoded island (the hash is valid enough to decode
+      // by this point, or restoreState threw into the catch below).
+      trackSharedLinkOpened({
+        pokemon_count: selectedPokemon.value.length,
+        small: small.value,
+        medium: medium.value,
+        large: large.value,
+      })
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -297,7 +350,7 @@ defineExpose({
     </BAlert>
     <BRow class="g-2 g-md-3">
       <BCol cols="12" xl="2">
-        <AutoSortCard v-model="autoSort" />
+        <AutoSortCard :model-value="autoSort" @update:model-value="setAutoSort" />
       </BCol>
       <BCol cols="12" xl="3">
         <HousesConfigCard
@@ -307,9 +360,9 @@ defineExpose({
           :min-small="minSmall"
           :min-medium="minMedium"
           :min-large="minLarge"
-          @update:small="small = $event"
-          @update:medium="medium = $event"
-          @update:large="large = $event"
+          @update:small="onHouseCountChange('small', $event)"
+          @update:medium="onHouseCountChange('medium', $event)"
+          @update:large="onHouseCountChange('large', $event)"
           @clear-all="clearHouses"
         />
       </BCol>
@@ -318,7 +371,7 @@ defineExpose({
           :selected-pokemon="selectedPokemon"
           :pokemon-names="pokemonNames"
           :pinned-names="pinStore.allPinnedPokemonNames"
-          @update:selected-pokemon="selectedPokemon = $event"
+          @update:selected-pokemon="onSelectedPokemonChange"
           @clear-all="clearPokemon"
         />
       </BCol>
@@ -415,7 +468,7 @@ defineExpose({
         "
         :auto-sort="autoSort"
         @add-pokemon="addPokemonToHouse"
-        @update:auto-sort="autoSort = $event"
+        @update:auto-sort="setAutoSort"
       />
     </TransitionGroup>
   </section>

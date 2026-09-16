@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { trackPokemonPinned, trackPokemonUnpinned } from '@/analytics'
 import EmptySlotButton from '@/components/EmptySlotButton.vue'
 import PokemonCard from '@/components/PokemonCard.vue'
 import PokemonSelect from '@/components/PokemonSelect.vue'
@@ -40,6 +41,17 @@ const emit = defineEmits<{
 
 const pinStore = usePinStore()
 
+// Pinning is owned by the local pin store; analytics distinguishes pin from
+// unpin based on the pre-toggle state, so each user click emits exactly one
+// event. The auto-pin performed inside HomeView's addPokemonToHouse is part
+// of "add pokemon" and is intentionally not double-tracked here.
+function onPokemonPinToggle(houseId: string, name: string) {
+  const pinned = pinStore.isPokemonPinned(houseId, name)
+  pinStore.togglePokemonPin(houseId, name)
+  if (pinned) trackPokemonUnpinned({ house_id: houseId, name })
+  else trackPokemonPinned({ house_id: houseId, name })
+}
+
 const emptySlots = computed(() => Math.max(0, props.house.capacity - props.house.pokemon.length))
 
 // Inline search on a totally empty house (no pokemon, no cart items): the
@@ -65,7 +77,7 @@ function onEmptyHouseInput(names: string[]) {
       :drag-enabled="dragEnabled"
       :house-id="house.houseId"
       context="house"
-      @toggle="pinStore.togglePokemonPin(house.houseId, name)"
+      @toggle="onPokemonPinToggle(house.houseId, name)"
       @favorite-clicked="emit('favorite-clicked', $event)"
       @habitat-clicked="emit('habitat-clicked', $event)"
     />

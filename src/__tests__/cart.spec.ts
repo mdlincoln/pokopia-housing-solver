@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
+import posthog from 'posthog-js'
 import { useCartStore } from '@/stores/cart'
 import {
   getAggregatedIngredients,
@@ -182,5 +183,62 @@ describe('cart store busy flag', () => {
     resolveRecipe2(CANOE_RECIPE)
     await add2
     expect(cart.busy).toBe(false)
+  })
+})
+
+describe('cart store analytics', () => {
+  function setup() {
+    setActivePinia(createPinia())
+    vi.mocked(getItemMetadata).mockResolvedValue(MOCK_METADATA)
+    vi.mocked(getItemPicturePath).mockResolvedValue('images/canoe.png')
+    vi.mocked(getRecipeForItem).mockResolvedValue(CANOE_RECIPE)
+    vi.mocked(getAggregatedIngredients).mockResolvedValue([])
+    return useCartStore()
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('AC.6 addItem tracks item_added with house_id/item', async () => {
+    const cart = setup()
+    await cart.addItem('S1', 'Canoe')
+    expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('item_added', {
+      house_id: 'S1',
+      item: 'Canoe',
+    })
+  })
+
+  it('AC.6 re-adding an existing item does not fire a duplicate item_added', async () => {
+    const cart = setup()
+    await cart.addItem('S1', 'Canoe')
+    vi.mocked(posthog.capture).mockClear()
+
+    await cart.addItem('S1', 'Canoe')
+    expect(vi.mocked(posthog.capture)).not.toHaveBeenCalledWith('item_added', expect.anything())
+  })
+
+  it('AC.6 removeItem tracks item_removed with house_id/item', async () => {
+    const cart = setup()
+    await cart.addItem('S1', 'Canoe')
+    vi.mocked(posthog.capture).mockClear()
+
+    await cart.removeItem('S1', 'Canoe')
+    expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('item_removed', {
+      house_id: 'S1',
+      item: 'Canoe',
+    })
+  })
+
+  it('AC.6 removing an item never added does not fire item_removed', async () => {
+    const cart = setup()
+    await cart.removeItem('S1', 'Canoe')
+    expect(vi.mocked(posthog.capture)).not.toHaveBeenCalledWith('item_removed', expect.anything())
+  })
+
+  it('AC.6 restoreItems does not track item_added', async () => {
+    const cart = setup()
+    await cart.restoreItems([{ houseId: 'S1', name: 'Canoe' }])
+    expect(vi.mocked(posthog.capture)).not.toHaveBeenCalledWith('item_added', expect.anything())
   })
 })

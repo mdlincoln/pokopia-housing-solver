@@ -4,6 +4,7 @@
 // identical (legacy `houseIndex`/`quantity` tolerance lives in restoreState on
 // the HomeView side; deleting/undoing must keep the 8s single-slot window).
 
+import { trackIslandLoaded, trackIslandSaved } from '@/analytics'
 import { useCartStore } from '@/stores/cart'
 import { useHouseStore } from '@/stores/houses'
 import { usePinStore } from '@/stores/pins'
@@ -144,6 +145,12 @@ export function useSavedQueries({
     }
     savedQueries.value = [entry, ...savedQueries.value]
     persistSavedQueries()
+    trackIslandSaved({
+      pokemon_count: selectedPokemon.value.length,
+      small: small.value,
+      medium: medium.value,
+      large: large.value,
+    })
     saveSuccess.value = true
     setTimeout(() => {
       saveSuccess.value = false
@@ -165,6 +172,7 @@ export function useSavedQueries({
     restoringQuery.value = true
     try {
       await restoreState(query)
+      trackIslandLoaded({ source: 'saved_query' })
     } finally {
       restoringQuery.value = false
     }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { trackTourCompleted } from '@/analytics'
 import { markTourSeen, ONBOARDING_STEPS } from '@/onboarding'
 import { useCartStore } from '@/stores/cart'
 import { BButton } from 'bootstrap-vue-next'
@@ -165,12 +166,16 @@ onMounted(() => {
 
 // Finish and Skip share one teardown: mark seen, tear down the overlay cleanly
 // (`finish()` restores `document.body` pointer-events that the overlay's
-// `preventOverlayInteraction` disabled), then unmount via `exited`.
-function complete() {
+// `preventOverlayInteraction` disabled), then unmount via `exited`. The
+// `method` distinguishes how the tour ended for analytics.
+function complete(method: 'finish' | 'skip') {
+  trackTourCompleted(method)
   markTourSeen()
   finish()
   emit('exited')
 }
+
+defineExpose({ complete })
 </script>
 
 <template>
@@ -201,7 +206,7 @@ function complete() {
               variant="primary"
               class="beach-button beach-button--sm"
               data-testid="onboarding-next"
-              @click="isLast ? complete() : next()"
+              @click="isLast ? complete('finish') : next()"
             >
               {{ isLast ? 'Finish' : 'Next' }}
             </BButton>
@@ -209,7 +214,7 @@ function complete() {
               variant="outline-secondary"
               class="beach-button beach-button--sm"
               data-testid="onboarding-skip"
-              @click="complete"
+              @click="complete('skip')"
             >
               Skip
             </BButton>

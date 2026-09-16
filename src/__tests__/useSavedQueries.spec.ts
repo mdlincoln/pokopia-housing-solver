@@ -1,7 +1,8 @@
 import { useSavedQueries, type SavedQuery } from '@/composables/useSavedQueries'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import posthog from 'posthog-js'
 import { defineComponent, ref } from 'vue'
 
 const restoreState = vi.fn<(query: unknown) => Promise<void>>()
@@ -125,5 +126,30 @@ describe('useSavedQueries', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([legacy]))
     const wrapper = mount(Host)
     expect(wrapper.vm.api.savedQueries.value).toEqual([legacy])
+  })
+
+  it('AC.5 confirmSave tracks island_saved with island counts', () => {
+    const wrapper = mount(Host)
+    wrapper.vm.api.queryTitle.value = 'My island'
+    wrapper.vm.api.confirmSave()
+    expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('island_saved', {
+      pokemon_count: 1,
+      small: 1,
+      medium: 0,
+      large: 0,
+    })
+  })
+
+  it('AC.5 selecting a saved query tracks island_loaded with source saved_query', async () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([existing]))
+    const wrapper = mount(Host)
+
+    wrapper.vm.api.selectedTimestamp.value = existing.timestamp
+    await flushPromises()
+
+    expect(restoreState).toHaveBeenCalled()
+    expect(vi.mocked(posthog.capture)).toHaveBeenCalledWith('island_loaded', {
+      source: 'saved_query',
+    })
   })
 })
