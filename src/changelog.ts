@@ -32,6 +32,24 @@ export interface ChangeLogEntry {
 export const changelog: ChangeLogEntry[] = [
   // newest first; consecutive dates at least 7 days apart
   {
+    date: '2026-09-26',
+    summary: 'Fresh data, smarter dragging, and saved islands that survive renames',
+    changes: [
+      'The Pokémon, item, and habitat catalogs were refreshed with the newest data from Serebii.',
+      'With manual sorting on, dropping a Pokémon onto another one now swaps their places.',
+      'Saved islands and shared links keep working when a Pokémon or item has been renamed.',
+    ],
+  },
+  {
+    date: '2026-09-15',
+    summary: 'A bolder sort toggle, a warmer welcome, and better accessibility',
+    changes: [
+      'The automatic-sorting option is now a prominent Auto/Manual button at the top of the page.',
+      'The guided tour now opens with a friendly welcome screen.',
+      'Accessibility improved across the site.',
+    ],
+  },
+  {
     date: '2026-08-30',
     summary: 'Take a guided tour, sort on your own, and get roommate suggestions',
     changes: [
