@@ -6,8 +6,10 @@
 //   src/data/pokemon.json        — { names, dataByName }        (bundled by Vite)
 //   src/data/items.json          — the ItemGraph shape          (bundled by Vite)
 //   src/data/habitats.json       — the HabitatCatalog shape     (bundled by Vite)
-//   public/data/adjacency.json   — { names, size, data(base64 Int16Array) }
-//                                  (fetched once at runtime, kept out of the bundle)
+//   public/data/adjacency.json   — { names, size, data(base64 Int16Array) }  (fetched)
+//   public/data/tombstones.json  — { pokemon/items/habitats: {oldName: canonicalName} }
+//                                  (fetched once at runtime, kept out of the bundle; baked
+//                                  from the *_tombstones tables maintained by the rename CLI)
 //
 // ORDER BY clauses are load-bearing: itemsByFavorite / recipeByItem insertion
 // order, and GROUP_CONCAT favorites ordering, must match the pre-refactor SQL
@@ -26,6 +28,7 @@ export function outputPaths(projectRoot = PROJECT_ROOT) {
     itemsOut: path.join(projectRoot, 'src', 'data', 'items.json'),
     habitatsOut: path.join(projectRoot, 'src', 'data', 'habitats.json'),
     adjacencyOut: path.join(projectRoot, 'public', 'data', 'adjacency.json'),
+    tombstonesOut: path.join(projectRoot, 'public', 'data', 'tombstones.json'),
   }
 }
 
@@ -252,19 +255,91 @@ export function buildAdjacency(db) {
   return { names, size, data, edgeCount: edgeRows.length }
 }
 
+// Tombstone (old name -> canonical name) maps, baked from the *_tombstones
+// tables the rename CLI maintains. Chains are flattened transitively here
+// (A->B, B->C bakes as A->C) so the runtime lookup is a single map read;
+// cycles and orphans are maintainer errors and fail the bake loudly, matching
+// the repo's verify-gate philosophy rather than degrading silently in the
+// browser. The payload is always emitted (even with every map empty) so the
+// runtime fetch never 404s; a pre-migration DB without the tombstone tables
+// tolerantly bakes empty maps.
+const TOMBSTONE_PAIRS = [
+  { table: 'pokemon_tombstones', entity: 'pokemon', fk: 'pokemon_id', mapKey: 'pokemon' },
+  { table: 'item_tombstones', entity: 'items', fk: 'item_id', mapKey: 'items' },
+  {
+    table: 'habitat_tombstones',
+    entity: 'habitat_entries',
+    fk: 'habitat_id',
+    mapKey: 'habitats',
+  },
+]
+
+export function buildTombstones(db) {
+  const result = {}
+  for (const { table, entity, fk, mapKey } of TOMBSTONE_PAIRS) {
+    const exists = db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .get(table)
+    if (!exists) {
+      result[mapKey] = {}
+      continue
+    }
+    // LEFT JOIN so orphaned tombstone rows (target entity missing) are
+    // visible; FKs normally prevent this, but rows inserted with FKs off
+    // would silently drop out of an INNER JOIN.
+    const rows = db
+      .prepare(
+        `SELECT t.old_name, e.name AS new_name ` +
+          `FROM ${table} t LEFT JOIN ${entity} e ON e.id = t.${fk} ` +
+          `ORDER BY t.old_name ASC`,
+      )
+      .all()
+
+    const orphans = rows.filter((r) => r.new_name === null).map((r) => r.old_name)
+    if (orphans.length > 0) {
+      throw new Error(
+        `Tombstone orphan(s) in ${table}: ${orphans.join(', ')} — the target entity no longer ` +
+          `exists. Delete the tombstone row(s) or re-point them at a live entity.`,
+      )
+    }
+
+    const direct = new Map(rows.map((r) => [r.old_name, r.new_name]))
+    const resolved = {}
+    for (const [oldName, newName] of direct) {
+      const chain = [oldName, newName]
+      const visited = new Set([oldName])
+      let current = newName
+      while (direct.has(current)) {
+        if (visited.has(current)) {
+          throw new Error(`Tombstone cycle in ${table}: ${chain.join(' -> ')} -> ${current}`)
+        }
+        visited.add(current)
+        current = direct.get(current)
+        chain.push(current)
+      }
+      resolved[oldName] = current
+    }
+    result[mapKey] = resolved
+  }
+  return result
+}
+
 export function bake(dbPath, projectRoot = PROJECT_ROOT) {
-  const { pokemonOut, itemsOut, habitatsOut, adjacencyOut } = outputPaths(projectRoot)
+  const { pokemonOut, itemsOut, habitatsOut, adjacencyOut, tombstonesOut } =
+    outputPaths(projectRoot)
   const db = openReadOnlyDb(dbPath)
   try {
     const pokemon = buildPokemon(db)
     const items = buildItems(db)
     const habitats = buildHabitats(db)
     const adjacency = buildAdjacency(db)
+    const tombstones = buildTombstones(db)
 
     fs.mkdirSync(path.dirname(pokemonOut), { recursive: true })
     fs.mkdirSync(path.dirname(itemsOut), { recursive: true })
     fs.mkdirSync(path.dirname(habitatsOut), { recursive: true })
     fs.mkdirSync(path.dirname(adjacencyOut), { recursive: true })
+    fs.mkdirSync(path.dirname(tombstonesOut), { recursive: true })
 
     // Format via the same deterministic pretty-printer the committed files
     // carry (matches lint-staged's oxfmt pass on src/**), so re-running the
@@ -277,7 +352,12 @@ export function bake(dbPath, projectRoot = PROJECT_ROOT) {
       adjacencyOut,
       formatDataJson({ names: adjacency.names, size: adjacency.size, data: adjacency.data }),
     )
+    fs.writeFileSync(tombstonesOut, formatDataJson(tombstones))
 
+    const tombstoneCount = Object.values(tombstones).reduce(
+      (sum, map) => sum + Object.keys(map).length,
+      0,
+    )
     return {
       pokemonCount: pokemon.names.length,
       itemCount: Object.keys(items.itemDetailsByName).length,
@@ -288,7 +368,8 @@ export function bake(dbPath, projectRoot = PROJECT_ROOT) {
       adjacencySize: adjacency.size,
       adjacencyEdgeCount: adjacency.edgeCount,
       adjacencyBytes: fs.statSync(adjacencyOut).size,
-      paths: { pokemonOut, itemsOut, habitatsOut, adjacencyOut },
+      tombstoneCount,
+      paths: { pokemonOut, itemsOut, habitatsOut, adjacencyOut, tombstonesOut },
     }
   } finally {
     db.close()
@@ -310,6 +391,7 @@ function main() {
     `adjacency.json: ${stats.adjacencySize}x${stats.adjacencySize} matrix, ` +
       `${stats.adjacencyEdgeCount} edges, ${(stats.adjacencyBytes / 1024).toFixed(0)} KiB on disk`,
   )
+  console.log(`tombstones.json: ${stats.tombstoneCount} rename tombstone(s)`)
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename ?? '')) {

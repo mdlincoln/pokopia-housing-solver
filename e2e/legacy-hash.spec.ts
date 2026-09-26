@@ -34,6 +34,14 @@ test.describe('Legacy hash loading (sql.js → baked-data)', () => {
   test('restores a legacy c016616 hash end-to-end in the HEAD build', async ({ page }) => {
     test.setTimeout(40_000)
 
+    // Tombstone-era contract (AC.6): a fully-resolvable legacy restore must
+    // never surface the unmapped-entity alert.
+    let sawDialog = false
+    page.on('dialog', (dialog) => {
+      sawDialog = true
+      void dialog.dismiss().catch(() => {})
+    })
+
     await page.goto(`/#${fixture.hash}`)
 
     // House counts restore (BFormSpinbutton renders its id on the inner output).
@@ -59,5 +67,7 @@ test.describe('Legacy hash loading (sql.js → baked-data)', () => {
     for (const name of expectedNames) {
       await expect(page.getByTestId('cart-items')).toContainText(name, { timeout: 5000 })
     }
+
+    expect(sawDialog).toBe(false)
   })
 })

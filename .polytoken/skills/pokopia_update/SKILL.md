@@ -31,8 +31,9 @@ cp src/pokehousing.sqlite /tmp/pokehousing-pre-sync-$(date +%Y%m%d-%H%M).sqlite
 ```
 
 `src/pokehousing.sqlite` is git-committed, so a committed checkout is a second
-rollback path. Payloads (`src/data/*.json`, `public/data/adjacency.json`) are
-gitignored build artifacts — only the sqlite is committed.
+rollback path. Payloads (`src/data/*.json`, `public/data/adjacency.json`,
+`public/data/tombstones.json`) are gitignored build artifacts — only the sqlite
+is committed.
 
 ### 2. Dry-run first (~15 min each)
 
@@ -85,7 +86,11 @@ allowlist and can never be re-cased.
 ### 5. Bake payloads
 
 Included in `harvest:sync`; standalone is `npm run build:data`. Payloads are
-gitignored — only `src/pokehousing.sqlite` is committed.
+gitignored — only `src/pokehousing.sqlite` is committed. The bake emits five
+payloads, including the fetched tombstone map
+(`public/data/tombstones.json`) built from the `*_tombstones` tables; a failed
+bake with `Tombstone cycle`/`Tombstone orphan` is a maintainer error in the
+tombstone tables, never something to patch in the payload by hand.
 
 ### 6. Verify
 
@@ -124,23 +129,43 @@ plus the matching `?raw` import in `src/iconSvg.ts` — or the suite fails.
 
 ### 9. Legacy-compat guardrail
 
-Never rename `items.name` / `pokemon.name`, and never normalize those columns:
-old URL hashes and saved islands resolve these names byte-for-byte
-(`scripts/legacy_compat.test.js`, `scripts/legacy_storage_compat.test.js`),
-and renames can clash with `e2e/fixtures/legacy-*.json`.
+Never rename `items.name` / `pokemon.name` / `habitat_entries.name` **by hand or
+via the harvest scripts**, and never normalize those columns: old URL hashes and
+saved islands resolve these names byte-for-byte
+(`scripts/legacy_compat.test.js`, `scripts/legacy_storage_compat.test.js`).
+Renames **are** allowed through the tombstone CLI (step 10) — the harvest
+scripts themselves still never rename, ever.
 
 ### 10. Report & manual top-level decisions
 
 Print a per-table delta summary (added/updated/deleted sub-records per domain)
 against the pre-run snapshot. Roll back via the preflight snapshot copy
 (`cp` it back over `src/pokehousing.sqlite`) if the operator rejects the delta.
-Top-level removals are report-only by design: if the report flags a vanished
-item/pokemon/habitat and the operator wants it removed, delete it as an
-explicit **manual** step, then run `npx playwright test e2e/legacy-hash.spec.ts
-e2e/legacy-storage.spec.ts` before committing — a deleted name breaks old URL
-hashes/saved islands referencing it and can clash with `e2e/fixtures/legacy-*.json`.
-Fixture fallout is a **stop-and-ask** condition, never a silent fixture
-regeneration.
+
+**Potential renames are candidate-detect, operator-confirm, then CLI.** A sync
+(or dry-run) report showing a DB entity whose name no longer appears anywhere in
+the scrape **plus** a new incoming entity (often sharing the slug / dex number /
+image path or other metadata) is the rename signature. When you spot one:
+present the candidate `old → new` pair with the supporting evidence to the
+operator and stop for confirmation — never act on a detected rename unilaterally.
+
+After the operator confirms, execute with the rename CLI (never an SQL UPDATE,
+never a hand edit of the DB):
+
+```bash
+npm run rename:entity -- --type <pokemon|item|habitat> --from "Old" --to "New" --dry-run
+npm run rename:entity -- --type <pokemon|item|habitat> --from "Old" --to "New"   # records the tombstone row
+npm run build:data   # bakes public/data/tombstones.json (oldName -> canonicalName)
+npm run test:harvest # rerun the harvest suite incl. rename/skill tests
+```
+
+Record which tombstone rows the run created, and re-run the existing verify and
+`e2e/legacy-hash.spec.ts` / `e2e/legacy-storage.spec.ts` steps before committing.
+Deleted names **cannot** be tombstoned (there is no surviving entity to point
+at): a top-level removal the operator requests remains an explicit **manual**
+step, breaks old URL hashes/saved islands referencing the name, and can clash
+with `e2e/fixtures/legacy-*.json` — fixture fallout is a **stop-and-ask**
+condition, never a silent fixture regeneration.
 
 ## Harness notes
 

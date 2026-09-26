@@ -3,8 +3,14 @@
 // selectedTimestamp → restore watch. Behavior must stay byte-for-byte
 // identical (legacy `houseIndex`/`quantity` tolerance lives in restoreState on
 // the HomeView side; deleting/undoing must keep the 8s single-slot window).
+//
+// Restored entries are rewritten in place when restoreState upgraded names
+// (tombstoned renames mapped or unmapped entities dropped), title/timestamp
+// preserved — so the persisted copy carries canonical names and the
+// unmapped-entity alert fires once for a given entry, not on every restore.
 
 import { trackIslandLoaded, trackIslandSaved } from '@/analytics'
+import { formatUnmappedAlert, type RestoreResult } from '@/entityUpgrade'
 import { useCartStore } from '@/stores/cart'
 import { useHouseStore } from '@/stores/houses'
 import { usePinStore } from '@/stores/pins'
@@ -36,7 +42,7 @@ const STORAGE_KEY = 'pokehousing_saved_queries'
 export type SharedState = Omit<SavedQuery, 'title' | 'timestamp'>
 
 interface UseSavedQueriesOptions {
-  restoreState: (query: SharedState) => Promise<void>
+  restoreState: (query: SharedState) => Promise<RestoreResult>
   small: Ref<number>
   medium: Ref<number>
   large: Ref<number>
@@ -171,8 +177,29 @@ export function useSavedQueries({
     if (!query) return
     restoringQuery.value = true
     try {
-      await restoreState(query)
+      const result = await restoreState(query)
+
+      // Upgraded restore: rewrite the persisted entry in place with the
+      // canonical names (title/timestamp preserved) so the stored copy stops
+      // carrying dropped/stale names and the alert fires once, not on every
+      // future restore of the same entry. The entry is re-located by
+      // timestamp rather than remembered by index — the manage modal may have
+      // deleted it mid-restore.
+      if (result.upgraded) {
+        const index = savedQueries.value.findIndex((q) => q.timestamp === ts)
+        if (index !== -1) {
+          savedQueries.value[index] = { ...savedQueries.value[index]!, ...result.state }
+          persistSavedQueries()
+        }
+      }
+
       trackIslandLoaded({ source: 'saved_query' })
+
+      // Deferred to a macrotask so the restored island is visible behind the
+      // native dialog when entities had to be dropped.
+      if (result.unmapped.length > 0) {
+        setTimeout(() => window.alert(formatUnmappedAlert(result.unmapped)), 0)
+      }
     } finally {
       restoringQuery.value = false
     }

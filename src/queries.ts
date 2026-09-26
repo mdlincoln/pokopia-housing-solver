@@ -9,6 +9,8 @@ import {
   loadHabitatCatalogData,
   loadItemGraphData,
   loadPokemonCatalog,
+  loadTombstoneData,
+  type TombstoneData,
 } from '@/data'
 import { getScore, type AdjacencyData, type PokemonData } from '@/solver'
 
@@ -101,6 +103,60 @@ export function loadItemGraph(): Promise<ItemGraph> {
     return { itemDetailsByName, itemsByFavorite, favoritesByItem, recipeByItem, itemsByTag }
   })()
   return _itemGraphPromise
+}
+
+// ---------------------------------------------------------------------------
+// Entity-name resolvers (restore-time upgrade of legacy URL hashes and saved
+// islands, which encode entity names)
+// ---------------------------------------------------------------------------
+
+export interface EntityNameResolvers {
+  /** Canonical pokemon name, or null when the name matches no live entity or tombstone. */
+  resolvePokemon: (name: string) => string | null
+  /** Canonical item name, or null when the name matches no live entity or tombstone. */
+  resolveItem: (name: string) => string | null
+}
+
+/**
+ * Pure resolver factory (unit-test seam): builds resolvers from explicit
+ * live-catalog name sets and baked tombstone maps. Resolution order:
+ * (1) name resolves in the live catalog -> keep as-is (this is what makes
+ * name recycling safe — a reused old name always wins as its new self),
+ * (2) name present in the tombstone map -> upgrade to the canonical name,
+ * (3) neither -> null (the caller drops the entity and reports it).
+ */
+export function makeEntityResolvers(
+  pokemonNames: Iterable<string>,
+  itemNames: Iterable<string>,
+  tombstones: TombstoneData,
+): EntityNameResolvers {
+  const livePokemon = new Set(pokemonNames)
+  const liveItems = new Set(itemNames)
+  return {
+    resolvePokemon: (name: string) => {
+      if (livePokemon.has(name)) return name
+      return tombstones.pokemon[name] ?? null
+    },
+    resolveItem: (name: string) => {
+      if (liveItems.has(name)) return name
+      return tombstones.items[name] ?? null
+    },
+  }
+}
+
+/**
+ * Builds resolvers against the real baked data. Pokemon names come from the
+ * bundled catalog (sync); item names from the cached item-graph promise
+ * (pre-warmed by HomeView); tombstones from the lazily-fetched
+ * public/data/tombstones.json (nothing is requested until the first restore).
+ */
+export async function buildEntityResolvers(): Promise<EntityNameResolvers> {
+  const [graphData, tombstones] = await Promise.all([loadItemGraph(), loadTombstoneData()])
+  return makeEntityResolvers(
+    loadPokemonCatalog().names,
+    graphData.itemDetailsByName.keys(),
+    tombstones,
+  )
 }
 
 export async function getItemMetadata(itemName: string): Promise<{

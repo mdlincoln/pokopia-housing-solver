@@ -13,6 +13,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
+import { fileURLToPath } from 'node:url'
 
 import { DEFAULT_DB_PATH, openReadOnlyDb, PROJECT_ROOT } from './harvest_lib.js'
 import {
@@ -21,8 +22,13 @@ import {
   buildHabitats,
   buildItems,
   buildPokemon,
+  buildTombstones,
   normalizeRarity,
+  outputPaths,
 } from './build_data.mjs'
+
+const HERE = path.dirname(fileURLToPath(import.meta.url))
+const DB_SQL_PATH = path.join(HERE, 'db.sql')
 
 function withDb(fn) {
   const db = openReadOnlyDb(DEFAULT_DB_PATH)
@@ -399,5 +405,176 @@ test('bake() writes all four output files and they parse as JSON', () => {
     assert.ok(typeof adjacency.data === 'string')
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Tombstone payload (public/data/tombstones.json)
+// ---------------------------------------------------------------------------
+
+const EMPTY_TOMBSTONES = { pokemon: {}, items: {}, habitats: {} }
+
+// Seeds tombstone fixture rows into an open DB created from db.sql.
+function seedTombstoneFixture(db) {
+  // Wrapped in a transaction: the circular habitats.opposite FKs are only
+  // deferred inside one.
+  db.exec('BEGIN')
+  db.exec(`
+    INSERT INTO habitats (habitat, opposite) VALUES ('Cool', 'Warm');
+    INSERT INTO habitats (habitat, opposite) VALUES ('Warm', 'Cool');
+    INSERT INTO pokemon (id, name, image_path, habitat) VALUES (1, 'Pika-Old', 'images/p.png', 'Cool');
+    INSERT INTO pokemon (id, name, image_path, habitat) VALUES (2, 'Pika-Mid', 'images/p2.png', 'Cool');
+    INSERT INTO pokemon (id, name, image_path, habitat) VALUES (3, 'Pika-New', 'images/p3.png', 'Cool');
+    INSERT INTO items (id, name) VALUES (1, 'Gem-Old');
+    INSERT INTO items (id, name) VALUES (2, 'Gem-New');
+    INSERT INTO habitat_entries (id, number, name, category) VALUES (1, 1, 'Forest-Old', 'main');
+    INSERT INTO habitat_entries (id, number, name, category) VALUES (2, 2, 'Forest-New', 'main');
+  `)
+  db.exec('COMMIT')
+}
+
+function makeTombstoneDb(t, { migrate = true } = {}) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'build-data-tombstones-'))
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  let schemaSql = fs.readFileSync(DB_SQL_PATH, 'utf8')
+  if (!migrate) {
+    for (const name of ['pokemon_tombstones', 'item_tombstones', 'habitat_tombstones']) {
+      schemaSql = schemaSql.replace(
+        new RegExp(`CREATE\\s+TABLE\\s+${name}\\s+\\([\\s\\S]*?\\);\\n?`, 'i'),
+        '',
+      )
+    }
+  }
+  const db = new DatabaseSync(path.join(tmp, 'test.db'))
+  db.exec('PRAGMA foreign_keys=ON')
+  db.exec(schemaSql)
+  return { tmp, db }
+}
+
+test('buildTombstones: empty DB produces three empty maps', (t) => {
+  const { db } = makeTombstoneDb(t)
+  try {
+    assert.deepStrictEqual(buildTombstones(db), EMPTY_TOMBSTONES)
+  } finally {
+    db.close()
+  }
+})
+
+test('buildTombstones: single-hop rename map per entity type', (t) => {
+  const { db } = makeTombstoneDb(t)
+  try {
+    seedTombstoneFixture(db)
+    db.exec(`
+      INSERT INTO pokemon_tombstones (old_name, pokemon_id) VALUES ('Pika-Old', 2);
+      INSERT INTO item_tombstones (old_name, item_id) VALUES ('Gem-Old', 2);
+      INSERT INTO habitat_tombstones (old_name, habitat_id) VALUES ('Forest-Old', 2);
+    `)
+    assert.deepStrictEqual(buildTombstones(db), {
+      pokemon: { 'Pika-Old': 'Pika-Mid' },
+      items: { 'Gem-Old': 'Gem-New' },
+      habitats: { 'Forest-Old': 'Forest-New' },
+    })
+  } finally {
+    db.close()
+  }
+})
+
+test('buildTombstones: chain A->B->C flattens transitively to A->C', (t) => {
+  const { db } = makeTombstoneDb(t)
+  try {
+    seedTombstoneFixture(db)
+    db.exec(`
+      INSERT INTO pokemon_tombstones (old_name, pokemon_id) VALUES ('Pika-Old', 2);
+      INSERT INTO pokemon_tombstones (old_name, pokemon_id) VALUES ('Pika-Mid', 3);
+    `)
+    assert.deepStrictEqual(buildTombstones(db).pokemon, {
+      'Pika-Old': 'Pika-New',
+      'Pika-Mid': 'Pika-New',
+    })
+  } finally {
+    db.close()
+  }
+})
+
+test('buildTombstones: a cycle fails the bake loudly', (t) => {
+  const { db } = makeTombstoneDb(t)
+  try {
+    seedTombstoneFixture(db)
+    db.exec(`
+      INSERT INTO pokemon_tombstones (old_name, pokemon_id) VALUES ('Pika-Old', 2);
+      INSERT INTO pokemon_tombstones (old_name, pokemon_id) VALUES ('Pika-Mid', 1);
+    `)
+    assert.throws(() => buildTombstones(db), /Tombstone cycle/)
+  } finally {
+    db.close()
+  }
+})
+
+test('buildTombstones: an orphaned tombstone row (target entity gone) fails the bake', (t) => {
+  const { db } = makeTombstoneDb(t)
+  try {
+    seedTombstoneFixture(db)
+    db.exec("INSERT INTO pokemon_tombstones (old_name, pokemon_id) VALUES ('Pika-Old', 2)")
+    db.exec('PRAGMA foreign_keys=OFF')
+    db.exec('DELETE FROM pokemon WHERE id = 2')
+    db.exec('PRAGMA foreign_keys=ON')
+    assert.throws(() => buildTombstones(db), /Tombstone orphan/)
+  } finally {
+    db.close()
+  }
+})
+
+test('buildTombstones: pre-migration DB (missing tombstone tables) tolerantly bakes empty maps', (t) => {
+  const { db } = makeTombstoneDb(t, { migrate: false })
+  try {
+    assert.deepStrictEqual(buildTombstones(db), EMPTY_TOMBSTONES)
+  } finally {
+    db.close()
+  }
+})
+
+test('buildTombstones: deterministic across two runs (key order from ORDER BY old_name)', (t) => {
+  const { db } = makeTombstoneDb(t)
+  try {
+    seedTombstoneFixture(db)
+    db.exec(`
+      INSERT INTO pokemon_tombstones (old_name, pokemon_id) VALUES ('Pika-Mid', 3);
+      INSERT INTO pokemon_tombstones (old_name, pokemon_id) VALUES ('Pika-Old', 2);
+      INSERT INTO item_tombstones (old_name, item_id) VALUES ('Gem-Old', 2);
+    `)
+    const first = buildTombstones(db)
+    const second = buildTombstones(db)
+    assert.deepStrictEqual(first, second)
+    assert.ok(Object.keys(first.pokemon)[0] === 'Pika-Mid') // insertion order = SQL order
+  } finally {
+    db.close()
+  }
+})
+
+test('bake() writes tombstones.json alongside the other payloads', (t) => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'build-data-tomb-bake-'))
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const snapshotDb = path.join(tmp, 'pokehousing.sqlite')
+  fs.copyFileSync(DEFAULT_DB_PATH, snapshotDb)
+  const stats = bake(snapshotDb, tmp)
+  const parsed = JSON.parse(fs.readFileSync(stats.paths.tombstonesOut, 'utf8'))
+  assert.deepStrictEqual(Object.keys(parsed).sort(), ['habitats', 'items', 'pokemon'])
+  for (const key of Object.keys(parsed)) {
+    assert.ok(typeof parsed[key] === 'object' && !Array.isArray(parsed[key]))
+  }
+  assert.strictEqual(
+    stats.tombstoneCount,
+    Object.values(parsed)
+      .map((m) => Object.keys(m).length)
+      .reduce((a, b) => a + b, 0),
+  )
+})
+
+test('.gitignore enumerates every outputPaths() target (no baked artifact is commitable)', () => {
+  const gitignore = fs.readFileSync(path.join(HERE, '..', '.gitignore'), 'utf8')
+  const projectRoot = path.join(HERE, '..')
+  for (const [key, absolute] of Object.entries(outputPaths())) {
+    const relative = path.relative(projectRoot, absolute)
+    assert.ok(gitignore.includes(relative), `.gitignore is missing a line for ${key} (${relative})`)
   }
 })

@@ -49,6 +49,17 @@ vi.mock('@/queries', async (importOriginal) => {
     loadAdjacencyMap: vi.fn<() => Promise<import('@/solver').AdjacencyData>>(),
     loadSpawnHabitatsByName:
       vi.fn<() => Promise<Record<string, import('@/queries').SpawnHabitat[]>>>(),
+    // Restore-time entity upgrade against the real tombstone layer would drop
+    // this spec's mock pokemon names (they aren't in the bundled catalog) and
+    // would inject a real fetch into the restore chain (breaking the
+    // flushPromises timing the gate tests rely on). This spec resolves
+    // locally instead: mock pokemon universe, items pass through untouched.
+    buildEntityResolvers: vi.fn<() => Promise<import('@/queries').EntityNameResolvers>>(
+      async () => ({
+        resolvePokemon: (name: string) => (name in testPokemonData ? name : null),
+        resolveItem: (name: string) => name,
+      }),
+    ),
   }
 })
 

@@ -705,7 +705,7 @@ test.describe('URL Hash Sharing', () => {
       medium: 0,
       large: 0,
       pokemon: ['Bulbasaur'],
-      cart: [{ houseId: 'S1', name: 'Berry Pots', quantity: 2 }],
+      cart: [{ houseId: 'S1', name: 'Punching Bag', quantity: 2 }],
     }
     const hash = btoa(JSON.stringify(state))
 

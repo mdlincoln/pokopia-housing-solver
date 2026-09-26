@@ -103,6 +103,31 @@ CREATE TABLE
       , FOREIGN KEY (habitat_id, pokemon_name) REFERENCES habitat_pokemon (habitat_id, pokemon_name)
     );
 
+-- Entity tombstones record old->new rename provenance so legacy URL hashes and
+-- saved islands (which encode entity *names*) can transparently upgrade to
+-- canonical names at restore time. Populated exclusively by
+-- scripts/rename_entity.mjs (`npm run rename:entity`); never hand-edit.
+CREATE TABLE
+    pokemon_tombstones (
+        old_name TEXT PRIMARY KEY
+      , pokemon_id INTEGER NOT NULL REFERENCES pokemon (id)
+      , renamed_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+CREATE TABLE
+    item_tombstones (
+        old_name TEXT PRIMARY KEY
+      , item_id INTEGER NOT NULL REFERENCES items (id)
+      , renamed_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+CREATE TABLE
+    habitat_tombstones (
+        old_name TEXT PRIMARY KEY
+      , habitat_id INTEGER NOT NULL REFERENCES habitat_entries (id)
+      , renamed_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
 CREATE VIEW
     shared_favorites AS
 SELECT

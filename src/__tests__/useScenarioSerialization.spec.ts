@@ -35,6 +35,15 @@ vi.mock('@/queries', () => ({
     .mockReturnValue({ category: '', tag: '', flavorText: '' }),
   getItemPicturePath: vi.fn<() => string>().mockReturnValue(''),
   getRecipeForItem: vi.fn<() => { ingredients: unknown[] }>().mockReturnValue({ ingredients: [] }),
+  // Full factory mock: restoreState builds resolvers through this export.
+  // Resolution is identity over the spec's mock universes (extend the arrays
+  // in a test to simulate catalog changes); anything else resolves null and
+  // is dropped by the upgrade.
+  buildEntityResolvers: vi.fn<() => Promise<import('@/queries').EntityNameResolvers>>(async () => ({
+    resolvePokemon: (name: string) => (['Pikachu', 'Raichu'].includes(name) ? name : null),
+    resolveItem: (name: string) =>
+      ['Item1', 'Item2', 'Punching Bag'].includes(name) ? name : null,
+  })),
 }))
 
 const Host = defineComponent({
@@ -230,5 +239,84 @@ describe('useScenarioSerialization', () => {
     expect(decoded.pinnedPokemon).toBeDefined()
     expect(decoded.checkedCartItems).toContain('S1:Item1')
     expect(decoded.cart).toEqual(cartStore.serializedCart)
+  })
+
+  it('restoreState drops an unknown pokemon name and reports it as unmapped', async () => {
+    const wrapper = mount(Host)
+
+    const query: SharedState = {
+      version: 2,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['Pikachu', 'NotARealMon', 'Raichu'],
+    }
+
+    const result = await wrapper.vm.api.restoreState(query)
+
+    expect(wrapper.vm.selectedPokemon).toEqual(['Pikachu', 'Raichu'])
+    expect(result.unmapped).toEqual([{ type: 'pokemon', name: 'NotARealMon' }])
+    expect(result.upgraded).toBe(true)
+    expect(result.state.pokemon).toEqual(['Pikachu', 'Raichu'])
+  })
+
+  it('restoreState drops unknown cart items (both cart arrays and composite keys)', async () => {
+    const cartStore = useCartStore()
+    const progressStore = useProgressStore()
+    const wrapper = mount(Host)
+
+    const query: SharedState = {
+      version: 2,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['Pikachu'],
+      cart: [
+        { houseId: 'S1', name: 'Punching Bag', quantity: 1 },
+        { houseId: 'S1', name: 'GhostItem', quantity: 2 },
+      ],
+      checkedCartItems: ['S1:Item1', 'S1:GhostItem'],
+      placedItems: ['S1:Item2', 'S1:GhostPlaced'],
+    }
+
+    const result = await wrapper.vm.api.restoreState(query)
+
+    expect(cartStore.items.has('S1:Punching Bag')).toBe(true)
+    expect([...cartStore.items.keys()].some((k) => k.includes('GhostItem'))).toBe(false)
+    expect(progressStore.checkedCartItems.has('S1:Item1')).toBe(true)
+    expect(progressStore.checkedCartItems.has('S1:GhostItem')).toBe(false)
+    expect(progressStore.placedItems.has('S1:Item2')).toBe(true)
+    expect(progressStore.placedItems.has('S1:GhostPlaced')).toBe(false)
+    expect(result.unmapped).toEqual([
+      { type: 'item', name: 'GhostItem' }, // cart occurrence
+      { type: 'item', name: 'GhostItem' }, // checkedCartItems occurrence
+      { type: 'item', name: 'GhostPlaced' },
+    ])
+    expect(result.upgraded).toBe(true)
+  })
+
+  it('restoreState returns unmapped: [] and upgraded: false for a fully-valid state', async () => {
+    const wrapper = mount(Host)
+
+    const query: SharedState = {
+      version: 2,
+      small: 1,
+      medium: 0,
+      large: 0,
+      pokemon: ['Pikachu', 'Raichu'],
+      cart: [{ houseId: 'S1', name: 'Punching Bag', quantity: 1 }],
+      checkedCartItems: ['S1:Item1'],
+      placedItems: ['S1:Item2'],
+      pinnedPokemon: ['S1:Pikachu'],
+    }
+
+    const result = await wrapper.vm.api.restoreState(query)
+
+    expect(result.unmapped).toEqual([])
+    expect(result.upgraded).toBe(false)
+    expect(result.state.pokemon).toEqual(['Pikachu', 'Raichu'])
+    // The returned state carries the same values (a clean upgrade is a no-op).
+    expect(result.state.checkedCartItems).toEqual(['S1:Item1'])
+    expect(result.state.placedItems).toEqual(['S1:Item2'])
   })
 })

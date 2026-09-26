@@ -49,3 +49,4 @@ src/data/pokemon.json
 src/data/items.json
 src/data/habitats.json
 public/data/adjacency.json
+public/data/tombstones.json

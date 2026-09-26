@@ -6,6 +6,10 @@
 //   pokemon.json  + items.json  — bundled by Vite (small, always needed)
 //   adjacency.json              — public/data/, fetched once, decoded into an
 //                                 Int16Array (kept out of the JS bundle)
+//   tombstones.json             — public/data/, fetched once on first restore
+//                                 (kept out of the JS bundle): old->canonical
+//                                 entity-name maps for legacy hash/storage
+//                                 upgrades
 
 import { assetPath } from '@/assetPath'
 import type { AdjacencyData } from '@/solver'
@@ -115,5 +119,49 @@ export function loadAdjacencyData(): Promise<AdjacencyData> {
     return { names: payload.names, indexByName, size: payload.size, matrix }
   })()
   return _adjacencyPromise
+}
+
+// JSON-shaped tombstone maps: old entity name -> canonical entity name, one
+// map per entity type. Baked from the *_tombstone tables by
+// scripts/build_data.mjs (chains flattened at bake time). Habitat names never
+// appear in serialized state — the habitat map is retained for future use.
+export interface TombstoneData {
+  pokemon: Record<string, string>
+  items: Record<string, string>
+  habitats: Record<string, string>
+}
+
+const EMPTY_TOMBSTONES: TombstoneData = { pokemon: {}, items: {}, habitats: {} }
+
+let _tombstonePromise: Promise<TombstoneData> | null = null
+
+/**
+ * Fetches the tombstone payload exactly once, lazily — nothing is requested
+ * until the first restore needs it, so the common fresh-visit path pays no
+ * extra request. A failed fetch (HTTP error, malformed JSON, or the thrown
+ * TypeError Node-style fetch produces for a relative assetPath under
+ * jsdom/vitest) degrades to empty maps rather than breaking restores: an
+ * unavailable tombstone layer simply reports names as unmapped, which is the
+ * correct behavior for a missing rename history.
+ */
+export function loadTombstoneData(): Promise<TombstoneData> {
+  _tombstonePromise ??= (async (): Promise<TombstoneData> => {
+    try {
+      const res = await fetch(assetPath('data/tombstones.json'))
+      if (!res.ok) {
+        throw new Error(`Failed to load tombstone data: HTTP ${res.status}`)
+      }
+      const data = (await res.json()) as TombstoneData
+      return {
+        pokemon: data?.pokemon ?? {},
+        items: data?.items ?? {},
+        habitats: data?.habitats ?? {},
+      }
+    } catch (e) {
+      console.error('Tombstone data unavailable; restores cannot upgrade renamed entities', e)
+      return EMPTY_TOMBSTONES
+    }
+  })()
+  return _tombstonePromise
 }
 

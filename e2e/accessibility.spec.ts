@@ -18,8 +18,13 @@ type AxeViolation = { id: string; impact?: string | null; nodes: { target: unkno
 // per-node target selectors) so callers can inspect/filter. Used directly by
 // the axe-gate-fires self-test (which must observe the violations *before* the
 // gate throws) and by runAxe below.
+//
+// The vite-plugin-vue-devtools overlay (its injected anchor button carries
+// aria-label on a role-less div — vue-devtools' own markup, not app UI) is
+// excluded so upgrades of that dev-only plugin cannot gate the suite on
+// third-party violations.
 async function analyze(page: Page): Promise<AxeViolation[]> {
-  const { violations } = await new AxeBuilder({ page }).analyze()
+  const { violations } = await new AxeBuilder({ page }).exclude('.vue-devtools__anchor').analyze()
   return violations as unknown as AxeViolation[]
 }
 
