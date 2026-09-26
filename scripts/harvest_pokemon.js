@@ -162,6 +162,15 @@ export async function scrapePokemonDetail(slug, baseDelay) {
 // DB helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Case-insensitive habitat-name map for validating scraped habitat values, so
+ * the insert path and the update path share one validation code path.
+ */
+function loadValidHabitatsLower(db) {
+  const validHabitatRows = db.prepare('SELECT habitat FROM habitats').all()
+  return new Map(validHabitatRows.map((r) => [r.habitat.toLowerCase(), r.habitat]))
+}
+
 export function getExistingPokemon(dbPath) {
   const db = openReadOnlyDb(dbPath)
   try {
@@ -186,10 +195,7 @@ export function addPokemonToDb(dbPath, name, imagePath, habitat, favorites, exis
   const unmapped = new Set()
   try {
     // --- Habitat validation ---
-    const validHabitatRows = db.prepare('SELECT habitat FROM habitats').all()
-    const validHabitatsLower = new Map(
-      validHabitatRows.map((r) => [r.habitat.toLowerCase(), r.habitat]),
-    )
+    const validHabitatsLower = loadValidHabitatsLower(db)
 
     let habitatDb = habitat
     if (habitat && validHabitatsLower.has(habitat.toLowerCase())) {
@@ -225,6 +231,232 @@ export function addPokemonToDb(dbPath, name, imagePath, habitat, favorites, exis
     db.close()
   }
   return { pokemonId, unmapped }
+}
+
+// ---------------------------------------------------------------------------
+// Update existing pokemon (opt-in --update-existing)
+// ---------------------------------------------------------------------------
+
+/**
+ * Full-sync refresh of pre-existing pokemon rows against the Serebii detail
+ * pages. For each scraped list entry whose lowercased name already exists in
+ * the ``pokemon`` table:
+ *   - UPDATE ``habitat`` only when it differs, validated case-insensitively
+ *     against the ``habitats`` axis table (shared code path with the insert).
+ *   - Image self-heal: re-download the sprite when the file on disk is missing
+ *     (upstream 404s are logged and skipped, not fatal).
+ *   - Full-sync ``pokemon_favorites``: insert missing favorites (validated
+ *     against the favorites table, keeping the unmapped-favorite warning),
+ *     delete rows not in the scraped set.
+ *
+ * ``name`` is never modified (legacy-hash contract), and a ``pokemon`` row
+ * absent from the scraped listing is never deleted — top-level removals are
+ * report-only in every domain.
+ *
+ * Null-parse skip rule: a fetch/parse failure skips the row entirely — no
+ * habitat update, no favorites reconciliation, no deletes.
+ *
+ * With ``dryRun`` the planned delta is printed with zero DB/image writes.
+ */
+export async function updateExistingPokemon(
+  dbPath,
+  allEntries,
+  imagesDir,
+  baseDelay,
+  existingFavLower,
+  { dryRun = false } = {},
+) {
+  console.log(
+    `\n--- Updating existing pokemon (full sync)${dryRun ? ' [DRY RUN — no writes]' : ''} ---`,
+  )
+
+  const ro = openReadOnlyDb(dbPath)
+  let dbRows
+  try {
+    dbRows = ro
+      .prepare('SELECT id, name, image_path, habitat FROM pokemon')
+      .all()
+      .map((r) => [r.name.toLowerCase(), r])
+  } finally {
+    ro.close()
+  }
+  const existingByLower = new Map(dbRows)
+
+  let processed = 0
+  let skipped = 0
+  let habitatUpdates = 0
+  let favInserted = 0
+  let favDeleted = 0
+  let imagesHealed = 0
+
+  for (const [i, entry] of allEntries.entries()) {
+    const tag = `[${i + 1}/${allEntries.length}]`
+    const row = existingByLower.get(entry.name.toLowerCase())
+    if (!row) {
+      continue // new pokemon — handled by the insert pass
+    }
+
+    let detail
+    try {
+      detail = await scrapePokemonDetail(entry.slug, baseDelay)
+    } catch (e) {
+      console.log(
+        `  ${tag} SKIP '${row.name}': fetch failed (${e.message}) — no updates, no deletes`,
+      )
+      skipped += 1
+      continue
+    }
+    if (detail === null) {
+      console.log(
+        `  ${tag} SKIP '${row.name}': parse failed — no updates, no reconciliation, no deletes`,
+      )
+      skipped += 1
+      continue
+    }
+    processed += 1
+    const dry = dryRun ? 'DRY RUN: ' : ''
+
+    // --- Habitat diff ---
+    let habitatDb = detail.habitat
+    if (habitatDb) {
+      const db = openWritableDb(dbPath)
+      let validHabitatsLower
+      try {
+        validHabitatsLower = loadValidHabitatsLower(db)
+      } finally {
+        db.close()
+      }
+      if (validHabitatsLower.has(habitatDb.toLowerCase())) {
+        habitatDb = validHabitatsLower.get(habitatDb.toLowerCase())
+      } else {
+        console.log(
+          `    WARNING: habitat '${habitatDb}' not in habitats table; storing NULL for '${row.name}'`,
+        )
+        habitatDb = null
+      }
+    } else {
+      habitatDb = null
+    }
+    if ((row.habitat ?? null) !== (habitatDb ?? null)) {
+      habitatUpdates += 1
+      console.log(
+        `  ${tag} ${dry}UPDATE '${row.name}' → habitat: ${JSON.stringify(row.habitat)} -> ` +
+          `${JSON.stringify(habitatDb)}`,
+      )
+      if (!dryRun) {
+        const db = openWritableDb(dbPath)
+        try {
+          db.prepare('UPDATE pokemon SET habitat = ? WHERE id = ?').run(habitatDb, row.id)
+        } finally {
+          db.close()
+        }
+      }
+    }
+
+    // --- Image self-heal ---
+    if (row.image_path) {
+      const localFile = path.join(imagesDir, row.image_path.replace(/^images\//, ''))
+      if (!fs.existsSync(localFile) && detail.imageFilename) {
+        imagesHealed += 1
+        if (dryRun) {
+          console.log(
+            `  ${tag} DRY RUN: would re-download missing sprite for '${row.name}' (${row.image_path})`,
+          )
+        } else {
+          try {
+            const healed = await downloadImage(
+              detail.imageUrl,
+              detail.imageFilename,
+              imagesDir,
+              dbPath,
+              { table: 'pokemon', column: 'image_path' },
+              baseDelay,
+            )
+            console.log(`  ${tag} Image self-heal for '${row.name}': downloaded ${healed}`)
+            if (healed !== row.image_path) {
+              console.log(
+                `    WARNING: healed image path ${healed} differs from DB image_path ` +
+                  `${row.image_path} (DB value left unchanged)`,
+              )
+            }
+          } catch (e) {
+            console.log(
+              `    WARNING: image self-heal failed for '${row.name}': ${e.message}. Skipping.`,
+            )
+          }
+        }
+      }
+    }
+
+    // --- pokemon_favorites full sync ---
+    const expectedFavs = new Set(detail.favorites.map((f) => f.toLowerCase()))
+    const db = openWritableDb(dbPath)
+    let existingFavRows
+    try {
+      existingFavRows = db
+        .prepare('SELECT favorite_name FROM pokemon_favorites WHERE pokemon_id = ?')
+        .all(row.id)
+    } finally {
+      db.close()
+    }
+
+    for (const fav of expectedFavs) {
+      const already = existingFavRows.some((r) => r.favorite_name.toLowerCase() === fav)
+      if (already) {
+        continue
+      }
+      if (!existingFavLower.has(fav)) {
+        console.log(
+          `  ${tag} favorite '${fav}' not in favorites table (no insert, row kept if present)`,
+        )
+        continue
+      }
+      favInserted += 1
+      if (dryRun) {
+        console.log(`  ${tag} DRY RUN: favorite INSERT '${fav}'`)
+      } else {
+        const wdb = openWritableDb(dbPath)
+        try {
+          wdb
+            .prepare(
+              'INSERT OR IGNORE INTO pokemon_favorites (pokemon_id, favorite_name) VALUES (?, ?)',
+            )
+            .run(row.id, fav)
+        } finally {
+          wdb.close()
+        }
+        console.log(`  ${tag} favorite INSERT '${fav}'`)
+      }
+    }
+    for (const { favorite_name: favName } of existingFavRows) {
+      if (!expectedFavs.has(favName.toLowerCase())) {
+        favDeleted += 1
+        if (dryRun) {
+          console.log(
+            `  ${tag} DRY RUN: favorite DELETE '${favName}' (not expected by the scraped page)`,
+          )
+        } else {
+          const wdb = openWritableDb(dbPath)
+          try {
+            wdb
+              .prepare('DELETE FROM pokemon_favorites WHERE pokemon_id = ? AND favorite_name = ?')
+              .run(row.id, favName)
+          } finally {
+            wdb.close()
+          }
+          console.log(`  ${tag} favorite DELETE '${favName}' (absent from scraped favorites)`)
+        }
+      }
+    }
+  }
+
+  console.log(
+    `\nPokemon update pass: processed=${processed}, skipped=${skipped}, ` +
+      `habitatUpdates=${habitatUpdates}, favorite inserts/deletes=${favInserted}/${favDeleted}, ` +
+      `imagesHealed=${imagesHealed}`,
+  )
+
+  return { processed, skipped, habitatUpdates, favInserted, favDeleted, imagesHealed }
 }
 
 // ---------------------------------------------------------------------------
@@ -378,6 +610,9 @@ Harvest missing Pokemon from Serebii's Pokopia Pokedex.
 
 Options:
   --dry-run          Scrape and report what would be added, but do not write.
+  --update-existing  Also refresh existing pokemon (habitat, sprite self-heal)
+                     and full-sync their favorites (favorites absent from
+                     Serebii are deleted; pokemon themselves are never deleted).
   --verify           Skip harvesting; run the completeness + integrity check only.
   --db <path>        Path to the SQLite DB (default: ${DEFAULT_DB_PATH})
   --images-dir <dir> Directory for sprite images (default: ${DEFAULT_IMAGES_DIR})
@@ -394,6 +629,7 @@ export async function main(argv = process.argv.slice(2)) {
       strict: true,
       options: {
         'dry-run': { type: 'boolean', default: false },
+        'update-existing': { type: 'boolean', default: false },
         verify: { type: 'boolean', default: false },
         db: { type: 'string', default: DEFAULT_DB_PATH },
         'images-dir': { type: 'string', default: DEFAULT_IMAGES_DIR },
@@ -428,7 +664,8 @@ export async function main(argv = process.argv.slice(2)) {
   if (values.verify) {
     console.log('Running in verify-only mode.\n')
     const allEntries = await scrapePokemonList(baseDelay)
-    verifyCompleteness(dbPath, allEntries, imagesDir)
+    const ok = verifyCompleteness(dbPath, allEntries, imagesDir)
+    process.exitCode = ok ? 0 : 1
     return
   }
 
@@ -447,8 +684,16 @@ export async function main(argv = process.argv.slice(2)) {
   )
 
   if (missing.length === 0) {
-    console.log('Nothing to add. Running verification...')
-    verifyCompleteness(dbPath, allEntries, imagesDir)
+    if (values['update-existing']) {
+      await updateExistingPokemon(dbPath, allEntries, imagesDir, baseDelay, existingFavLower, {
+        dryRun: values['dry-run'],
+      })
+    }
+    if (!values['dry-run']) {
+      console.log('Nothing to add. Running verification...')
+      const ok = verifyCompleteness(dbPath, allEntries, imagesDir)
+      process.exitCode = ok ? 0 : 1
+    }
     return
   }
 
@@ -475,6 +720,11 @@ export async function main(argv = process.argv.slice(2)) {
       }
     }
     console.log('\n[DRY RUN complete — no writes performed.]')
+    if (values['update-existing']) {
+      await updateExistingPokemon(dbPath, allEntries, imagesDir, baseDelay, existingFavLower, {
+        dryRun: true,
+      })
+    }
     return
   }
 
@@ -529,10 +779,17 @@ export async function main(argv = process.argv.slice(2)) {
 
   flagUnmappedFavorites(allSeenFavorites, existingFavLower)
 
+  if (values['update-existing']) {
+    await updateExistingPokemon(dbPath, allEntries, imagesDir, baseDelay, existingFavLower, {
+      dryRun: values['dry-run'],
+    })
+  }
+
   console.log(
     `\nHarvest complete: added=${added}, failed=${failed}, total on Serebii=${allEntries.length}`,
   )
-  verifyCompleteness(dbPath, allEntries, imagesDir)
+  const ok = verifyCompleteness(dbPath, allEntries, imagesDir)
+  process.exitCode = ok ? 0 : 1
 }
 
 // Run when this file is the entry point (mirrors Python's `if __name__ == "__main__"`).

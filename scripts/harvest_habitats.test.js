@@ -23,6 +23,7 @@ import {
   main,
   parseHabitatDetailHtml,
   parseHabitatListHtml,
+  updateExistingHabitats,
 } from './harvest_habitats.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -918,6 +919,8 @@ test('main --verify with stubbed fetch prints verification report', async (t) =>
 
   stubFetch(t, habitatsFetchMap())
 
+  const savedExit = process.exitCode
+  process.exitCode = 0
   const originalLog = console.log
   const chunks = []
   console.log = (...args) => chunks.push(args.join(' '))
@@ -925,10 +928,422 @@ test('main --verify with stubbed fetch prints verification report', async (t) =>
     await main(['--verify', '--db', dbPath, '--images-dir', imagesDir, '--delay', '0'])
   } finally {
     console.log = originalLog
+    process.exitCode = savedExit
   }
   const output = chunks.join('\n')
 
   assert.match(output, /VERIFICATION REPORT/)
   assert.match(output, /Serebii habitats:/)
   assert.match(output, /DB habitats:/)
+})
+
+// ---------------------------------------------------------------------------
+// --update-existing (Phase 5 of the plan: full sync + FK-safe deletes)
+// ---------------------------------------------------------------------------
+
+function openHabDb(dbPath) {
+  const db = new DatabaseSync(dbPath)
+  db.exec('PRAGMA foreign_keys=ON')
+  return db
+}
+
+function readHabDb(dbPath, sql, params = []) {
+  const ro = new DatabaseSync(dbPath, { readOnly: true })
+  try {
+    return ro
+      .prepare(sql)
+      .all(...params)
+      .map((r) => ({ ...r }))
+  } finally {
+    ro.close()
+  }
+}
+
+const TALLGRASS_ENTRY = {
+  number: 1,
+  name: 'Tall Grass',
+  slug: 'tallgrass',
+  thumbnailBasename: '1',
+  description: 'desc',
+  category: 'main',
+}
+
+/**
+ * Seed habitat 1 'Tall Grass' (slug tallgrass) with stale state:
+ *   - description 'old desc' (to be refreshed)
+ *   - recipe: 'Old Item' x2 (to be deleted), 'Tall Grass' x999 (qty corrected)
+ *   - spawn 'Psyduck' with join rows (removed FK-safely: Psyduck is absent
+ *     from DETAIL_HTML)
+ *   - spawn 'Bulbasaur' rarity 'Rare' (corrected to 'Common'), missing
+ *     location 'Bleak Beach'
+ * The detail page (DETAIL_HTML) additionally spawns Charmander/Squirtle/
+ * Geodude/Oddish/Charizard (inserted with join values).
+ */
+function seedHabitatUpdateFixtures(dbPath, imagesDir) {
+  seedTestDb(dbPath)
+  const db = openHabDb(dbPath)
+  db.prepare(
+    'INSERT INTO habitat_entries (id, number, name, detail_slug, image_path, description, category) ' +
+      "VALUES (1, 1, 'Tall Grass', 'tallgrass', 'images/habitats/1.png', 'old desc', 'main')",
+  ).run()
+  db.prepare(
+    "INSERT INTO habitat_recipe (habitat_id, item_name, quantity) VALUES (1, 'Old Item', 2)",
+  ).run()
+  db.prepare(
+    "INSERT INTO habitat_recipe (habitat_id, item_name, quantity) VALUES (1, 'Tall Grass', 999)",
+  ).run()
+  db.prepare(
+    "INSERT INTO habitat_pokemon (habitat_id, pokemon_name, rarity) VALUES (1, 'Psyduck', 'Common')",
+  ).run()
+  db.prepare(
+    "INSERT INTO habitat_pokemon_location (habitat_id, pokemon_name, location) VALUES (1, 'Psyduck', 'Palette Town')",
+  ).run()
+  db.prepare(
+    "INSERT INTO habitat_pokemon_time (habitat_id, pokemon_name, time) VALUES (1, 'Psyduck', 'Day')",
+  ).run()
+  db.prepare(
+    "INSERT INTO habitat_pokemon (habitat_id, pokemon_name, rarity) VALUES (1, 'Bulbasaur', 'Rare')",
+  ).run()
+  db.prepare(
+    "INSERT INTO habitat_pokemon_location (habitat_id, pokemon_name, location) VALUES (1, 'Bulbasaur', 'Withered Wastelands')",
+  ).run()
+  db.close()
+
+  fs.mkdirSync(imagesDir, { recursive: true })
+  fs.writeFileSync(path.join(imagesDir, '1.png'), 'png-bytes')
+}
+
+test('updateExistingHabitats refreshes description and full-syncs recipe/spawns (FK-safe)', async (t) => {
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images', 'habitats')
+  seedHabitatUpdateFixtures(dbPath, imagesDir)
+
+  stubFetch(t, habitatsFetchMap())
+
+  const summary = await updateExistingHabitats(dbPath, [TALLGRASS_ENTRY], imagesDir, 0)
+
+  // Description refreshed from the scraped flavor text.
+  const entry = readHabDb(dbPath, 'SELECT * FROM habitat_entries WHERE id = 1')[0]
+  assert.match(entry.description, /Four tufts of tall grass/)
+  assert.strictEqual(entry.name, 'Tall Grass')
+  assert.strictEqual(entry.image_path, 'images/habitats/1.png')
+  assert.strictEqual(summary.descriptionUpdates, 1)
+
+  // Recipe full sync: quantity corrected 999 -> 4, 'Old Item' deleted (AC.5).
+  const recipe = readHabDb(
+    dbPath,
+    'SELECT item_name, quantity FROM habitat_recipe WHERE habitat_id = 1 ORDER BY item_name',
+  )
+  assert.deepStrictEqual(recipe, [{ item_name: 'Tall Grass', quantity: 4 }])
+  assert.strictEqual(summary.recipeUpdated, 1)
+  assert.strictEqual(summary.recipeDeleted, 1)
+
+  // Spawn full sync: Psyduck removed (its join rows went with it, FK-safe);
+  // Bulbasaur rarity corrected; the other five spawns inserted (AC.4/AC.5).
+  const spawns = readHabDb(
+    dbPath,
+    'SELECT pokemon_name, rarity FROM habitat_pokemon WHERE habitat_id = 1 ORDER BY pokemon_name',
+  )
+  assert.deepStrictEqual(
+    spawns.map((r) => r.pokemon_name),
+    ['Bulbasaur', 'Charizard', 'Charmander', 'Geodude', 'Oddish', 'Squirtle'],
+  )
+  const bulbasaur = spawns.find((r) => r.pokemon_name === 'Bulbasaur')
+  assert.strictEqual(bulbasaur.rarity, 'Common')
+  assert.strictEqual(summary.spawnDeleted, 1)
+  assert.strictEqual(summary.spawnInserted, 5)
+  assert.strictEqual(summary.spawnUpdated, 1)
+
+  // Join rows for removed Psyduck are gone; inserted spawns carry join values.
+  assert.deepStrictEqual(
+    readHabDb(
+      dbPath,
+      "SELECT location FROM habitat_pokemon_location WHERE pokemon_name = 'Psyduck'",
+    ),
+    [],
+  )
+  assert.deepStrictEqual(
+    readHabDb(dbPath, "SELECT time FROM habitat_pokemon_time WHERE pokemon_name = 'Psyduck'"),
+    [],
+  )
+  assert.deepStrictEqual(
+    readHabDb(
+      dbPath,
+      "SELECT location FROM habitat_pokemon_location WHERE pokemon_name = 'Squirtle'",
+    )
+      .map((r) => r.location)
+      .sort(),
+    ['Rocky Ridges', 'Sparkling Skylands'],
+  )
+  assert.deepStrictEqual(
+    readHabDb(dbPath, "SELECT time FROM habitat_pokemon_time WHERE pokemon_name = 'Squirtle'").map(
+      (r) => r.time,
+    ),
+    ['Night'],
+  )
+  assert.deepStrictEqual(
+    readHabDb(
+      dbPath,
+      "SELECT weather FROM habitat_pokemon_weather WHERE pokemon_name = 'Squirtle'",
+    ).map((r) => r.weather),
+    ['Rain'],
+  )
+})
+
+test('updateExistingHabitats is a no-op on already-synced state', async (t) => {
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images', 'habitats')
+  seedHabitatUpdateFixtures(dbPath, imagesDir)
+
+  stubFetch(t, habitatsFetchMap())
+
+  await updateExistingHabitats(dbPath, [TALLGRASS_ENTRY], imagesDir, 0)
+  const before = {
+    entries: readHabDb(dbPath, 'SELECT * FROM habitat_entries'),
+    recipe: readHabDb(dbPath, 'SELECT * FROM habitat_recipe ORDER BY item_name'),
+    pokemon: readHabDb(dbPath, 'SELECT * FROM habitat_pokemon ORDER BY pokemon_name'),
+    loc: readHabDb(
+      dbPath,
+      'SELECT * FROM habitat_pokemon_location ORDER BY pokemon_name, location',
+    ),
+    time: readHabDb(dbPath, 'SELECT * FROM habitat_pokemon_time ORDER BY pokemon_name, time'),
+    weather: readHabDb(
+      dbPath,
+      'SELECT * FROM habitat_pokemon_weather ORDER BY pokemon_name, weather',
+    ),
+  }
+  const summary = await updateExistingHabitats(dbPath, [TALLGRASS_ENTRY], imagesDir, 0)
+  const after = {
+    entries: readHabDb(dbPath, 'SELECT * FROM habitat_entries'),
+    recipe: readHabDb(dbPath, 'SELECT * FROM habitat_recipe ORDER BY item_name'),
+    pokemon: readHabDb(dbPath, 'SELECT * FROM habitat_pokemon ORDER BY pokemon_name'),
+    loc: readHabDb(
+      dbPath,
+      'SELECT * FROM habitat_pokemon_location ORDER BY pokemon_name, location',
+    ),
+    time: readHabDb(dbPath, 'SELECT * FROM habitat_pokemon_time ORDER BY pokemon_name, time'),
+    weather: readHabDb(
+      dbPath,
+      'SELECT * FROM habitat_pokemon_weather ORDER BY pokemon_name, weather',
+    ),
+  }
+  assert.deepStrictEqual(after, before)
+  assert.strictEqual(summary.descriptionUpdates, 0)
+  assert.strictEqual(summary.recipeInserted + summary.recipeUpdated + summary.recipeDeleted, 0)
+  assert.strictEqual(summary.spawnInserted + summary.spawnUpdated + summary.spawnDeleted, 0)
+  assert.strictEqual(summary.joinInserted + summary.joinDeleted, 0)
+})
+
+test('top-level guard: a habitat absent from the scraped list survives --update-existing', async (t) => {
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images', 'habitats')
+  seedHabitatUpdateFixtures(dbPath, imagesDir)
+  const db = openHabDb(dbPath)
+  db.prepare(
+    'INSERT INTO habitat_entries (number, name, detail_slug, image_path, description, category) ' +
+      "VALUES (99, 'Vanished Habitat', 'vanishedhabitat', 'images/habitats/99.png', 'gone', 'main')",
+  ).run()
+  db.close()
+
+  stubFetch(t, habitatsFetchMap())
+
+  const savedExit = process.exitCode
+  process.exitCode = 0
+  const originalLog = console.log
+  console.log = () => {}
+  try {
+    await main(['--update-existing', '--db', dbPath, '--images-dir', imagesDir, '--delay', '0'])
+  } finally {
+    console.log = originalLog
+    process.exitCode = savedExit
+  }
+
+  const vanished = readHabDb(
+    dbPath,
+    "SELECT * FROM habitat_entries WHERE name = 'Vanished Habitat'",
+  )
+  assert.strictEqual(vanished.length, 1, 'the extra top-level row must survive the run')
+})
+
+test('null-parse skip: a failed fetch/parse must not reconcile or delete sub-records (habitats)', async (t) => {
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images', 'habitats')
+  seedHabitatUpdateFixtures(dbPath, imagesDir)
+
+  stubFetch(t, () => '') // detail pages return '' -> fetch throws -> null
+
+  const summary = await updateExistingHabitats(dbPath, [TALLGRASS_ENTRY], imagesDir, 0)
+
+  assert.strictEqual(summary.processed, 0)
+  assert.strictEqual(summary.recipeDeleted, 0)
+  assert.strictEqual(summary.spawnDeleted, 0)
+  assert.strictEqual(summary.joinDeleted, 0)
+  assert.strictEqual(summary.descriptionUpdates, 0)
+  const recipe = readHabDb(dbPath, 'SELECT COUNT(*) AS cnt FROM habitat_recipe')[0]
+  assert.strictEqual(recipe.cnt, 2)
+})
+
+test('--update-existing --dry-run prints the planned delta with zero DB writes (habitats)', async (t) => {
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images', 'habitats')
+  seedHabitatUpdateFixtures(dbPath, imagesDir)
+
+  stubFetch(t, habitatsFetchMap())
+
+  const before = {
+    entries: readHabDb(dbPath, 'SELECT * FROM habitat_entries'),
+    recipe: readHabDb(dbPath, 'SELECT * FROM habitat_recipe ORDER BY item_name'),
+    pokemon: readHabDb(dbPath, 'SELECT * FROM habitat_pokemon ORDER BY pokemon_name'),
+    loc: readHabDb(
+      dbPath,
+      'SELECT * FROM habitat_pokemon_location ORDER BY pokemon_name, location',
+    ),
+    time: readHabDb(dbPath, 'SELECT * FROM habitat_pokemon_time ORDER BY pokemon_name, time'),
+    weather: readHabDb(
+      dbPath,
+      'SELECT * FROM habitat_pokemon_weather ORDER BY pokemon_name, weather',
+    ),
+  }
+
+  const originalLog = console.log
+  const chunks = []
+  console.log = (...args) => chunks.push(args.join(' '))
+  try {
+    await updateExistingHabitats(dbPath, [TALLGRASS_ENTRY], imagesDir, 0, { dryRun: true })
+  } finally {
+    console.log = originalLog
+  }
+  const output = chunks.join('\n')
+
+  assert.match(output, /DRY RUN/)
+  assert.match(output, /recipe DELETE 'Old Item'/)
+  assert.match(output, /spawn DELETE 'Psyduck'/)
+
+  const after = {
+    entries: readHabDb(dbPath, 'SELECT * FROM habitat_entries'),
+    recipe: readHabDb(dbPath, 'SELECT * FROM habitat_recipe ORDER BY item_name'),
+    pokemon: readHabDb(dbPath, 'SELECT * FROM habitat_pokemon ORDER BY pokemon_name'),
+    loc: readHabDb(
+      dbPath,
+      'SELECT * FROM habitat_pokemon_location ORDER BY pokemon_name, location',
+    ),
+    time: readHabDb(dbPath, 'SELECT * FROM habitat_pokemon_time ORDER BY pokemon_name, time'),
+    weather: readHabDb(
+      dbPath,
+      'SELECT * FROM habitat_pokemon_weather ORDER BY pokemon_name, weather',
+    ),
+  }
+  assert.deepStrictEqual(after, before)
+})
+
+// ---------------------------------------------------------------------------
+// Verify gating (AC.8) — in-process main() since fetch cannot be stubbed
+// across a spawnSync process boundary.
+// ---------------------------------------------------------------------------
+
+/**
+ * Seed a single basin habitat ('Basin tall grass', slug basintallgrass) that
+ * matches BASIN_DETAIL_HTML: recipe Lumber x2 + Fluff x3, spawn Psyduck
+ * (Common, Palette Town, 4 times, Sun+Rain).
+ */
+function seedBasinHabitat(dbPath, imagesDir, { recipeQty = { Lumber: 2, Fluff: 3 } } = {}) {
+  seedTestDb(dbPath)
+  const db = openHabDb(dbPath)
+  db.prepare(
+    'INSERT INTO habitat_entries (id, number, name, detail_slug, image_path, description, category) ' +
+      "VALUES (1, 1, 'Basin tall grass', 'basintallgrass', 'images/habitats/b1.png', 'd', 'basin')",
+  ).run()
+  for (const [name, qty] of Object.entries(recipeQty)) {
+    db.prepare('INSERT INTO habitat_recipe (habitat_id, item_name, quantity) VALUES (1, ?, ?)').run(
+      name,
+      qty,
+    )
+  }
+  db.prepare(
+    "INSERT INTO habitat_pokemon (habitat_id, pokemon_name, rarity) VALUES (1, 'Psyduck', 'Common')",
+  ).run()
+  db.prepare(
+    "INSERT INTO habitat_pokemon_location (habitat_id, pokemon_name, location) VALUES (1, 'Psyduck', 'Palette Town')",
+  ).run()
+  for (const time of ['Morning', 'Day', 'Evening', 'Night']) {
+    db.prepare(
+      "INSERT INTO habitat_pokemon_time (habitat_id, pokemon_name, time) VALUES (1, 'Psyduck', ?)",
+    ).run(time)
+  }
+  for (const weather of ['Sun', 'Rain']) {
+    db.prepare(
+      "INSERT INTO habitat_pokemon_weather (habitat_id, pokemon_name, weather) VALUES (1, 'Psyduck', ?)",
+    ).run(weather)
+  }
+  db.close()
+
+  fs.mkdirSync(imagesDir, { recursive: true })
+  fs.writeFileSync(path.join(imagesDir, 'b1.png'), 'png-bytes')
+}
+
+// A one-entry list page (Basin section) so the verify gate tests compare
+// exactly the single seeded habitat.
+const BASIN_ONLY_LIST_HTML = `<html><body><table>
+<tr><td class="fooevo" colspan="4">Habitats (Basin)</td></tr>
+<tr>
+<td class="cen">#001</td>
+<td><a href="habitatdex/basintallgrass.shtml"><img src="habitatdex/th/b1.png" /></a></td>
+<td><a href="habitatdex/basintallgrass.shtml"><u>Basin tall grass</u></a></td>
+<td class="fooinfo">Some description</td>
+</tr>
+</table></body></html>`
+
+async function runHabitatVerify(t, opts) {
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images', 'habitats')
+  seedBasinHabitat(dbPath, imagesDir, opts)
+
+  stubFetch(t, (url) => {
+    if (url.includes('habitats.shtml')) {
+      return BASIN_ONLY_LIST_HTML
+    }
+    // basintallgrass.shtml contains tallgrass.shtml, so this branch must run
+    // before the shared map (whose earlier branch would serve the main
+    // habitat's detail page).
+    if (url.includes('basintallgrass.shtml')) {
+      return BASIN_DETAIL_HTML
+    }
+    return habitatsFetchMap()(url)
+  })
+
+  const savedExit = process.exitCode
+  process.exitCode = 0
+  const originalLog = console.log
+  console.log = () => {}
+  let exit
+  try {
+    await main(['--verify', '--db', dbPath, '--images-dir', imagesDir, '--delay', '0'])
+  } finally {
+    console.log = originalLog
+    exit = process.exitCode
+    process.exitCode = savedExit
+  }
+  return exit
+}
+
+test('habitat verify exits 1 when detailed recipe quantities mismatch (previously un-gated)', async (t) => {
+  const exit = await runHabitatVerify(t, { recipeQty: { Lumber: 2, Fluff: 999 } })
+  assert.strictEqual(exit, 1)
+})
+
+test('habitat verify exits 0 when the habitat matches the scraped page exactly', async (t) => {
+  const exit = await runHabitatVerify(t, {})
+  assert.strictEqual(exit, 0)
 })

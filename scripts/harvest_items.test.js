@@ -22,6 +22,7 @@ import {
   main,
   parseFavoritesPageHtml,
   parseItemDetailHtml,
+  updateExistingItems,
 } from './harvest_items.js'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -235,6 +236,11 @@ function stubFetch(t, htmlByUrlMatch) {
   const original = globalThis.fetch
   globalThis.fetch = async (url) => {
     const html = htmlByUrlMatch(url)
+    // Non-string responses (e.g. { ok: false, status: 404, ... }) pass through
+    // verbatim — used to simulate upstream 404s.
+    if (typeof html === 'object' && html !== null) {
+      return html
+    }
     const bytes = new TextEncoder().encode(html)
     return {
       ok: true,
@@ -524,6 +530,8 @@ test('verify integration prints VERIFICATION REPORT', async (t) => {
 
   stubFetch(t, itemsFetchMap())
 
+  const savedExit = process.exitCode
+  process.exitCode = 0
   const originalLog = console.log
   const chunks = []
   console.log = (...args) => chunks.push(args.join(' '))
@@ -531,6 +539,7 @@ test('verify integration prints VERIFICATION REPORT', async (t) => {
     await main(['--verify', '--db', dbPath, '--images-dir', imagesDir, '--delay', '0'])
   } finally {
     console.log = originalLog
+    process.exitCode = savedExit
   }
   const output = chunks.join('\n')
 
@@ -538,4 +547,614 @@ test('verify integration prints VERIFICATION REPORT', async (t) => {
   assert.match(output, /Serebii unique items:/)
   assert.match(output, /DB items count:/)
   assert.match(output.toUpperCase(), /INTEGRITY/)
+})
+
+// ---------------------------------------------------------------------------
+// --update-existing (Phases 3, 5-8 of the plan: full sync)
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal but parser-valid item detail page. Mirrors the STORAGEBOX fixture
+ * layout (Category/Tag cen cells in a two-row header table, Flavor Text
+ * between headers, Recipe section last, Favorite Categories colspan cell).
+ */
+function itemDetailHtml({ name, imgSlug, category, tag = null, flavor, recipe = [], favs = [] }) {
+  const tagCell = tag ?? '&nbsp;'
+  const recipeRows = recipe
+    .map((r) => `<tr><td><a href="${r.slug}.shtml"><u>${r.name}</u></a> * ${r.count}</td></tr>`)
+    .join('\n')
+  const favsHtml = favs
+    .map(
+      (f) =>
+        `<a href="/pokemonpokopia/favorites/${f.toLowerCase().replace(/ /g, '')}.shtml"><u>${f}</u></a>`,
+    )
+    .join('<br />')
+  return `<html><body>
+<h1>${name}</h1>
+<table><tr><td class="pkmn"><img src="/pokemonpokopia/items/${imgSlug}.png" alt="${name}" /></td></tr></table>
+<table class="tab" align="center">
+<tr>
+<td class="fooevo" width="25%">Category</td>
+<td class="fooevo" width="25%">Tag</td>
+<td class="fooevo">Paintable</td>
+<td class="fooevo" width="25%">Requirements</td>
+</tr>
+<tr><td class="cen">${category}</td><td class="cen">${tagCell}</td><td class="cen">Paint<br /></td><td class="cen"></td></tr>
+<tr>
+<td class="fooevo" width="25%">Trade Value</td>
+<td class="fooevo" width="25%">3D Print Cost</td>
+<td class="fooevo" width="50%" colspan="2">Favorite Categories</td>
+</tr>
+<tr><td class="cen"></td><td class="cen"></td><td class="cen" colspan="2" valign="top">${favsHtml}</td></tr>
+</table>
+<table class="tab"><tr><td class="fooevo"><h2>Flavor Text</h2></td></tr>
+<tr><td class="fooinfo">${flavor}</td></tr></table>
+<table class="dextable"><tr><td class="fooevo" colspan="3"><h2>Recipe</h2></td></tr>
+<tr><td class="fooinfo" colspan="2"><table align="center">${recipeRows}</table></td></tr></table>
+</body></html>`
+}
+
+const PAPER_DETAIL_HTML = itemDetailHtml({
+  name: 'Paper',
+  imgSlug: 'paper',
+  category: 'Furniture',
+  tag: null,
+  flavor: 'A fresh sheet.',
+  recipe: [{ slug: 'lumber', name: 'Lumber', count: 1 }],
+  favs: ['Blocky stuff'],
+})
+
+const LUMBER_DETAIL_HTML = itemDetailHtml({
+  name: 'Lumber',
+  imgSlug: 'lumber',
+  category: 'Road',
+  tag: null,
+  flavor: 'Raw wood.',
+  favs: ['Wooden stuff'],
+})
+
+const GOLDINGOT_DETAIL_HTML = itemDetailHtml({
+  name: 'Gold ingot',
+  imgSlug: 'goldingot',
+  category: 'Road',
+  tag: null,
+  flavor: 'Shiny gold.',
+  favs: [],
+})
+
+// The listing for update tests: paper, lumber, goldingot (vanishing item NOT
+// listed — it only exists in the DB for the top-level guard tests).
+const UPDATE_ITEMS_LISTING_HTML = `<table>
+<tr><td class="cen"><a href="items/paper.shtml"><u>Paper</u></a></td></tr>
+<tr><td class="cen"><a href="items/lumber.shtml"><u>Lumber</u></a></td></tr>
+<tr><td class="cen"><a href="items/goldingot.shtml"><u>Gold ingot</u></a></td></tr>
+</table>`
+
+// Minimal nav + page fixtures listing exactly one item — used where the DB
+// fixture set must equal the Serebii listing (default-run and verify-exit
+// tests), keeping verify's "favorites vs Serebii categories" check green too.
+const ONE_FAV_NAV_HTML = `<select>
+<option value="/pokemonpokopia/favorites/blockystuff.shtml">Blocky stuff</option>
+<option value="/pokemonpokopia/favorites/cleanliness.shtml">Cleanliness</option>
+<option value="/pokemonpokopia/favorites/woodenstuff.shtml">Wooden stuff</option>
+</select>`
+
+const PAPER_ONLY_PAGE_HTML = `<table>
+<tr><td class="cen"><a href="/pokemonpokopia/items/paper.shtml"><u>Paper</u></a></td></tr>
+</table>`
+
+const REBUILDKIT_ONLY_PAGE_HTML = `<table>
+<tr><td class="cen"><a href="/pokemonpokopia/items/pokemoncenterrebuildkit.shtml"><u>Pokemon center rebuild kit</u></a></td></tr>
+</table>`
+
+function updateItemsFetchMap(t) {
+  stubFetch(t, (url) => {
+    if (url.includes('blockystuff.shtml')) {
+      return FAVORITES_NAV_HTML + FAVORITES_PAGE_HTML
+    }
+    if (url.includes('cleanliness.shtml')) {
+      return FAVORITES_NAV_HTML + '<table></table>'
+    }
+    if (url.includes('paper.shtml')) {
+      return PAPER_DETAIL_HTML
+    }
+    if (url.includes('lumber.shtml')) {
+      return LUMBER_DETAIL_HTML
+    }
+    if (url.includes('goldingot.shtml')) {
+      return GOLDINGOT_DETAIL_HTML
+    }
+    if (url.includes('vanished.shtml')) {
+      return '' // parse -> null -> null-parse skip rule
+    }
+    if (url.replace(/\/+$/, '').endsWith('items.shtml')) {
+      return UPDATE_ITEMS_LISTING_HTML
+    }
+    return ''
+  })
+}
+
+/**
+ * Seed the drifted state:
+ *   - items 1 Paper (stale category/tag/flavor), 2 Lumber, 3 Gold ingot,
+ *     optionally id 9 vanished (absent from the listing).
+ *   - recipe (1->2, x2 stale), (1->3, x1 to be deleted).
+ *   - favorites (1,'blocky stuff') kept, (1,'cleanliness') to be deleted.
+ */
+function seedUpdateFixtures(dbPath, imagesDir, { withVanished = false } = {}) {
+  const db = new DatabaseSync(dbPath)
+  db.exec('PRAGMA foreign_keys=ON')
+  db.prepare("INSERT INTO favorites (name) VALUES ('blocky stuff')").run()
+  db.prepare("INSERT INTO favorites (name) VALUES ('cleanliness')").run()
+  db.prepare("INSERT INTO favorites (name) VALUES ('wooden stuff')").run()
+  db.prepare(
+    'INSERT INTO items (id, name, category, picture_path, flavor_text, tag) ' +
+      "VALUES (1, 'Paper', 'Stale Cat', 'images/paper.png', 'stale', 'Toy')",
+  ).run()
+  db.prepare(
+    'INSERT INTO items (id, name, category, picture_path, flavor_text) ' +
+      "VALUES (2, 'Lumber', 'Road', 'images/lumber.png', 'Raw wood.')",
+  ).run()
+  db.prepare(
+    'INSERT INTO items (id, name, category, picture_path, flavor_text) ' +
+      "VALUES (3, 'Gold ingot', 'Road', 'images/goldingot.png', 'Shiny gold.')",
+  ).run()
+  if (withVanished) {
+    db.prepare(
+      'INSERT INTO items (id, name, category, picture_path, flavor_text) ' +
+        "VALUES (9, 'Vanished Item', 'Toy', 'images/vanished.png', 'gone from Serebii')",
+    ).run()
+  }
+  db.prepare("INSERT INTO item_favorites (item_id, favorite_name) VALUES (1, 'blocky stuff')").run()
+  db.prepare("INSERT INTO item_favorites (item_id, favorite_name) VALUES (1, 'cleanliness')").run()
+  db.prepare('INSERT INTO item_recipe (item_id, ingredient_id, COUNT) VALUES (1, 2, 2)').run()
+  db.prepare('INSERT INTO item_recipe (item_id, ingredient_id, COUNT) VALUES (1, 3, 1)').run()
+  db.close()
+
+  // Sprite files exist on disk so no self-heal is attempted for these.
+  fs.mkdirSync(imagesDir, { recursive: true })
+  const spriteFiles = ['paper.png', 'lumber.png', 'goldingot.png']
+  if (withVanished) {
+    spriteFiles.push('vanished.png') // otherwise verify exits 1 on its missing image
+  }
+  for (const img of spriteFiles) {
+    fs.writeFileSync(path.join(imagesDir, img), 'png-bytes')
+  }
+}
+
+function readDb(dbPath, sql, params = []) {
+  const ro = new DatabaseSync(dbPath, { readOnly: true })
+  try {
+    return ro.prepare(sql).all(...params)
+  } finally {
+    ro.close()
+  }
+}
+
+test('updateExistingItems refreshes differing metadata and full-syncs recipe/favorites', async (t) => {
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images')
+  seedTestDb(dbPath)
+  seedUpdateFixtures(dbPath, imagesDir)
+
+  updateItemsFetchMap(t)
+
+  const favoritesMap = new Map([['paper', new Set(['blocky stuff'])]])
+  const existingFavLower = new Set(['blocky stuff', 'cleanliness', 'wooden stuff'])
+
+  const summary = await updateExistingItems(dbPath, imagesDir, 0, favoritesMap, existingFavLower)
+
+  // Metadata refreshed on Paper; name and picture_path untouched (AC.2).
+  const paper = readDb(dbPath, 'SELECT * FROM items WHERE id = 1')[0]
+  assert.strictEqual(paper.category, 'Furniture')
+  assert.strictEqual(paper.tag, null)
+  assert.strictEqual(paper.flavor_text, 'A fresh sheet.')
+  assert.strictEqual(paper.name, 'Paper')
+  assert.strictEqual(paper.picture_path, 'images/paper.png')
+
+  // Recipe full sync: count updated 2 -> 1, orphan ingredient deleted (AC.5).
+  const recipe = readDb(
+    dbPath,
+    'SELECT item_id, ingredient_id, COUNT FROM item_recipe ORDER BY ingredient_id',
+  ).map((r) => ({ item_id: r.item_id, ingredient_id: r.ingredient_id, COUNT: r.COUNT }))
+  assert.deepStrictEqual(recipe, [{ item_id: 1, ingredient_id: 2, COUNT: 1 }])
+  assert.strictEqual(summary.recipeUpdated, 1)
+  assert.strictEqual(summary.recipeDeleted, 1)
+
+  // Favorites full sync: 'cleanliness' deleted from Paper; 'wooden stuff'
+  // inserted for Lumber from its detail page (AC.5).
+  const favs1 = readDb(dbPath, 'SELECT favorite_name FROM item_favorites WHERE item_id = 1').map(
+    (r) => r.favorite_name,
+  )
+  assert.deepStrictEqual(favs1, ['blocky stuff'])
+  const favs2 = readDb(dbPath, 'SELECT favorite_name FROM item_favorites WHERE item_id = 2').map(
+    (r) => r.favorite_name,
+  )
+  assert.deepStrictEqual(favs2, ['wooden stuff'])
+  assert.strictEqual(summary.favDeleted, 1)
+  assert.strictEqual(summary.favInserted, 1)
+})
+
+test('updateExistingItems leaves already-synced rows alone (no spurious updates)', async (t) => {
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images')
+  seedTestDb(dbPath)
+  seedUpdateFixtures(dbPath, imagesDir)
+  updateItemsFetchMap(t)
+
+  const favoritesMap = new Map([['paper', new Set(['blocky stuff'])]])
+  const existingFavLower = new Set(['blocky stuff', 'cleanliness', 'wooden stuff'])
+
+  // First pass syncs everything; second pass must be a no-op.
+  await updateExistingItems(dbPath, imagesDir, 0, favoritesMap, existingFavLower)
+  const before = {
+    items: readDb(dbPath, 'SELECT * FROM items ORDER BY id'),
+    recipe: readDb(dbPath, 'SELECT * FROM item_recipe ORDER BY item_id, ingredient_id'),
+    favorites: readDb(dbPath, 'SELECT * FROM item_favorites ORDER BY item_id, favorite_name'),
+  }
+  const summary = await updateExistingItems(dbPath, imagesDir, 0, favoritesMap, existingFavLower)
+  const after = {
+    items: readDb(dbPath, 'SELECT * FROM items ORDER BY id'),
+    recipe: readDb(dbPath, 'SELECT * FROM item_recipe ORDER BY item_id, ingredient_id'),
+    favorites: readDb(dbPath, 'SELECT * FROM item_favorites ORDER BY item_id, favorite_name'),
+  }
+  assert.deepStrictEqual(after, before)
+  assert.strictEqual(summary.metadataUpdates, 0)
+  assert.strictEqual(summary.recipeInserted + summary.recipeUpdated + summary.recipeDeleted, 0)
+  assert.strictEqual(summary.favInserted + summary.favDeleted, 0)
+})
+
+test('null-parse skip: a failed fetch/parse must not reconcile or delete sub-records', async (t) => {
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images')
+  seedTestDb(dbPath)
+  seedUpdateFixtures(dbPath, imagesDir)
+
+  stubFetch(t, () => '') // every detail page fails to parse -> null
+
+  const favoritesMap = new Map([['paper', new Set(['blocky stuff'])]])
+  const existingFavLower = new Set(['blocky stuff', 'cleanliness', 'wooden stuff'])
+
+  const summary = await updateExistingItems(dbPath, imagesDir, 0, favoritesMap, existingFavLower)
+
+  // skipped for every row, zero reconciliations, zero deletes.
+  assert.strictEqual(summary.processed, 0)
+  assert.strictEqual(summary.recipeDeleted, 0)
+  assert.strictEqual(summary.favDeleted, 0)
+  assert.strictEqual(summary.metadataUpdates, 0)
+  const recipe = readDb(dbPath, 'SELECT COUNT(*) AS cnt FROM item_recipe')[0]
+  assert.strictEqual(recipe.cnt, 2)
+  const favs = readDb(dbPath, 'SELECT COUNT(*) AS cnt FROM item_favorites')[0]
+  assert.strictEqual(favs.cnt, 2)
+})
+
+test('--update-existing --dry-run prints the planned delta with zero DB writes', async (t) => {
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images')
+  seedTestDb(dbPath)
+  seedUpdateFixtures(dbPath, imagesDir)
+  updateItemsFetchMap(t)
+
+  const before = {
+    items: readDb(dbPath, 'SELECT * FROM items ORDER BY id'),
+    recipe: readDb(dbPath, 'SELECT * FROM item_recipe ORDER BY ingredient_id'),
+    favorites: readDb(dbPath, 'SELECT * FROM item_favorites ORDER BY item_id, favorite_name'),
+  }
+
+  const originalLog = console.log
+  const chunks = []
+  console.log = (...args) => chunks.push(args.join(' '))
+  try {
+    await main([
+      '--update-existing',
+      '--dry-run',
+      '--db',
+      dbPath,
+      '--images-dir',
+      imagesDir,
+      '--delay',
+      '0',
+    ])
+  } finally {
+    console.log = originalLog
+  }
+  const output = chunks.join('\n')
+
+  assert.match(output, /DRY RUN/)
+  assert.match(output, /category: "Stale Cat" -> "Furniture"/)
+  assert.match(output, /full sync/)
+
+  const after = {
+    items: readDb(dbPath, 'SELECT * FROM items ORDER BY id'),
+    recipe: readDb(dbPath, 'SELECT * FROM item_recipe ORDER BY ingredient_id'),
+    favorites: readDb(dbPath, 'SELECT * FROM item_favorites ORDER BY item_id, favorite_name'),
+  }
+  assert.deepStrictEqual(after, before)
+})
+
+test('default (no flag) run leaves existing rows byte-identical (AC.1 regression guard)', async (t) => {
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images')
+  seedTestDb(dbPath)
+  seedUpdateFixtures(dbPath, imagesDir)
+  updateItemsFetchMap(t)
+
+  // Sync once via the update pass...
+  const favoritesMap = new Map([['paper', new Set(['blocky stuff'])]])
+  const existingFavLower = new Set(['blocky stuff', 'cleanliness', 'wooden stuff'])
+  await updateExistingItems(dbPath, imagesDir, 0, favoritesMap, existingFavLower)
+  const before = {
+    items: readDb(dbPath, 'SELECT * FROM items ORDER BY id'),
+    recipe: readDb(dbPath, 'SELECT * FROM item_recipe ORDER BY item_id, ingredient_id'),
+    favorites: readDb(dbPath, 'SELECT * FROM item_favorites ORDER BY item_id, favorite_name'),
+  }
+
+  // ...then a default main() run (nothing missing) must not touch anything.
+  // Dedicated stub: favorites page lists only Paper (the shared fixture would
+  // drag in Wall storage box and take the insert path instead).
+  stubFetch(t, (url) => {
+    if (url.includes('blockystuff.shtml')) {
+      return ONE_FAV_NAV_HTML + PAPER_ONLY_PAGE_HTML
+    }
+    if (url.includes('cleanliness.shtml') || url.includes('woodenstuff.shtml')) {
+      return ONE_FAV_NAV_HTML + '<table></table>'
+    }
+    if (url.replace(/\/+$/, '').endsWith('items.shtml')) {
+      return UPDATE_ITEMS_LISTING_HTML
+    }
+    return ''
+  })
+
+  const savedExit = process.exitCode
+  process.exitCode = 0
+  const originalLog = console.log
+  const chunks = []
+  console.log = (...args) => chunks.push(args.join(' '))
+  try {
+    await main(['--db', dbPath, '--images-dir', imagesDir, '--delay', '0'])
+  } finally {
+    console.log = originalLog
+    process.exitCode = savedExit
+  }
+
+  const after = {
+    items: readDb(dbPath, 'SELECT * FROM items ORDER BY id'),
+    recipe: readDb(dbPath, 'SELECT * FROM item_recipe ORDER BY item_id, ingredient_id'),
+    favorites: readDb(dbPath, 'SELECT * FROM item_favorites ORDER BY item_id, favorite_name'),
+  }
+  assert.deepStrictEqual(after, before)
+  assert.match(chunks.join('\n'), /Nothing to add/)
+})
+
+test('top-level guard: an item absent from the scraped listing survives --update-existing', async (t) => {
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images')
+  seedTestDb(dbPath)
+  seedUpdateFixtures(dbPath, imagesDir, { withVanished: true })
+  updateItemsFetchMap(t)
+
+  const savedExit = process.exitCode
+  process.exitCode = 0
+  const originalLog = console.log
+  const chunks = []
+  console.log = (...args) => chunks.push(args.join(' '))
+  try {
+    await main(['--update-existing', '--db', dbPath, '--images-dir', imagesDir, '--delay', '0'])
+  } finally {
+    console.log = originalLog
+    process.exitCode = savedExit
+  }
+
+  const vanished = readDb(dbPath, 'SELECT * FROM items WHERE id = 9')
+  assert.strictEqual(vanished.length, 1, 'the extra top-level row must survive the run')
+  assert.strictEqual(vanished[0].name, 'Vanished Item')
+  // and the verify report flags it — report-only, never deleted:
+  assert.match(chunks.join('\n'), /Extra in DB/)
+})
+
+test('verify exit code: allowlisted missing ROW (upstream-404 item never insertable) passes the gate (0)', async (t) => {
+  // seabedflowerseeds(purple) is on the Serebii listing but its sprite 404s,
+  // so the DB has no row at all. The allowlist must make that warning-only.
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images')
+  seedTestDb(dbPath)
+
+  const db = new DatabaseSync(dbPath)
+  db.exec('PRAGMA foreign_keys=ON')
+  db.prepare("INSERT INTO favorites (name) VALUES ('blocky stuff')").run()
+  db.prepare(
+    "INSERT INTO items (id, name, picture_path) VALUES (1, 'Paper', 'images/paper.png')",
+  ).run()
+  db.prepare("INSERT INTO item_favorites (item_id, favorite_name) VALUES (1, 'blocky stuff')").run()
+  db.close()
+  fs.mkdirSync(imagesDir, { recursive: true })
+  fs.writeFileSync(path.join(imagesDir, 'paper.png'), 'png')
+
+  stubFetch(t, (url) => {
+    if (url.includes('blockystuff.shtml')) {
+      return FAVORITES_NAV_HTML + PAPER_ONLY_PAGE_HTML
+    }
+    if (url.includes('cleanliness.shtml')) {
+      return FAVORITES_NAV_HTML + '<table></table>'
+    }
+    if (url.replace(/\/+$/, '').endsWith('items.shtml')) {
+      return (
+        `<table><tr><td class="cen"><a href="items/paper.shtml"><u>Paper</u></a></td></tr>` +
+        `<tr><td class="cen"><a href="items/seabedflowerseeds(purple).shtml"><u>Seabed flower seeds (purple)</u></a></td></tr></table>`
+      )
+    }
+    return ''
+  })
+
+  const savedExit = process.exitCode
+  process.exitCode = 0
+  const originalLog = console.log
+  const chunks = []
+  console.log = (...args) => chunks.push(args.join(' '))
+  try {
+    await main(['--verify', '--db', dbPath, '--images-dir', imagesDir, '--delay', '0'])
+  } finally {
+    console.log = originalLog
+    process.exitCode = savedExit
+  }
+  assert.match(chunks.join('\n'), /known upstream 404/)
+})
+
+test('insert pass places an allowlisted upstream-404 item despite the failed image download', async (t) => {
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images')
+  seedTestDb(dbPath)
+
+  const db = new DatabaseSync(dbPath)
+  db.exec('PRAGMA foreign_keys=ON')
+  db.prepare("INSERT INTO favorites (name) VALUES ('blocky stuff')").run()
+  db.close()
+
+  stubFetch(t, (url) => {
+    if (url.includes('blockystuff.shtml')) {
+      return (
+        FAVORITES_NAV_HTML +
+        `<table><tr><td class="cen"><a href="/pokemonpokopia/items/seabedflowerseeds(purple).shtml"><u>Seabed flower seeds (purple)</u></a></td></tr></table>`
+      )
+    }
+    if (url.includes('cleanliness.shtml')) {
+      return FAVORITES_NAV_HTML + '<table></table>'
+    }
+    if (url.includes('seabedflowerseeds(purple).shtml')) {
+      return itemDetailHtml({
+        name: 'Seabed flower seeds (purple)',
+        imgSlug: 'seabedflowerseeds(purple)',
+        category: 'Road',
+        tag: null,
+        flavor: 'Purple variant.',
+        favs: ['Blocky stuff'],
+      })
+    }
+    if (url.replace(/\/+$/, '').endsWith('items.shtml')) {
+      return `<table><tr><td class="cen"><a href="items/seabedflowerseeds(purple).shtml"><u>Seabed flower seeds (purple)</u></a></td></tr></table>`
+    }
+    if (url.includes('/items/seabedflowerseeds(purple).png')) {
+      // Upstream 404 for the sprite.
+      return { ok: false, status: 404, arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) }
+    }
+    return ''
+  })
+
+  const originalLog = console.log
+  console.log = () => {}
+  try {
+    await main(['--db', dbPath, '--images-dir', imagesDir, '--delay', '0'])
+  } finally {
+    console.log = originalLog
+  }
+
+  const row = readDb(dbPath, "SELECT * FROM items WHERE name = 'Seabed flower seeds (purple)'")
+  assert.strictEqual(row.length, 1, 'the allowlisted item must be inserted despite the 404 sprite')
+  assert.strictEqual(row[0].picture_path, 'images/seabedflowerseeds(purple).png')
+  assert.ok(!fs.existsSync(path.join(imagesDir, 'seabedflowerseeds(purple).png')))
+})
+
+// ---------------------------------------------------------------------------
+// Verify exit-code gating (AC.8)
+// ---------------------------------------------------------------------------
+
+/**
+ * Run main(['--verify', ...]) in-process (fetch is stubbed, so spawnSync would
+ * hit the network in a child process) and return the exit code main() set.
+ */
+async function runVerifyExitCode(t, { itemName, picturePath, writeFile }) {
+  const tmp = makeTempDir()
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const dbPath = dbPathFor(tmp)
+  const imagesDir = path.join(tmp, 'images')
+  seedTestDb(dbPath)
+
+  const db = new DatabaseSync(dbPath)
+  db.exec('PRAGMA foreign_keys=ON')
+  db.prepare("INSERT INTO favorites (name) VALUES ('blocky stuff')").run()
+  db.prepare('INSERT INTO items (id, name, picture_path) VALUES (1, ?, ?)').run(
+    itemName,
+    picturePath,
+  )
+  db.prepare("INSERT INTO item_favorites (item_id, favorite_name) VALUES (1, 'blocky stuff')").run()
+  db.close()
+
+  if (writeFile) {
+    fs.mkdirSync(imagesDir, { recursive: true })
+    fs.writeFileSync(path.join(imagesDir, path.basename(picturePath)), 'png')
+  }
+
+  const slug = path.basename(picturePath).replace(/\.png$/, '')
+  const itemPageHtml =
+    slug === 'pokemoncenterrebuildkit' ? REBUILDKIT_ONLY_PAGE_HTML : PAPER_ONLY_PAGE_HTML
+  stubFetch(t, (url) => {
+    if (url.includes('blockystuff.shtml')) {
+      return ONE_FAV_NAV_HTML + itemPageHtml
+    }
+    if (url.includes('cleanliness.shtml') || url.includes('woodenstuff.shtml')) {
+      return ONE_FAV_NAV_HTML + '<table></table>'
+    }
+    if (url.replace(/\/+$/, '').endsWith('items.shtml')) {
+      // Listing that contains exactly the seeded item.
+      return `<table><tr><td class="cen"><a href="items/${slug}.shtml"><u>${itemName}</u></a></td></tr></table>`
+    }
+    return ''
+  })
+
+  const savedExit = process.exitCode
+  process.exitCode = 0
+  const originalLog = console.log
+  console.log = () => {}
+  let exit
+  try {
+    await main(['--verify', '--db', dbPath, '--images-dir', imagesDir, '--delay', '0'])
+  } finally {
+    console.log = originalLog
+    exit = process.exitCode
+    process.exitCode = savedExit
+  }
+  return exit
+}
+
+test('verify exit code: non-allowlisted missing image fails the gate (1)', async (t) => {
+  const exit = await runVerifyExitCode(t, {
+    itemName: 'Paper',
+    picturePath: 'images/paper.png',
+    writeFile: false,
+  })
+  assert.strictEqual(exit, 1)
+})
+
+test('verify exit code: known-404-only missing image passes the gate (0)', async (t) => {
+  const exit = await runVerifyExitCode(t, {
+    itemName: 'Pokemon center rebuild kit',
+    picturePath: 'images/pokemoncenterrebuildkit.png',
+    writeFile: false,
+  })
+  assert.strictEqual(exit, 0)
+})
+
+test('verify exit code: clean DB verifies 0', async (t) => {
+  const exit = await runVerifyExitCode(t, {
+    itemName: 'Paper',
+    picturePath: 'images/paper.png',
+    writeFile: true,
+  })
+  assert.strictEqual(exit, 0)
 })

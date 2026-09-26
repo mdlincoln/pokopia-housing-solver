@@ -554,6 +554,412 @@ export async function backfillHabitats(dbPath, imagesDir, baseDelay) {
 }
 
 // ---------------------------------------------------------------------------
+// Update existing habitats (opt-in --update-existing)
+// ---------------------------------------------------------------------------
+
+// Join-table value columns: (table, value column). These must be reconciled
+// and their parent ``habitat_pokemon`` rows deleted only after the child rows
+// (composite FKs), so keep the order encoded here.
+const HABITAT_JOIN_TARGETS = [
+  { table: 'habitat_pokemon_location', column: 'location', detailKey: 'locations' },
+  { table: 'habitat_pokemon_time', column: 'time', detailKey: 'times' },
+  { table: 'habitat_pokemon_weather', column: 'weather', detailKey: 'weathers' },
+]
+
+/**
+ * Full-sync refresh of pre-existing habitat rows against the Serebii detail
+ * pages. For each scraped entry whose lowercased name already exists in
+ * ``habitat_entries``:
+ *   - UPDATE ``description`` where it differs; re-download the image file if
+ *     the on-disk file referenced by ``image_path`` is missing.
+ *   - Full-sync ``habitat_recipe``: insert missing (item_name, quantity),
+ *     update changed quantities, delete rows whose item_name is absent from
+ *     the scraped recipe (compared case-insensitively — casing normalization
+ *     may run before or after).
+ *   - Full-sync ``habitat_pokemon``: insert new spawns (INSERT OR IGNORE),
+ *     update changed rarity, delete removed spawns — child join rows
+ *     (``habitat_pokemon_location/time/weather``) deleted first, parent row
+ *     second (``foreign_keys=ON`` composite FK order). For the join tables
+ *     themselves, insert missing values and delete values absent from the
+ *     scraped set.
+ *
+ * ``name`` is never modified, and a ``habitat_entries`` row absent from the
+ * scraped list is never deleted — top-level removals are report-only.
+ *
+ * Null-parse skip rule: a fetch/parse failure skips the habitat entirely,
+ * including all recipe/spawn reconciliation.
+ *
+ * With ``dryRun`` the planned delta is printed with zero DB/image writes.
+ */
+export async function updateExistingHabitats(
+  dbPath,
+  allEntries,
+  imagesDir,
+  baseDelay,
+  { dryRun = false } = {},
+) {
+  console.log(
+    `\n--- Updating existing habitats (full sync)${dryRun ? ' [DRY RUN — no writes]' : ''} ---`,
+  )
+
+  const ro = openReadOnlyDb(dbPath)
+  let dbRows
+  try {
+    dbRows = ro
+      .prepare('SELECT id, name, detail_slug, image_path, description FROM habitat_entries')
+      .all()
+      .map((r) => [r.name.toLowerCase(), r])
+  } finally {
+    ro.close()
+  }
+  const existingByLower = new Map(dbRows)
+
+  let processed = 0
+  let skipped = 0
+  let descriptionUpdates = 0
+  let recipeInserted = 0
+  let recipeUpdated = 0
+  let recipeDeleted = 0
+  let spawnInserted = 0
+  let spawnUpdated = 0
+  let spawnDeleted = 0
+  let joinInserted = 0
+  let joinDeleted = 0
+  let imagesHealed = 0
+
+  for (const [i, entry] of allEntries.entries()) {
+    const tag = `[${i + 1}/${allEntries.length}]`
+    const row = existingByLower.get(entry.name.toLowerCase())
+    if (!row) {
+      continue // new habitat — handled by the insert pass
+    }
+
+    const detail = await scrapeHabitatDetail(entry.slug, baseDelay)
+    if (detail === null) {
+      console.log(
+        `  ${tag} SKIP '${row.name}': fetch/parse failed — no reconciliation for this habitat`,
+      )
+      skipped += 1
+      continue
+    }
+    processed += 1
+    const dry = dryRun ? 'DRY RUN: ' : ''
+
+    // --- Description diff ---
+    if ((row.description ?? null) !== (detail.flavorText ?? null)) {
+      descriptionUpdates += 1
+      console.log(
+        `  ${tag} ${dry}UPDATE '${row.name}' → description: ` +
+          `${JSON.stringify((row.description ?? '').slice(0, 60))} -> ` +
+          `${JSON.stringify((detail.flavorText ?? '').slice(0, 60))}…`,
+      )
+      if (!dryRun) {
+        const db = openWritableDb(dbPath)
+        try {
+          db.prepare('UPDATE habitat_entries SET description = ? WHERE id = ?').run(
+            detail.flavorText,
+            row.id,
+          )
+        } finally {
+          db.close()
+        }
+      }
+    }
+
+    // --- Image self-heal ---
+    if (row.image_path) {
+      // image_path is "images/habitats/<basename>.png"; imagesDir may already
+      // be the habitats subdir (matches verifyHabitats' resolution).
+      const baseImagesDir = path.dirname(imagesDir)
+      const localFile = path.join(baseImagesDir, row.image_path.replace(/^images\//, ''))
+      if (!fs.existsSync(localFile) && detail.imageNumber) {
+        imagesHealed += 1
+        if (dryRun) {
+          console.log(
+            `  ${tag} DRY RUN: would re-download missing habitat image for '${row.name}' (${row.image_path})`,
+          )
+        } else {
+          try {
+            fs.mkdirSync(imagesDir, { recursive: true })
+            await downloadHabitatImage(detail.imageUrl, detail.imageNumber, imagesDir, baseDelay)
+            console.log(`  ${tag} Image self-heal for '${row.name}': downloaded ${row.image_path}`)
+          } catch (e) {
+            console.log(`    WARNING: image self-heal failed for '${row.name}': ${e.message}`)
+          }
+        }
+      }
+    }
+
+    // --- Recipe full sync (case-insensitive compare + target-cased deletes) ---
+    const db = openWritableDb(dbPath)
+    let existingRecipeRows
+    try {
+      existingRecipeRows = db
+        .prepare('SELECT item_name, quantity FROM habitat_recipe WHERE habitat_id = ?')
+        .all(row.id)
+    } finally {
+      db.close()
+    }
+    const existingRecipeByLower = new Map(
+      existingRecipeRows.map((r) => [r.item_name.toLowerCase(), r]),
+    )
+    const expectedRecipeByLower = new Map(detail.recipe.map((r) => [r.name.toLowerCase(), r]))
+
+    for (const [lower, expected] of expectedRecipeByLower) {
+      const existing = existingRecipeByLower.get(lower)
+      if (!existing) {
+        recipeInserted += 1
+        if (dryRun) {
+          console.log(`  ${tag} DRY RUN: recipe INSERT '${expected.name}' x${expected.quantity}`)
+        } else {
+          const wdb = openWritableDb(dbPath)
+          try {
+            wdb
+              .prepare(
+                'INSERT OR IGNORE INTO habitat_recipe (habitat_id, item_name, quantity) VALUES (?, ?, ?)',
+              )
+              .run(row.id, expected.name, expected.quantity)
+          } finally {
+            wdb.close()
+          }
+          console.log(`  ${tag} recipe INSERT '${expected.name}' x${expected.quantity}`)
+        }
+      } else if (existing.quantity !== expected.quantity) {
+        recipeUpdated += 1
+        console.log(
+          `  ${tag} ${dry}recipe UPDATE '${existing.item_name}': ${existing.quantity} -> ${expected.quantity}`,
+        )
+        if (!dryRun) {
+          const wdb = openWritableDb(dbPath)
+          try {
+            // Update on the exact existing (possibly cased) row.
+            wdb
+              .prepare(
+                'UPDATE habitat_recipe SET quantity = ? WHERE habitat_id = ? AND item_name = ?',
+              )
+              .run(expected.quantity, row.id, existing.item_name)
+          } finally {
+            wdb.close()
+          }
+        }
+      }
+    }
+    for (const { item_name: itemName } of existingRecipeRows) {
+      if (!expectedRecipeByLower.has(itemName.toLowerCase())) {
+        recipeDeleted += 1
+        if (dryRun) {
+          console.log(`  ${tag} DRY RUN: recipe DELETE '${itemName}' (absent from scraped list)`)
+        } else {
+          const wdb = openWritableDb(dbPath)
+          try {
+            wdb
+              .prepare('DELETE FROM habitat_recipe WHERE habitat_id = ? AND item_name = ?')
+              .run(row.id, itemName)
+          } finally {
+            wdb.close()
+          }
+          console.log(`  ${tag} recipe DELETE '${itemName}' (absent from scraped list)`)
+        }
+      }
+    }
+
+    // --- Spawn full sync ---
+    const wdb0 = openWritableDb(dbPath)
+    let existingSpawnRows
+    let existingPerTable
+    try {
+      existingSpawnRows = wdb0
+        .prepare('SELECT pokemon_name, rarity FROM habitat_pokemon WHERE habitat_id = ?')
+        .all(row.id)
+      existingPerTable = new Map(
+        HABITAT_JOIN_TARGETS.map((t) => [
+          t.table,
+          wdb0
+            .prepare(
+              `SELECT pokemon_name, ${t.column} AS value FROM ${t.table} WHERE habitat_id = ?`,
+            )
+            .all(row.id),
+        ]),
+      )
+    } finally {
+      wdb0.close()
+    }
+
+    const expectedSpawnsByLower = new Map(detail.pokemon.map((p) => [p.name.toLowerCase(), p]))
+    const existingSpawnsByLower = new Map(
+      existingSpawnRows.map((r) => [r.pokemon_name.toLowerCase(), r]),
+    )
+
+    // Insert new spawns + join values; update rarity. Full-sync FK order:
+    // children first, then parents, for deletions.
+    for (const [lower, existing] of existingSpawnsByLower) {
+      if (!expectedSpawnsByLower.has(lower)) {
+        spawnDeleted += 1
+        if (dryRun) {
+          console.log(
+            `  ${tag} DRY RUN: spawn DELETE '${existing.pokemon_name}' (absent from scraped page)`,
+          )
+        } else {
+          const wdb = openWritableDb(dbPath)
+          try {
+            // Child join rows first (composite FK), then the parent row.
+            for (const t of HABITAT_JOIN_TARGETS) {
+              wdb
+                .prepare(`DELETE FROM ${t.table} WHERE habitat_id = ? AND pokemon_name = ?`)
+                .run(row.id, existing.pokemon_name)
+            }
+            wdb
+              .prepare('DELETE FROM habitat_pokemon WHERE habitat_id = ? AND pokemon_name = ?')
+              .run(row.id, existing.pokemon_name)
+          } finally {
+            wdb.close()
+          }
+          console.log(
+            `  ${tag} spawn DELETE '${existing.pokemon_name}' (+ join rows, FK-safe order)`,
+          )
+        }
+      }
+    }
+
+    for (const [lower, expected] of expectedSpawnsByLower) {
+      const existing = existingSpawnsByLower.get(lower)
+      const nameForDb = existing ? existing.pokemon_name : expected.name
+      if (!existing) {
+        spawnInserted += 1
+        if (dryRun) {
+          console.log(
+            `  ${tag} DRY RUN: spawn INSERT '${expected.name}' (rarity=${expected.rarity})`,
+          )
+        } else {
+          const wdb = openWritableDb(dbPath)
+          try {
+            wdb
+              .prepare(
+                'INSERT OR IGNORE INTO habitat_pokemon (habitat_id, pokemon_name, rarity) VALUES (?, ?, ?)',
+              )
+              .run(row.id, expected.name, expected.rarity ?? null)
+          } finally {
+            wdb.close()
+          }
+          console.log(`  ${tag} spawn INSERT '${expected.name}' (rarity=${expected.rarity})`)
+        }
+      } else if ((existing.rarity ?? null) !== (expected.rarity ?? null)) {
+        spawnUpdated += 1
+        console.log(
+          `  ${tag} ${dry}spawn UPDATE '${nameForDb}' rarity: ${JSON.stringify(existing.rarity)} -> ` +
+            `${JSON.stringify(expected.rarity)}`,
+        )
+        if (!dryRun) {
+          const wdb = openWritableDb(dbPath)
+          try {
+            wdb
+              .prepare(
+                'UPDATE habitat_pokemon SET rarity = ? WHERE habitat_id = ? AND pokemon_name = ?',
+              )
+              .run(expected.rarity ?? null, row.id, nameForDb)
+          } finally {
+            wdb.close()
+          }
+        }
+      }
+
+      // --- Join-table value sync for this spawn ---
+      for (const t of HABITAT_JOIN_TARGETS) {
+        // Case-insensitive membership (matching the recipe sync): casing
+        // normalization may run before or after, so a case-only drift must be
+        // a no-op rather than delete+insert churn. Inserts use the scraped
+        // spelling; deletes use the stored spelling.
+        const expectedValues = expected[t.detailKey].map((v) => String(v))
+        const expectedLowers = new Set(expectedValues.map((v) => v.toLowerCase()))
+        if (!existing && dryRun) {
+          joinInserted += new Set(expectedLowers).size
+          if (expectedLowers.size > 0) {
+            console.log(
+              `  ${tag} DRY RUN: ${t.table} INSERT ${expectedLowers.size} value(s) for '${expected.name}'`,
+            )
+          }
+          continue
+        }
+        const existingValues = (existingPerTable.get(t.table) ?? []).filter(
+          (v) => v.pokemon_name === nameForDb,
+        )
+        // Insert missing
+        for (const value of expectedValues) {
+          const already = existingValues.some((v) => v.value.toLowerCase() === value.toLowerCase())
+          if (already) {
+            continue
+          }
+          joinInserted += 1
+          if (dryRun) {
+            console.log(`  ${tag} DRY RUN: ${t.table} INSERT '${value}' (${nameForDb})`)
+          } else {
+            const wdb = openWritableDb(dbPath)
+            try {
+              wdb
+                .prepare(
+                  `INSERT OR IGNORE INTO ${t.table} (habitat_id, pokemon_name, ${t.column}) VALUES (?, ?, ?)`,
+                )
+                .run(row.id, nameForDb, value)
+            } finally {
+              wdb.close()
+            }
+            console.log(`  ${tag} ${t.table} INSERT '${value}' (${nameForDb})`)
+          }
+        }
+        // Delete absent
+        for (const v of existingValues) {
+          if (!expectedLowers.has(v.value.toLowerCase())) {
+            joinDeleted += 1
+            if (dryRun) {
+              console.log(
+                `  ${tag} DRY RUN: ${t.table} DELETE '${v.value}' (${v.pokemon_name}; absent from scraped page)`,
+              )
+            } else {
+              const wdb = openWritableDb(dbPath)
+              try {
+                wdb
+                  .prepare(
+                    `DELETE FROM ${t.table} WHERE habitat_id = ? AND pokemon_name = ? AND ${t.column} = ?`,
+                  )
+                  .run(row.id, v.pokemon_name, v.value)
+              } finally {
+                wdb.close()
+              }
+              console.log(
+                `  ${tag} ${t.table} DELETE '${v.value}' (${v.pokemon_name}; absent from scraped page)`,
+              )
+            }
+          }
+        }
+      }
+    }
+  }
+
+  console.log(
+    `\nHabitat update pass: processed=${processed}, skipped=${skipped}, ` +
+      `descriptionUpdates=${descriptionUpdates}, ` +
+      `recipe inserts/updates/deletes=${recipeInserted}/${recipeUpdated}/${recipeDeleted}, ` +
+      `spawn inserts/updates/deletes=${spawnInserted}/${spawnUpdated}/${spawnDeleted}, ` +
+      `join inserts/deletes=${joinInserted}/${joinDeleted}, imagesHealed=${imagesHealed}`,
+  )
+
+  return {
+    processed,
+    skipped,
+    descriptionUpdates,
+    recipeInserted,
+    recipeUpdated,
+    recipeDeleted,
+    spawnInserted,
+    spawnUpdated,
+    spawnDeleted,
+    joinInserted,
+    joinDeleted,
+    imagesHealed,
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Verification
 // ---------------------------------------------------------------------------
 
@@ -630,7 +1036,12 @@ export function verifyHabitats(dbPath, allEntries, imagesDir) {
     }
   }
 
-  const violations = missing.length + extra.length + missingImages
+  // A habitat absent from Serebii (extra) is a report-only finding by design
+  // (operator Option B: top-level rows are never auto-deleted) — it must not
+  // gate, matching the items/pokemon verifiers and keeping the &&-chained npm
+  // scripts away from a permanent halt on a vanished habitat. Missing rows and
+  // missing images remain hard violations.
+  const violations = missing.length + missingImages
 
   if (violations === 0) {
     console.log('\nIntegrity: OK (no violations)')
@@ -659,6 +1070,10 @@ Harvest Pokopia habitat data from Serebii's habitat database.
 
 Options:
   --dry-run          Scrape and report what would be added, but do not write.
+  --update-existing  Also refresh existing habitats (description, image) and
+                     full-sync their recipes and spawn rosters (sub-records
+                     absent from Serebii are deleted; habitats themselves are
+                     never deleted).
   --verify           Skip harvesting; run the completeness + integrity check only.
   --db <path>        Path to the SQLite DB (default: ${DEFAULT_DB_PATH})
   --images-dir <dir> Directory for habitat images (default: ${DEFAULT_HABITAT_IMAGES_DIR})
@@ -675,6 +1090,7 @@ export async function main(argv = process.argv.slice(2)) {
       strict: true,
       options: {
         'dry-run': { type: 'boolean', default: false },
+        'update-existing': { type: 'boolean', default: false },
         verify: { type: 'boolean', default: false },
         db: { type: 'string', default: DEFAULT_DB_PATH },
         'images-dir': { type: 'string', default: DEFAULT_HABITAT_IMAGES_DIR },
@@ -742,9 +1158,15 @@ export async function main(argv = process.argv.slice(2)) {
       }
 
       // Check recipe
-      const dbRecipeRows = openReadOnlyDb(dbPath)
-        .prepare('SELECT item_name, quantity FROM habitat_recipe WHERE habitat_id = ?')
-        .all(dbRow.id)
+      const recipeRo = openReadOnlyDb(dbPath)
+      let dbRecipeRows
+      try {
+        dbRecipeRows = recipeRo
+          .prepare('SELECT item_name, quantity FROM habitat_recipe WHERE habitat_id = ?')
+          .all(dbRow.id)
+      } finally {
+        recipeRo.close()
+      }
       const dbRecipeMap = new Map(dbRecipeRows.map((r) => [r.item_name.toLowerCase(), r.quantity]))
 
       for (const { name, quantity } of detail.recipe) {
@@ -763,9 +1185,15 @@ export async function main(argv = process.argv.slice(2)) {
       }
 
       // Check pokemon
-      const dbPokeRows = openReadOnlyDb(dbPath)
-        .prepare('SELECT * FROM habitat_pokemon WHERE habitat_id = ?')
-        .all(dbRow.id)
+      const pokeRo = openReadOnlyDb(dbPath)
+      let dbPokeRows
+      try {
+        dbPokeRows = pokeRo
+          .prepare('SELECT * FROM habitat_pokemon WHERE habitat_id = ?')
+          .all(dbRow.id)
+      } finally {
+        pokeRo.close()
+      }
       const dbPokeMap = new Map(dbPokeRows.map((r) => [r.pokemon_name.toLowerCase(), r]))
 
       for (const p of detail.pokemon) {
@@ -783,9 +1211,17 @@ export async function main(argv = process.argv.slice(2)) {
       }
     }
 
-    verifyHabitats(dbPath, allEntries, imagesDir)
+    const ok = verifyHabitats(dbPath, allEntries, imagesDir)
     if (mismatches > 0) {
       console.log(`\nDetailed mismatches: ${mismatches}`)
+    }
+    // Both the detailed comparison and the aggregate verifier gate the exit:
+    // nonzero when either reports a problem.
+    if (mismatches > 0) {
+      process.exitCode = 1
+    }
+    if (!ok) {
+      process.exitCode = 1
     }
     return
   }
@@ -806,13 +1242,21 @@ export async function main(argv = process.argv.slice(2)) {
 
   if (missing.length === 0 && !values['dry-run']) {
     console.log('Nothing to add. Running backfill + verification...')
+    if (values['update-existing']) {
+      await updateExistingHabitats(dbPath, allEntries, imagesDir, baseDelay)
+    }
     await backfillHabitats(dbPath, imagesDir, baseDelay)
-    verifyHabitats(dbPath, allEntries, imagesDir)
+    const ok = verifyHabitats(dbPath, allEntries, imagesDir)
+    process.exitCode = ok ? 0 : 1
     return
   }
 
   if (missing.length === 0 && values['dry-run']) {
-    console.log('[DRY RUN] No missing habitats found.')
+    if (values['update-existing']) {
+      await updateExistingHabitats(dbPath, allEntries, imagesDir, baseDelay, { dryRun: true })
+    } else {
+      console.log('[DRY RUN] No missing habitats found.')
+    }
     return
   }
 
@@ -843,6 +1287,9 @@ export async function main(argv = process.argv.slice(2)) {
       }
     }
     console.log('\n[DRY RUN complete — no writes performed.]')
+    if (values['update-existing']) {
+      await updateExistingHabitats(dbPath, allEntries, imagesDir, baseDelay, { dryRun: true })
+    }
     return
   }
 
@@ -913,12 +1360,17 @@ export async function main(argv = process.argv.slice(2)) {
   // Backfill
   await backfillHabitats(dbPath, imagesDir, baseDelay)
 
+  if (values['update-existing']) {
+    await updateExistingHabitats(dbPath, allEntries, imagesDir, baseDelay)
+  }
+
   console.log(
     `\nHarvest complete: added=${added}, failed=${failed}, total on Serebii=${allEntries.length}`,
   )
 
   // Verify
-  verifyHabitats(dbPath, allEntries, imagesDir)
+  const ok = verifyHabitats(dbPath, allEntries, imagesDir)
+  process.exitCode = ok ? 0 : 1
 }
 
 // Run when this file is the entry point.

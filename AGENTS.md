@@ -43,9 +43,13 @@ A pre-commit hook runs lint-staged (eslint + oxlint + oxfmt) on staged `.js`/`.t
 ```bash
 npm run harvest:pokemon              # scrape + add missing pokemon
 npm run harvest:pokemon -- --dry-run # report only, no DB/image writes
-npm run harvest:pokemon -- --verify  # completeness + data-integrity check
+npm run harvest:pokemon -- --update-existing --dry-run  # preview update + favorites sync deltas
+npm run harvest:pokemon -- --update-existing  # also refresh existing pokemon (full sync)
+npm run harvest:pokemon -- --verify  # completeness + data-integrity check (exit code gates)
 npm run harvest:pokemon -- --delay 1.0  # raise base request delay (jittered to [delay, 3.0]s)
 ```
+
+`--update-existing` refreshes pre-existing pokemon rows against their live detail pages: habitat is updated when it differs, a sprite file missing on disk is re-downloaded (image self-heal), and `pokemon_favorites` is full-synced — favorites absent from the live page are **deleted**, missing ones are inserted (still validated against the `favorites` table with the flag-don't-insert warning). `pokemon.name` is never modified, and a pokemon absent from the scraped listing is **never deleted** (top-level removals are report-only; see the `pokopia_update` skill). A fetch/parse failure skips that row entirely — sub-records are never reconciled against an empty scrape.
 
 The script uses only the Node standard library (`fetch`, `node:sqlite`, `node:util`). It requests pages with a jittered delay to scrape politely. New form-variant pokemon use the Serebii image filename directly (e.g., `images/592-frillishmaleform.png`) rather than the legacy `images/<dex>.png` convention.
 
@@ -58,9 +62,17 @@ Recipes use a two-pass insertion approach: all new items are inserted first (Pas
 ```bash
 npm run harvest:items              # scrape + add missing items
 npm run harvest:items -- --dry-run # report only, no DB/image writes
-npm run harvest:items -- --verify  # completeness + data-integrity check
+npm run harvest:items -- --update-existing --dry-run  # preview the full-sync update delta (~50 min)
+npm run harvest:items -- --update-existing  # also refresh existing items (full sync, ~70 min extra)
+npm run harvest:items -- --verify  # completeness + data-integrity check (exit code gates)
 npm run harvest:items -- --delay 1.0  # raise base request delay (jittered to [delay, 3.0]s)
 ```
+
+`--update-existing` refreshes pre-existing item rows against their live detail pages: `category`/`tag`/`flavor_text` are updated only where they differ (`items.name` and `picture_path` are never modified — name is pinned by the legacy-hash contract), a sprite file missing on disk is re-downloaded (image self-heal; the two permanent upstream 404s are logged and skipped), `item_recipe` is full-synced (missing ingredients inserted, changed counts updated, rows whose ingredient is absent from the live recipe deleted), and `item_favorites` is full-synced the same way. Items themselves are never deleted (report-only). A fetch/parse failure skips that row entirely — sub-records are never reconciled against an empty scrape.
+
+**Verify exit codes gate.** All three harvest scripts set `process.exitCode` from the verifier result (and the habitat deep-verify mismatch count), so a nonzero `--verify` exit is a real failure. In `verifyItemsCompleteness`, the two `KNOWN_MISSING_IMAGE_SLUGS` upstream 404s (`seabedflowerseeds(purple)`, `pokemoncenterrebuildkit`, defined in `scripts/harvest_lib.js`) print warnings and never gate, in either of their shapes (row present but sprite file missing, or row still absent pending a retried insert). Any other missing image fails the run. This is what makes the `&&`-chained npm scripts below safe. Once Serebii uploads a sprite, the `--update-existing` self-heal downloads it; remove the slug from the allowlist to re-arm the check.
+
+**Capitalization normalization.** `scripts/normalize_capitalization.js` (`npm run normalize:casing`) collapses casing drift in allowlisted vocabulary columns (`items.category`, `habitat_entries.category`, `habitat_recipe.item_name`, `habitat_pokemon.rarity`, and the three `habitat_pokemon_*` value columns) by majority rule — ties prefer the title-cased variant, then the lexicographically smallest. Name columns (`items.name`, `pokemon.name`, `favorites.name`, `habitat_entries.name`, ...) are hard-excluded via the `CASING_NORMALIZATION_TARGETS` allowlist in `scripts/harvest_lib.js` and can never be re-cased (also enforced against arbitrary SQL identifier interpolation). Rows whose primary key collides with an existing canonical-valued row are merged (deleted). `--dry-run` reports only; `--verify` exits 1 while non-canonical casing remains (CI gate).
 
 The script uses only the Node standard library (`fetch`, `node:sqlite`, `node:util`). Like `harvest_pokemon.js`, it requests pages with a jittered delay to scrape politely. The DB `picture_path` follows the convention `images/<slug>.png`, where `<slug>` matches the Serebii detail-page URL slug.
 
@@ -70,7 +82,7 @@ The script uses only the Node standard library (`fetch`, `node:sqlite`, `node:ut
 
 Any harvest that adds or renames a **favorite** or **habitat** must also add the corresponding icon mapping (`src/favoriteIcons.ts`, `src/habitats.ts` `HABITAT_ICONS`) **and** its `?raw` SVG import in `src/iconSvg.ts`; `src/__tests__/favoriteIcons.spec.ts` fails until both are added.
 
-Unit tests live in `scripts/harvest_items.test.js` and `scripts/harvest_pokemon.test.js` and use Node's built-in `node:test` (no extra dependencies). Run with:
+Unit tests live in `scripts/harvest_items.test.js`, `scripts/harvest_pokemon.test.js`, `scripts/harvest_habitats.test.js`, and `scripts/normalize_capitalization.test.js`, and use Node's built-in `node:test` (no extra dependencies). Run with:
 
 ```bash
 npm run test:harvest
@@ -83,9 +95,15 @@ npm run test:harvest
 ```bash
 npm run harvest:habitats              # scrape + add missing habitats
 npm run harvest:habitats -- --dry-run # report only, no DB/image writes
-npm run harvest:habitats -- --verify  # completeness + data-integrity check
+npm run harvest:habitats -- --update-existing --dry-run  # preview recipe/spawn full-sync deletes (~15 min)
+npm run harvest:habitats -- --update-existing  # also refresh existing habitats (full sync)
+npm run harvest:habitats -- --verify  # completeness + data-integrity check (exit code gates)
 npm run harvest:habitats -- --delay 1.0  # raise base request delay (jittered to [delay, 3.0]s)
 ```
+
+`--update-existing` refreshes pre-existing habitat rows against their live detail pages: `description` is updated where it differs, the image file is re-downloaded when missing, and `habitat_recipe`/`habitat_pokemon` plus the three spawn join tables are full-synced — rows/values absent from the live page are **deleted** (child join rows first, then the parent spawn row, to satisfy the composite FKs when `foreign_keys=ON`). Habitat recipe values compare case-insensitively so normalization runs cleanly before or after. `habitat_entries.name` is never modified, and a habitat absent from the scraped list is never deleted (report-only). A fetch/parse failure skips that habitat entirely.
+
+Two chained npm scripts cover the whole pipeline: `npm run harvest:all` (insert-only harvests + capitalization normalization + `build:data` — the normalization does write to the DB even without `--update-existing`) and `npm run harvest:sync` (the same chain with `--update-existing` on every harvest — sub-record full sync). The `&&` chaining is safe because the verify exit gating plus the `KNOWN_MISSING_IMAGE_SLUGS` allowlist keep runs exit-0 in the presence of the two permanent upstream 404s while any genuine integrity violation halts the chain. Because sync is destructive at the sub-record level, run it through the `pokopia_update` skill (`.polytoken/skills/pokopia_update/SKILL.md`), which mandates a preflight DB snapshot, a dry-run delta report, and per-step background-job timeouts (items ≥ 7200s, pokemon/habitats ≥ 3600s — never the 600s shell default, which killed a previous run mid-backfill).
 
 The script uses only the Node standard library (`fetch`, `node:sqlite`, `node:util`). It requests pages with a jittered delay to scrape politely. Habitat full-size images are downloaded to `public/images/habitats/`, stored as `images/habitats/<basename>.png` where `<basename>` is the image filename stem from the detail page (e.g. `93`, `b1`, `e7`), globally unique across Main/Basin/Event sections.
 
@@ -259,7 +277,7 @@ GitHub Actions builds on push to `main` (installs Node from `.nvmrc`, runs `npm 
 
 The app has a static changelog page at `/changelog` (route → `src/views/ChangelogView.vue`), fed by the typed, Vite-bundled data module `src/changelog.ts` (a `ChangeLogEntry[]`, newest-first). Each entry carries an ISO `YYYY-MM-DD` `date`, a one-line `summary`, and `changes: string[]` bullets. **Consecutive entry dates are ≥7 days apart** (minimum one-week buckets); the invariants (valid ISO dates, non-empty fields, newest-first sort, ≥7-day spacing, no duplicate dates) are pinned by `src/__tests__/changelog.spec.ts`, and backfill provenance against the real git commit window is guarded by `scripts/changelog_source.test.js` (auto-skipped when history is shallow).
 
-**Do not edit `src/changelog.ts` by hand.** Maintain it through the `update-changelog` skill (`.polytoken/skills/update-changelog/SKILL.md`) — it condenses `git log` since the last entry into dated weekly buckets, always stops for operator signoff before editing, and must be reloaded via `/daemon-reload` after changes. The footer "Changelog" `RouterLink` (`data-testid="changelog-link"`) is asserted by `App.spec.ts`; the route's render and no-horizontal-overflow-at-390px behavior are covered by `e2e/changelog.spec.ts`.
+**Do not edit `src/changelog.ts` by hand.** Maintain it through the `update-changelog` skill (`.polytoken/skills/update-changelog/SKILL.md`) — it condenses `git log` since the last entry into dated weekly buckets, always stops for operator signoff before editing, and must be reloaded via `/daemon-reload` after changes. Pokopia data sync is likewise maintained through the `pokopia_update` skill (`.polytoken/skills/pokopia_update/SKILL.md`), which encodes the full-sync workflow (preflight snapshot → dry-run deltas → timed background jobs → normalize → bake → verify) and is pin-checked by `scripts/skill.test.js`. Both skills take effect on `/daemon-reload`; a single invalid SKILL.md is skipped with a TUI warning. The footer "Changelog" `RouterLink` (`data-testid="changelog-link"`) is asserted by `App.spec.ts`; the route's render and no-horizontal-overflow-at-390px behavior are covered by `e2e/changelog.spec.ts`.
 
 # Credits
 

@@ -15,6 +15,7 @@ import { parseArgs } from 'node:util'
 import {
   DEFAULT_DB_PATH,
   DEFAULT_IMAGES_DIR,
+  KNOWN_MISSING_IMAGE_SLUGS,
   downloadImage,
   fetchPage,
   jitteredDelay,
@@ -506,6 +507,330 @@ export async function backfillRecipes(dbPath, slugMap, baseDelay) {
 }
 
 // ---------------------------------------------------------------------------
+// Update existing items (opt-in --update-existing)
+// ---------------------------------------------------------------------------
+
+/**
+ * Full-sync refresh of pre-existing item rows against the Serebii detail pages.
+ *
+ * Per existing row (slug derived from ``picture_path``):
+ *   - UPDATE ``category``/``tag``/``flavor_text`` — only the columns whose
+ *     value actually differs. Never ``name`` and never ``picture_path``
+ *     (both are pinned: name by the legacy-hash contract).
+ *   - Image self-heal: re-download the sprite when the file on disk is
+ *     missing (upstream 404s are logged and skipped, not fatal).
+ *   - Full-sync ``item_recipe``: insert missing ingredients, update changed
+ *     counts, delete rows whose ingredient is absent from the scraped recipe.
+ *   - Full-sync ``item_favorites``: insert missing (validated against the
+ *     favorites table), delete rows not in the scraped set.
+ *
+ * Null-parse skip rule: if the fetch or parse fails for a row, that row is
+ * skipped entirely — no updates, no reconciliation, and no deletes. A delete
+ * only ever runs against a successfully parsed expected set.
+ *
+ * Top-level removals are report-only: an ``items`` row absent from the
+ * scraped listing is printed by the verifier's "Extra in DB" delta and never
+ * deleted here.
+ *
+ * With ``dryRun`` the planned delta is printed with zero DB/image writes.
+ * Returns a summary of counted actions.
+ */
+export async function updateExistingItems(
+  dbPath,
+  imagesDir,
+  baseDelay,
+  favoritesMap,
+  existingFavLower,
+  { dryRun = false } = {},
+) {
+  console.log(
+    `\n--- Updating existing items (full sync)${dryRun ? ' [DRY RUN — no writes]' : ''} ---`,
+  )
+
+  const ro = openReadOnlyDb(dbPath)
+  let existingRows
+  try {
+    existingRows = ro
+      .prepare('SELECT id, name, category, tag, flavor_text, picture_path FROM items')
+      .all()
+  } finally {
+    ro.close()
+  }
+
+  // Fresh slug map — includes items inserted in Pass 1 of the same run, so
+  // recipes referencing those resolve.
+  const { slugMap } = getExistingItems(dbPath)
+
+  let processed = 0
+  let skipped = 0
+  let metadataUpdates = 0
+  let recipeInserted = 0
+  let recipeUpdated = 0
+  let recipeDeleted = 0
+  let favInserted = 0
+  let favDeleted = 0
+  let imagesHealed = 0
+
+  for (const [i, row] of existingRows.entries()) {
+    const tag = `[${i + 1}/${existingRows.length}]`
+    if (!row.picture_path) {
+      console.log(`  ${tag} SKIP '${row.name}': no picture_path (cannot derive slug)`)
+      skipped += 1
+      continue
+    }
+
+    const slug = slugFromPicturePath(row.picture_path)
+    const detail = await scrapeItemDetail(slug, baseDelay)
+    if (detail === null) {
+      console.log(
+        `  ${tag} SKIP '${row.name}': fetch/parse failed — no updates, no reconciliation, no deletes`,
+      )
+      skipped += 1
+      continue
+    }
+    processed += 1
+    const dry = dryRun ? 'DRY RUN: ' : ''
+
+    // --- Metadata diff (category, tag, flavor_text — never name/picture_path) ---
+    const wanted = { category: detail.category, tag: detail.tag, flavor_text: detail.flavorText }
+    const diffs = []
+    for (const col of ['category', 'tag', 'flavor_text']) {
+      if ((row[col] ?? null) !== (wanted[col] ?? null)) {
+        diffs.push(col)
+      }
+    }
+    if (diffs.length > 0) {
+      console.log(
+        `  ${tag} ${dry}UPDATE '${row.name}' → ` +
+          diffs
+            .map((c) => `${c}: ${JSON.stringify(row[c])} -> ${JSON.stringify(wanted[c])}`)
+            .join(', '),
+      )
+      metadataUpdates += diffs.length
+      if (!dryRun) {
+        const db = openWritableDb(dbPath)
+        try {
+          db.prepare(
+            `UPDATE items SET ${diffs.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`,
+          ).run(...diffs.map((c) => wanted[c]), row.id)
+        } finally {
+          db.close()
+        }
+      }
+    }
+
+    // --- Image self-heal ---
+    const localFile = path.join(imagesDir, row.picture_path.replace(/^images\//, ''))
+    if (!fs.existsSync(localFile) && detail.imageFilename) {
+      if (dryRun) {
+        imagesHealed += 1
+        console.log(
+          `  ${tag} DRY RUN: would re-download missing image for '${row.name}' (${row.picture_path})`,
+        )
+      } else {
+        try {
+          const healed = await downloadImage(
+            detail.imageUrl,
+            detail.imageFilename,
+            imagesDir,
+            dbPath,
+            { table: 'items', column: 'picture_path' },
+            baseDelay,
+          )
+          if (healed === row.picture_path) {
+            imagesHealed += 1
+            console.log(`  ${tag} Image self-heal for '${row.name}': downloaded ${healed}`)
+          } else {
+            // Never adopt a picture_path different from the DB value: the
+            // item stays unhealed and verify keeps flagging its missing file.
+            console.log(
+              `    WARNING: healed image path ${healed} differs from DB picture_path ` +
+                `${row.picture_path} (item '${row.name}' stays unhealed; DB value left unchanged)`,
+            )
+          }
+        } catch (e) {
+          console.log(
+            `    WARNING: image self-heal failed for '${row.name}' (upstream 404?): ${e.message}. Skipping.`,
+          )
+        }
+      }
+    }
+
+    // --- item_recipe full sync ---
+    const expectedRecipe = new Map() // ingredient_id -> { name, count }
+    for (const ingredient of detail.recipe) {
+      const ingId = slugMap.get(ingredient.slug)
+      if (ingId === undefined) {
+        console.log(
+          `    WARNING: recipe ingredient '${ingredient.name}' (slug '${ingredient.slug}') ` +
+            `not in DB; leaving existing row untouched for this ingredient`,
+        )
+        continue
+      }
+      expectedRecipe.set(ingId, { name: ingredient.name, count: ingredient.count })
+    }
+
+    const ingDb = openWritableDb(dbPath)
+    let existingRecipeRows
+    try {
+      existingRecipeRows = ingDb
+        .prepare('SELECT ingredient_id, COUNT FROM item_recipe WHERE item_id = ?')
+        .all(row.id)
+    } finally {
+      ingDb.close()
+    }
+    const existingById = new Map(existingRecipeRows.map((r) => [r.ingredient_id, r.COUNT]))
+
+    for (const [ingId, { name, count }] of expectedRecipe) {
+      if (!existingById.has(ingId)) {
+        console.log(`  ${tag} recipe INSERT ingredient '${name}' (${pageQtyName(name, count)})`)
+        recipeInserted += 1
+        if (!dryRun) {
+          const db = openWritableDb(dbPath)
+          try {
+            db.prepare(
+              'INSERT OR IGNORE INTO item_recipe (item_id, ingredient_id, COUNT) VALUES (?, ?, ?)',
+            ).run(row.id, ingId, count)
+          } finally {
+            db.close()
+          }
+        }
+      } else if (existingById.get(ingId) !== count) {
+        console.log(
+          `  ${tag} recipe UPDATE ingredient '${name}': ${existingById.get(ingId)} -> ${count}`,
+        )
+        recipeUpdated += 1
+        if (!dryRun) {
+          const db = openWritableDb(dbPath)
+          try {
+            db.prepare(
+              'UPDATE item_recipe SET COUNT = ? WHERE item_id = ? AND ingredient_id = ?',
+            ).run(count, row.id, ingId)
+          } finally {
+            db.close()
+          }
+        }
+      }
+    }
+    for (const deletedRow of existingRecipeRows) {
+      if (!expectedRecipe.has(deletedRow.ingredient_id)) {
+        recipeDeleted += 1
+        if (dryRun) {
+          console.log(
+            `  ${tag} DRY RUN: recipe DELETE ingredient_id=${deletedRow.ingredient_id} ` +
+              `(absent from scraped recipe)`,
+          )
+        } else {
+          const db = openWritableDb(dbPath)
+          try {
+            db.prepare('DELETE FROM item_recipe WHERE item_id = ? AND ingredient_id = ?').run(
+              row.id,
+              deletedRow.ingredient_id,
+            )
+          } finally {
+            db.close()
+          }
+          console.log(
+            `  ${tag} recipe DELETE ingredient_id=${deletedRow.ingredient_id} (absent from scraped recipe)`,
+          )
+        }
+      }
+    }
+
+    // --- item_favorites full sync ---
+    const expectedFavs = new Set()
+    if (favoritesMap.has(slug)) {
+      for (const fav of favoritesMap.get(slug)) {
+        expectedFavs.add(fav.toLowerCase())
+      }
+    }
+    for (const fav of detail.favorites) {
+      expectedFavs.add(fav.toLowerCase())
+    }
+
+    const existingFavRows = (() => {
+      const db = openWritableDb(dbPath)
+      try {
+        return db.prepare('SELECT favorite_name FROM item_favorites WHERE item_id = ?').all(row.id)
+      } finally {
+        db.close()
+      }
+    })()
+
+    for (const fav of expectedFavs) {
+      const already = existingFavRows.some((r) => r.favorite_name.toLowerCase() === fav)
+      if (already) {
+        continue
+      }
+      if (!existingFavLower.has(fav)) {
+        console.log(
+          `  ${tag} favorite '${fav}' not in favorites table (no insert, row kept if present)`,
+        )
+        continue
+      }
+      favInserted += 1
+      if (dryRun) {
+        console.log(`  ${tag} DRY RUN: favorite INSERT '${fav}'`)
+      } else {
+        const db = openWritableDb(dbPath)
+        try {
+          db.prepare(
+            'INSERT OR IGNORE INTO item_favorites (item_id, favorite_name) VALUES (?, ?)',
+          ).run(row.id, fav)
+        } finally {
+          db.close()
+        }
+        console.log(`  ${tag} favorite INSERT '${fav}'`)
+      }
+    }
+    for (const { favorite_name: favName } of existingFavRows) {
+      if (!expectedFavs.has(favName.toLowerCase())) {
+        favDeleted += 1
+        if (dryRun) {
+          console.log(
+            `  ${tag} DRY RUN: favorite DELETE '${favName}' (not expected by the scraped page)`,
+          )
+        } else {
+          const db = openWritableDb(dbPath)
+          try {
+            db.prepare('DELETE FROM item_favorites WHERE item_id = ? AND favorite_name = ?').run(
+              row.id,
+              favName,
+            )
+          } finally {
+            db.close()
+          }
+          console.log(`  ${tag} favorite DELETE '${favName}' (absent from scraped favorites)`)
+        }
+      }
+    }
+  }
+
+  console.log(
+    `\nItem update pass: processed=${processed}, skipped=${skipped}, ` +
+      `metadataUpdates=${metadataUpdates}, recipe inserts/updates/deletes=` +
+      `${recipeInserted}/${recipeUpdated}/${recipeDeleted}, ` +
+      `favorite inserts/deletes=${favInserted}/${favDeleted}, imagesHealed=${imagesHealed}`,
+  )
+
+  return {
+    processed,
+    skipped,
+    metadataUpdates,
+    recipeInserted,
+    recipeUpdated,
+    recipeDeleted,
+    favInserted,
+    favDeleted,
+    imagesHealed,
+  }
+}
+
+function pageQtyName(name, count) {
+  return `${count} x ${name}`
+}
+
+// ---------------------------------------------------------------------------
 // Verification
 // ---------------------------------------------------------------------------
 
@@ -544,7 +869,12 @@ export function verifyItemsCompleteness(dbPath, allSerebiiItems, imagesDir, sere
   }
 
   const serebiiNamesLower = new Set([...allSerebiiItems].map((e) => e.name.toLowerCase()))
+  const serebiiNameToSlug = new Map([...allSerebiiItems].map((e) => [e.name.toLowerCase(), e.slug]))
   const missing = new Set([...serebiiNamesLower].filter((n) => !dbNamesLower.has(n)))
+  const missingHitsAllowlist = (nameLower) => {
+    const slug = serebiiNameToSlug.get(nameLower)
+    return slug !== undefined && KNOWN_MISSING_IMAGE_SLUGS.includes(slug)
+  }
   const extra = new Set([...dbNamesLower].filter((n) => !serebiiNamesLower.has(n)))
 
   console.log('\n' + '='.repeat(60))
@@ -555,7 +885,14 @@ export function verifyItemsCompleteness(dbPath, allSerebiiItems, imagesDir, sere
   if (missing.size > 0) {
     console.log(`\nMISSING from DB (${missing.size}):`)
     for (const name of [...missing].sort()) {
-      console.log(`  - ${name}`)
+      if (missingHitsAllowlist(name)) {
+        console.log(
+          `  - ${name} (WARNING: slug '${serebiiNameToSlug.get(name)}' is a known upstream 404 — ` +
+            `allowlisted, does not gate; rerun the harvest to retry insertion)`,
+        )
+      } else {
+        console.log(`  - ${name}`)
+      }
     }
   } else {
     console.log('\nMissing from DB: none')
@@ -603,11 +940,21 @@ export function verifyItemsCompleteness(dbPath, allSerebiiItems, imagesDir, sere
     }
   }
 
-  // 4. Every picture_path file exists on disk
+  // 4. Every picture_path file exists on disk. The two KNOWN_MISSING_IMAGE_SLUGS
+  // upstream 404s print as warnings and are excluded from the ok aggregate;
+  // every other missing image is a hard violation.
   for (const { name, picture_path: picturePath } of allItems) {
     if (picturePath) {
+      const slug = slugFromPicturePath(picturePath)
       const localFile = path.join(imagesDir, picturePath.replace(/^images\//, ''))
       if (!fs.existsSync(localFile)) {
+        if (KNOWN_MISSING_IMAGE_SLUGS.includes(slug)) {
+          console.log(
+            `  WARNING: image file missing for '${name}' but slug '${slug}' is a ` +
+              `known upstream 404 (allowlisted, does not gate): ${localFile}`,
+          )
+          continue
+        }
         violations.push(`item '${name}': image file missing on disk: ${localFile}`)
       }
     }
@@ -630,7 +977,13 @@ export function verifyItemsCompleteness(dbPath, allSerebiiItems, imagesDir, sere
     console.log('\nIntegrity: OK (no violations)')
   }
 
-  const ok = missing.size === 0 && violations.length === 0
+  // The allowlisted upstream-404 slugs are the ONLY findings that never gate:
+  // an allowlisted name still missing from the DB (its sprite 404s, so the
+  // insert pass placed it without a file — or the row is absent pending a
+  // retried harvest) is warning-only, like its missing image file. Any other
+  // missing name is a hard failure.
+  const gatingMissing = [...missing].filter((n) => !missingHitsAllowlist(n))
+  const ok = gatingMissing.length === 0 && violations.length === 0
   console.log('='.repeat(60))
   console.log(`Result: ${ok ? 'PASS' : 'FAIL'}`)
   console.log('='.repeat(60))
@@ -647,6 +1000,9 @@ Harvest missing items from Serebii's Pokopia item database.
 
 Options:
   --dry-run          Scrape and report what would be added, but do not write.
+  --update-existing  Also refresh existing items and full-sync their
+                     recipes/favorites (sub-records absent from Serebii are
+                     deleted; items themselves are never deleted).
   --verify           Skip harvesting; run the completeness + integrity check only.
   --db <path>        Path to the SQLite DB (default: ${DEFAULT_DB_PATH})
   --images-dir <dir> Directory for sprite images (default: ${DEFAULT_IMAGES_DIR})
@@ -675,6 +1031,7 @@ export async function main(argv = process.argv.slice(2)) {
       strict: true,
       options: {
         'dry-run': { type: 'boolean', default: false },
+        'update-existing': { type: 'boolean', default: false },
         verify: { type: 'boolean', default: false },
         db: { type: 'string', default: DEFAULT_DB_PATH },
         'images-dir': { type: 'string', default: DEFAULT_IMAGES_DIR },
@@ -713,7 +1070,8 @@ export async function main(argv = process.argv.slice(2)) {
     const { items: allFavItems } = await scrapeAllFavoritesPages(baseDelay, favCategories)
     const listingItems = await scrapeItemsListing(baseDelay)
     const allItems = mergeDiscovered(allFavItems, listingItems)
-    verifyItemsCompleteness(dbPath, allItems, imagesDir, serebiiFavorites)
+    const ok = verifyItemsCompleteness(dbPath, allItems, imagesDir, serebiiFavorites)
+    process.exitCode = ok ? 0 : 1
     return
   }
 
@@ -754,13 +1112,23 @@ export async function main(argv = process.argv.slice(2)) {
   )
 
   if (missing.length === 0 && !values['dry-run']) {
+    if (values['update-existing']) {
+      await updateExistingItems(dbPath, imagesDir, baseDelay, favoritesMap, existingFavLower)
+    }
     console.log('Nothing to add. Running verification...')
-    verifyItemsCompleteness(dbPath, allItems, imagesDir, serebiiFavorites)
+    const ok = verifyItemsCompleteness(dbPath, allItems, imagesDir, serebiiFavorites)
+    process.exitCode = ok ? 0 : 1
     return
   }
 
   if (missing.length === 0 && values['dry-run']) {
-    console.log('[DRY RUN] No missing items found.')
+    if (values['update-existing']) {
+      await updateExistingItems(dbPath, imagesDir, baseDelay, favoritesMap, existingFavLower, {
+        dryRun: true,
+      })
+    } else {
+      console.log('[DRY RUN] No missing items found.')
+    }
     return
   }
 
@@ -792,6 +1160,11 @@ export async function main(argv = process.argv.slice(2)) {
       }
     }
     console.log('\n[DRY RUN complete — no writes performed.]')
+    if (values['update-existing']) {
+      await updateExistingItems(dbPath, imagesDir, baseDelay, favoritesMap, existingFavLower, {
+        dryRun: true,
+      })
+    }
     return
   }
 
@@ -812,14 +1185,34 @@ export async function main(argv = process.argv.slice(2)) {
         continue
       }
 
-      const imagePath = await downloadImage(
-        detail.imageUrl,
-        detail.imageFilename,
-        imagesDir,
-        dbPath,
-        { table: 'items', column: 'picture_path' },
-        baseDelay,
-      )
+      // Allowlisted upstream-404 items still get inserted: the DB row is real
+      // (metadata/recipe/favorites are live data), only the sprite file is
+      // permanently missing upstream. This mirrors the rebuildkit precedent —
+      // verify prints the file-gap as an allowlisted, never-gating warning.
+      let imagePath
+      let downloadFailedAllowlisted = false
+      try {
+        imagePath = await downloadImage(
+          detail.imageUrl,
+          detail.imageFilename,
+          imagesDir,
+          dbPath,
+          { table: 'items', column: 'picture_path' },
+          baseDelay,
+        )
+      } catch (e) {
+        if (KNOWN_MISSING_IMAGE_SLUGS.includes(entry.slug)) {
+          console.log(
+            `    WARNING: image download failed for '${entry.name}' but slug ` +
+              `'${entry.slug}' is a known upstream 404; inserting with a missing ` +
+              `image file (self-heal retries on --update-existing)`,
+          )
+          imagePath = `images/${detail.imageFilename}`
+          downloadFailedAllowlisted = true
+        } else {
+          throw e
+        }
+      }
 
       const itemId = addItemToDb(
         dbPath,
@@ -835,7 +1228,7 @@ export async function main(argv = process.argv.slice(2)) {
 
       console.log(
         `  [${i + 1}/${missing.length}] Added ${detail.name} ` +
-          `(category=${detail.category}, tag=${detail.tag})`,
+          `(category=${detail.category}, tag=${detail.tag}${downloadFailedAllowlisted ? ', IMAGE UPSTREAM 404' : ''})`,
       )
       added += 1
     } catch (e) {
@@ -867,13 +1260,20 @@ export async function main(argv = process.argv.slice(2)) {
     }
   }
 
+  if (values['update-existing']) {
+    await updateExistingItems(dbPath, imagesDir, baseDelay, favoritesMap, existingFavLower)
+  }
+
   backfillFavorites(dbPath, favoritesMap, slugMap, existingFavLower)
-  await backfillRecipes(dbPath, slugMap, baseDelay)
+  if (!values['update-existing']) {
+    await backfillRecipes(dbPath, slugMap, baseDelay)
+  }
 
   console.log(
     `\nHarvest complete: added=${added}, failed=${failed}, total on Serebii=${allItems.size}`,
   )
-  verifyItemsCompleteness(dbPath, allItems, imagesDir, serebiiFavorites)
+  const ok = verifyItemsCompleteness(dbPath, allItems, imagesDir, serebiiFavorites)
+  process.exitCode = ok ? 0 : 1
 }
 
 // Run when this file is the entry point (mirrors Python's `if __name__ == "__main__"`).

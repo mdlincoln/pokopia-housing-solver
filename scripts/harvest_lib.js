@@ -41,18 +41,54 @@ export function decodeHtmlPage(bytes) {
   }
 }
 
+// A full harvest makes a few hundred requests over several minutes, so a single
+// transient socket reset must not abort the run. Retry transport failures and
+// the retryable status codes with exponential backoff.
+const FETCH_MAX_ATTEMPTS = 4
+const FETCH_RETRY_BASE_MS = 1000
+
+function isRetryableStatus(status) {
+  return status === 429 || status >= 500
+}
+
 /**
- * Fetch ``url`` and return its HTML as a string. Raises on non-2xx or timeout.
+ * Fetch ``url`` and return its HTML as a string.
+ *
+ * Retries transient failures (connection resets, timeouts, 429/5xx) with
+ * exponential backoff. Permanent failures — any other 4xx — raise immediately.
  */
 export async function fetchPage(url) {
-  const res = await fetch(url, {
-    headers: { 'User-Agent': USER_AGENT },
-    signal: AbortSignal.timeout(30_000),
-  })
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} fetching ${url}`)
+  let lastError
+  for (let attempt = 1; attempt <= FETCH_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': USER_AGENT },
+        signal: AbortSignal.timeout(30_000),
+      })
+      if (res.ok) {
+        return decodeHtmlPage(new Uint8Array(await res.arrayBuffer()))
+      }
+      const err = new Error(`HTTP ${res.status} fetching ${url}`)
+      if (!isRetryableStatus(res.status)) {
+        err.permanent = true
+      }
+      throw err
+    } catch (e) {
+      if (e.permanent) {
+        throw e
+      }
+      lastError = e
+      if (attempt < FETCH_MAX_ATTEMPTS) {
+        const backoffMs = FETCH_RETRY_BASE_MS * 2 ** (attempt - 1)
+        console.log(
+          `  RETRY ${attempt}/${FETCH_MAX_ATTEMPTS - 1} for ${url} ` +
+            `after ${e.message} (waiting ${backoffMs}ms)`,
+        )
+        await sleep(backoffMs)
+      }
+    }
   }
-  return decodeHtmlPage(new Uint8Array(await res.arrayBuffer()))
+  throw lastError
 }
 
 export function sleep(ms) {
@@ -257,6 +293,221 @@ export function slugFromPicturePath(picturePath) {
   const idx = filename.lastIndexOf('.')
   return idx === -1 ? filename : filename.slice(0, idx)
 }
+
+// ---------------------------------------------------------------------------
+// Capitalization normalization
+// ---------------------------------------------------------------------------
+
+// The only (table, column) pairs the casing normalizer may ever touch. Any
+// other pair makes normalizeColumnCasing throw, which also prevents arbitrary
+// SQL identifier interpolation (same guard pattern as IMAGE_COLUMNS).
+//
+// Hard exclusions, and why:
+//   - items.name / pokemon.name / habitat_entries.name / favorites.name —
+//     pinned by the legacy-hash compatibility contract (old URL hashes and
+//     saved islands resolve these names byte-for-byte; see
+//     scripts/legacy_compat.test.js). They must NEVER be renamed — including
+//     "just" re-capitalized.
+//   - habitats.habitat / pokemon.habitat — FK targets of the habitats axis.
+//   - items.tag — validated vocabulary (VALID_TAGS).
+//   - habitat_pokemon.pokemon_name — must stay byte-identical to pokemon.name.
+export const CASING_NORMALIZATION_TARGETS = [
+  { table: 'items', column: 'category', keyColumns: ['id'] },
+  { table: 'habitat_entries', column: 'category', keyColumns: ['id'] },
+  { table: 'habitat_recipe', column: 'item_name', keyColumns: ['habitat_id', 'item_name'] },
+  { table: 'habitat_pokemon', column: 'rarity', keyColumns: ['habitat_id', 'pokemon_name'] },
+  {
+    table: 'habitat_pokemon_location',
+    column: 'location',
+    keyColumns: ['habitat_id', 'pokemon_name', 'location'],
+  },
+  {
+    table: 'habitat_pokemon_time',
+    column: 'time',
+    keyColumns: ['habitat_id', 'pokemon_name', 'time'],
+  },
+  {
+    table: 'habitat_pokemon_weather',
+    column: 'weather',
+    keyColumns: ['habitat_id', 'pokemon_name', 'weather'],
+  },
+]
+
+/**
+ * Title-case a lowercase key. Used only as a tie-break *preference* when
+ * picking the canonical casing for a lowercased group: it never rewrites
+ * values that don't already exist — it only makes an existing variant win a
+ * tie.
+ */
+function titleCaseKey(key) {
+  return key.replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+// Composite keys are joined with NUL for the in-memory dry-run key set; the
+// byte cannot appear in any of these vocabulary values.
+const KEY_SEP = '\u0000'
+
+function compositeKey(target, row) {
+  return target.keyColumns.map((k) => row[k]).join(KEY_SEP)
+}
+
+/**
+ * Normalize the capitalization of one allowlisted column by majority rule.
+ *
+ * For every distinct casing of the same lowercase value, the most frequent
+ * variant wins; ties prefer the title-cased variant, then the
+ * lexicographically smallest. Minority rows are either UPDATEd to the
+ * canonical value or — when a row with the same primary key but the canonical
+ * value already exists — merged (deleted); the discarded quantity/mapping
+ * surfaces in the report's ``mergedDeleted`` count.
+ *
+ * Returns a per-(from, to) change report; with ``dryRun`` the same report is
+ * computed with zero writes (mutations are simulated in memory).
+ */
+export function normalizeColumnCasing(dbPath, table, column, { dryRun = false } = {}) {
+  const target = CASING_NORMALIZATION_TARGETS.find((t) => t.table === table && t.column === column)
+  if (!target) {
+    throw new Error(
+      `normalizeColumnCasing: (table, column) pair '${table}.${column}' is not in ` +
+        `CASING_NORMALIZATION_TARGETS; refusing to run`,
+    )
+  }
+
+  const selectSql = `SELECT ${target.keyColumns.join(', ')}, ${column} FROM ${table}`
+  const ro = openReadOnlyDb(dbPath)
+  let rows
+  try {
+    rows = ro.prepare(selectSql).all()
+  } finally {
+    ro.close()
+  }
+
+  // Group rows by lowercased value, then by exact value.
+  const groups = new Map() // lower -> Map(value -> rows[])
+  for (const row of rows) {
+    const value = row[column]
+    if (value === null || value === undefined) {
+      continue
+    }
+    const lower = value.toLowerCase()
+    if (!groups.has(lower)) {
+      groups.set(lower, new Map())
+    }
+    const byValue = groups.get(lower)
+    if (!byValue.has(value)) {
+      byValue.set(value, [])
+    }
+    byValue.get(value).push(row)
+  }
+
+  const report = new Map() // `${from} -> ${to}` -> { table, column, from, to, updated, mergedDeleted }
+
+  // In-memory key set, kept in sync with (simulated or real) mutations so
+  // dry-run collision checks mirror what the live run would see. Keyed by
+  // composite key + column value, mirroring the live probe (which includes
+  // `AND column = canonical`) — for non-key-column targets the key alone
+  // would match the minority row itself.
+  const rowKeyStr = (row) => `${compositeKey(target, row)}${KEY_SEP}${String(row[column])}`
+  const keySet = new Set(rows.map(rowKeyStr))
+  // PK-collision probe: a row with this row's key values but the canonical
+  // column value. The `column = ?` condition is redundant when the column is
+  // part of the key, but essential for non-key targets (items.category,
+  // habitat_pokemon.rarity, ...) where the key conditions alone would match
+  // the minority row itself and turn every update into a delete.
+  const existsSql = `SELECT 1 FROM ${table} WHERE ${target.keyColumns
+    .map((k) => `${k} = ?`)
+    .join(' AND ')} AND ${column} = ?`
+  const db = dryRun ? null : openWritableDb(dbPath)
+  try {
+    const whereClause = target.keyColumns.map((k) => `${k} = ?`).join(' AND ')
+    const updateStmt = db
+      ? db.prepare(`UPDATE ${table} SET ${column} = ? WHERE ${whereClause}`)
+      : null
+    const deleteStmt = db ? db.prepare(`DELETE FROM ${table} WHERE ${whereClause}`) : null
+    const existsStmt = db ? db.prepare(existsSql) : null
+
+    for (const [lower, byValue] of groups) {
+      if (byValue.size <= 1) {
+        continue
+      }
+
+      // Deterministic canonical pick: count desc, title-case preference,
+      // then lexicographic.
+      const titleCase = titleCaseKey(lower)
+      const variants = [...byValue.keys()].sort((a, b) => {
+        const ca = byValue.get(a).length
+        const cb = byValue.get(b).length
+        if (cb !== ca) {
+          return cb - ca
+        }
+        const ta = a === titleCase ? 1 : 0
+        const tb = b === titleCase ? 1 : 0
+        if (tb !== ta) {
+          return tb - ta
+        }
+        return a < b ? -1 : a > b ? 1 : 0
+      })
+      const canonical = variants[0]
+
+      for (const variant of variants.slice(1)) {
+        for (const row of byValue.get(variant)) {
+          // PK-collision check: does a row with this row's key values but the
+          // canonical column value already exist? If so the UPDATE would
+          // violate the primary key — merge by deleting the minority row
+          // instead (the surviving canonical row keeps its own quantity).
+          const targetKey = target.keyColumns.map((k) => (k === column ? canonical : row[k]))
+          const targetKeyStr = targetKey.join(KEY_SEP) + KEY_SEP + canonical
+          const taken = dryRun
+            ? keySet.has(targetKeyStr)
+            : existsStmt.get(...targetKey, canonical) !== undefined
+
+          const reportKey = `${variant} -> ${canonical}`
+          if (!report.has(reportKey)) {
+            report.set(reportKey, {
+              table,
+              column,
+              from: variant,
+              to: canonical,
+              updated: 0,
+              mergedDeleted: 0,
+            })
+          }
+
+          if (taken) {
+            if (!dryRun) {
+              deleteStmt.run(...target.keyColumns.map((k) => row[k]))
+            } else {
+              keySet.delete(rowKeyStr(target, row))
+            }
+            report.get(reportKey).mergedDeleted += 1
+          } else {
+            if (!dryRun) {
+              updateStmt.run(canonical, ...target.keyColumns.map((k) => row[k]))
+            } else {
+              keySet.delete(rowKeyStr(target, row))
+              keySet.add(targetKeyStr)
+            }
+            report.get(reportKey).updated += 1
+          }
+        }
+      }
+    }
+  } finally {
+    if (db) {
+      db.close()
+    }
+  }
+
+  return [...report.values()]
+}
+
+// Item image slugs whose Serebii source files are permanently 404 as of
+// 2026-09. verifyItemsCompleteness prints their missing-on-disk images as
+// warnings and excludes them from the ok aggregate, so the --verify exit gate
+// and the &&-chained npm scripts never halt on these two permanent upstream
+// gaps. Once Serebii uploads a sprite, the --update-existing image self-heal
+// downloads it — remove the slug from this list to re-arm the check.
+export const KNOWN_MISSING_IMAGE_SLUGS = ['seabedflowerseeds(purple)', 'pokemoncenterrebuildkit']
 
 // Whitelist of valid (table, column) pairs for the generic image-collision
 // check. Prevents interpolating arbitrary identifiers into SQL.
