@@ -5,6 +5,7 @@ import { favoriteCoverageColumnKey, recommendedItemsForHouse } from '@/queries'
 import posthog from 'posthog-js'
 import type { AdjacencyData, HouseAssignment, PokemonData } from '@/solver'
 import { useCartStore } from '@/stores/cart'
+import { usePinStore } from '@/stores/pins'
 import { useProgressStore } from '@/stores/progress'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -1955,6 +1956,89 @@ describe('HouseRecord', () => {
         house_id: 'M1',
         name: 'AlphaOne',
       })
+    })
+  })
+
+  // Full-house swap affordance: while a drag hovers a full house over a valid
+  // unlocked resident card, that card is the pending swap counterpart and the
+  // house root swaps the coral denied highlight for the valid --swap one. A
+  // locked resident, a card-free hover, an under-capacity house, and a
+  // non-resident occupant must all stay unmarked.
+  describe('full-house swap affordance', () => {
+    const fullHouse: HouseAssignment = {
+      houseId: 'S1',
+      size: 'small',
+      capacity: 1,
+      pokemon: ['AlphaOne'],
+    }
+
+    function mountFullHouse(occupant: string | null) {
+      return mount(HouseRecord, {
+        props: {
+          house: fullHouse,
+          pokemonData: testPokemonData,
+          dragEnabled: true,
+          dropOver: true,
+          dropOverOccupant: occupant,
+        },
+      })
+    }
+
+    it('marks the hovered resident of a full house as the swap counterpart', () => {
+      const wrapper = mountFullHouse('AlphaOne')
+
+      expect(wrapper.classes()).toContain('drop-zone--over')
+      expect(wrapper.classes()).toContain('drop-zone--full')
+      expect(wrapper.classes()).toContain('drop-zone--swap')
+      expect(wrapper.findAll('.pokemon-card--swap-target')).toHaveLength(1)
+    })
+
+    it('leaves a locked resident unmarked', () => {
+      usePinStore().pinPokemon('S1', 'AlphaOne')
+      const wrapper = mountFullHouse('AlphaOne')
+
+      expect(wrapper.classes()).not.toContain('drop-zone--swap')
+      expect(wrapper.findAll('.pokemon-card--swap-target')).toHaveLength(0)
+    })
+
+    it('leaves a card-free hover unmarked', () => {
+      const wrapper = mountFullHouse(null)
+
+      expect(wrapper.classes()).not.toContain('drop-zone--swap')
+      expect(wrapper.findAll('.pokemon-card--swap-target')).toHaveLength(0)
+    })
+
+    it('leaves an under-capacity house without the full-house deny override but still marks the counterpart', () => {
+      const house: HouseAssignment = {
+        houseId: 'M1',
+        size: 'medium',
+        capacity: 2,
+        pokemon: ['AlphaOne'],
+      }
+      const wrapper = mount(HouseRecord, {
+        props: {
+          house,
+          pokemonData: testPokemonData,
+          dragEnabled: true,
+          dropOver: true,
+          dropOverOccupant: 'AlphaOne',
+        },
+      })
+
+      // Dropping onto a resident swaps at any capacity, so the card is marked —
+      // but the root needs no --swap override: it already has the valid
+      // --over highlight (there is no coral deny to revert).
+      expect(wrapper.classes()).toContain('drop-zone--over')
+      expect(wrapper.classes()).not.toContain('drop-zone--full')
+      expect(wrapper.classes()).not.toContain('drop-zone--swap')
+      expect(wrapper.findAll('.pokemon-card--swap-target')).toHaveLength(1)
+    })
+
+    it('leaves a non-resident occupant unmarked', () => {
+      const wrapper = mountFullHouse('BetaOne')
+
+      expect(wrapper.classes()).not.toContain('drop-zone--swap')
+      expect(wrapper.findAll('.pokemon-card--swap-target')).toHaveLength(0)
     })
   })
 })

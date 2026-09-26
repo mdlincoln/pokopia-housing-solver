@@ -30,6 +30,10 @@ const props = withDefaults(
     // the pointer gesture and the placement override.
     dragEnabled?: boolean
     dropOver?: boolean
+    // Resident name currently hovered inside this house (null when the hover is
+    // not over a card or on another house). Drives the full-house swap
+    // affordance; purely presentational — HomeView owns the gesture.
+    dropOverOccupant?: string | null
     // Whether island-wide auto-sort is on: forwarded to the housemate modal so
     // its re-sort warning can render and undermine itself via update:autoSort.
     autoSort?: boolean
@@ -39,11 +43,27 @@ const props = withDefaults(
     islandPokemon: () => new Set<string>(),
     dragEnabled: false,
     dropOver: false,
+    dropOverOccupant: null,
     autoSort: true,
   },
 )
 
 const isFull = computed(() => props.house.pokemon.length >= props.house.capacity)
+
+const cartStore = useCartStore()
+const pinStore = usePinStore()
+
+// Swap affordance: the resident card HomeView reports as hovered is the swap
+// counterpart whenever it is a resident of this house and unlocked — at any
+// capacity, since dropping onto a resident exchanges the two even when the house
+// still has room. Any other hover (locked resident, card-free area) marks
+// nothing.
+const swapOccupant = computed<string | null>(() => {
+  if (!props.dropOver || !props.dropOverOccupant) return null
+  if (!props.house.pokemon.includes(props.dropOverOccupant)) return null
+  if (pinStore.isPokemonPinned(props.house.houseId, props.dropOverOccupant)) return null
+  return props.dropOverOccupant
+})
 
 // Adding a pokemon is OWNED by HomeView (selection + auto-pin + re-solve);
 // HouseRecord only reports the intent.
@@ -51,9 +71,6 @@ const emit = defineEmits<{
   'add-pokemon': [payload: { houseId: string; name: string }]
   'update:autoSort': [value: boolean]
 }>()
-
-const cartStore = useCartStore()
-const pinStore = usePinStore()
 
 // Habitat-detail modal state: one HabitatModal per house card; only one is
 // ever open. Thumbnails re-emit `habitatClicked` from PokemonCards.
@@ -156,6 +173,9 @@ function onFavoriteClick(favorite: string) {
         'fully-fulfilled': allFulfilled,
         'drop-zone--over': dropOver,
         'drop-zone--full': isFull,
+        // Only a FULL house needs the coral deny reverted: an under-capacity
+        // house already carries the valid --over highlight.
+        'drop-zone--swap': isFull && swapOccupant !== null,
       },
     ]"
   >
@@ -188,6 +208,7 @@ function onFavoriteClick(favorite: string) {
       :suggestions-ready="suggestionsReady"
       :fulfilled-favorites="fulfilledFavorites"
       :drag-enabled="dragEnabled"
+      :drop-over-occupant="swapOccupant"
       :has-items="hasItems"
       @favorite-clicked="onFavoriteClick"
       @habitat-clicked="onHabitatClick"

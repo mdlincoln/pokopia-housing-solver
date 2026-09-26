@@ -42,23 +42,48 @@ async function cardCount(house: Locator): Promise<number> {
  * page.mouse to PointerEvents; >6px of movement arms the gesture. Both
  * endpoints are scrolled into view so document.elementsFromPoint (which only
  * resolves within-viewport points) can hit-test the drop zone.
+ *
+ * Before releasing, the drag verifies its own preconditions — the gesture armed
+ * (the drag ghost renders) and the pointer resolves to a drop zone (that zone's
+ * hover highlight is painted). Releasing without both is a silent no-op that a
+ * loaded CI box can produce from the pointer choreography alone, so the drag is
+ * retried; a genuinely broken drag still fails after the last attempt. Pass
+ * `expectNoDrag` for the cases that deliberately press a non-handle region to
+ * assert nothing moves.
  */
-async function dragFrom(page: Page, handle: Locator, target: Locator) {
-  await handle.scrollIntoViewIfNeeded()
-  const from = await handle.boundingBox()
-  if (!from) throw new Error('dragFrom: missing handle bounding box')
-  const sx = from.x + from.width / 2
-  const sy = from.y + from.height / 2
-  await page.mouse.move(sx, sy)
-  await page.mouse.down()
+async function dragFrom(
+  page: Page,
+  handle: Locator,
+  target: Locator,
+  options: { expectNoDrag?: boolean } = {},
+) {
+  const attempts = options.expectNoDrag ? 1 : 3
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    await handle.scrollIntoViewIfNeeded()
+    await handle.hover()
+    await page.mouse.down()
 
-  await target.scrollIntoViewIfNeeded()
-  const to = await target.boundingBox()
-  if (!to) throw new Error('dragFrom: missing target bounding box')
-  const tx = to.x + to.width / 2
-  const ty = to.y + to.height / 2
-  await page.mouse.move(tx, ty, { steps: 12 })
-  await page.mouse.up()
+    await target.scrollIntoViewIfNeeded()
+    const to = await target.boundingBox()
+    if (!to) throw new Error('dragFrom: missing target bounding box')
+    const tx = to.x + to.width / 2
+    const ty = to.y + to.height / 2
+    await page.mouse.move(tx, ty, { steps: 12 })
+    // Nudge the pointer so the composable re-resolves its drop target at the
+    // final point, then confirm the *intended* zone is the live one before
+    // releasing: a late re-layout can otherwise leave the release's fresh
+    // hit-test resolving a different zone (a silent no-op drop).
+    await page.mouse.move(tx + 1, ty)
+    const armed = (await page.locator('.pokemon-drag-ghost').count()) > 0
+    const overExpected = await target
+      .evaluate((el) => !!el.closest('.drop-zone--over'))
+      .catch(() => false)
+    await page.mouse.up()
+
+    if (options.expectNoDrag || (armed && overExpected)) return
+    await page.mouse.move(0, 0) // reset the pointer before retrying
+  }
+  throw new Error('dragFrom: the drop point never resolved to the intended drop zone')
 }
 
 test.describe('Drag pokemon between houses (auto-sort off)', () => {
@@ -146,7 +171,10 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     const sourceCard = source.getByTestId('pokemon-card').first()
     const name = (await sourceCard.locator('.pokemon-name').innerText()).trim()
 
-    await dragFrom(page, sourceCard.locator('.pokemon-drag-handle'), target)
+    // The target house may still hold a resident; aim at its card-free title so
+    // this keeps pinning the zone-level append path (a drop onto a resident card
+    // would swap instead).
+    await dragFrom(page, sourceCard.locator('.pokemon-drag-handle'), target.locator('.house-title'))
 
     await expect(target).toContainText(name, { timeout: 10_000 })
     await expect(source).not.toContainText(name)
@@ -181,7 +209,7 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     // card body — which must be a no-op.
     await expect(sourceCard.locator('.pokemon-drag-handle')).toHaveCount(1)
 
-    await dragFrom(page, sourceCard.locator('.pokemon-name'), target)
+    await dragFrom(page, sourceCard.locator('.pokemon-name'), target, { expectNoDrag: true })
 
     await expect(source).toContainText(name)
     await expect(target.getByTestId('pokemon-card')).toHaveCount(counts[targetIdx]!)
@@ -199,20 +227,23 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     await page.getByTestId('auto-sort-manual').click()
     await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
 
-    // A pokemon selected island-only lands in the warning so the alert renders
-    // and acts as the drop zone.
-    await selectPokemon(page, 'Ivysaur')
+    // The alert is a persistent drop target while OFF. With nothing unhoused yet
+    // every point inside its grid is card-free, so this pins the zone-level
+    // unhouse path — a drop onto a specific unhoused card would swap instead.
     const unhousedGrid = page.getByTestId('unhoused-pokemon-grid')
     await expect(unhousedGrid).toBeVisible({ timeout: 10_000 })
-    await expect(unhousedGrid.getByTestId('pokemon-card')).toHaveCount(1)
+    await expect(page.getByTestId('unhoused-empty-hint')).toBeVisible()
+    await expect(unhousedGrid.getByTestId('pokemon-card')).toHaveCount(0)
 
     const house = page.getByTestId('house-card').first()
     const bulbaCard = house.getByTestId('pokemon-card').filter({ hasText: 'Bulbasaur' }).first()
     await dragFrom(page, bulbaCard.locator('.pokemon-drag-handle'), unhousedGrid)
 
-    await expect(unhousedGrid.getByTestId('pokemon-card')).toHaveCount(2, { timeout: 10_000 })
+    await expect(unhousedGrid.getByTestId('pokemon-card')).toHaveCount(1, { timeout: 10_000 })
     await expect(unhousedGrid).toContainText('Bulbasaur')
     await expect(house).not.toContainText('Bulbasaur')
+    // The dashed placeholder yields to the dropped card.
+    await expect(page.getByTestId('unhoused-empty-hint')).toHaveCount(0)
     await expect(page.getByTestId('error')).toHaveCount(0)
   })
 
@@ -234,7 +265,9 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     await expect(ivyCard).toBeVisible()
 
     const house = page.getByTestId('house-card').first()
-    await dragFrom(page, ivyCard.locator('.pokemon-drag-handle'), house)
+    // Card-free house area: the house has a free slot, so this appends rather
+    // than swapping with the resident already there.
+    await dragFrom(page, ivyCard.locator('.pokemon-drag-handle'), house.locator('.house-title'))
 
     await expect(house).toContainText('Ivysaur', { timeout: 10_000 })
     // No pokemon left unhoused → the alert stays (persistent drop target) but
@@ -246,8 +279,10 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     ).toHaveCount(0)
   })
 
-  // AC.5 — a drop into a full house is blocked.
-  test('blocks a drop into a full house', async ({ page }) => {
+  // AC.1 — a drop onto the resident card of a full house performs a swap: the
+  // dragged pokemon takes the resident's place, the resident moves to the drag's
+  // origin house.
+  test('swaps when dropped onto the resident of a full house', async ({ page }) => {
     test.setTimeout(90_000)
     await page.goto('/')
     await setSpinbutton(page, 'house-small', 2)
@@ -265,8 +300,48 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     const name1 = (await s1.getByTestId('pokemon-card').first().locator('.pokemon-name').innerText()).trim()
     const name2 = (await s2.getByTestId('pokemon-card').first().locator('.pokemon-name').innerText()).trim()
 
-    // Both small houses are full (1/1); a cross-house drag must be blocked.
-    await dragFrom(page, s1.getByTestId('pokemon-card').first().locator('.pokemon-drag-handle'), s2)
+    // Both small houses are full (1/1); dropping onto s2's *pokemon card*
+    // (not the bare house card center) swaps the two residents.
+    await dragFrom(
+      page,
+      s1.getByTestId('pokemon-card').first().locator('.pokemon-drag-handle'),
+      s2.getByTestId('pokemon-card').first(),
+    )
+
+    await expect(s2).toContainText(name1, { timeout: 10_000 })
+    await expect(s1).toContainText(name2)
+    await expect(s1).not.toContainText(name1)
+    await expect(s2).not.toContainText(name2)
+    await expect(page.getByTestId('unhoused-empty-hint')).toBeVisible()
+    await expect(
+      page.getByTestId('unhoused-pokemon-grid').getByTestId('pokemon-card'),
+    ).toHaveCount(0)
+    await expect(page.getByTestId('error')).toHaveCount(0)
+  })
+
+  // AC.3 — a drop into a full house that does NOT land on a resident card
+  // (house title area) stays blocked.
+  test('blocks a drop into a full house not over a resident card', async ({ page }) => {
+    test.setTimeout(90_000)
+    await page.goto('/')
+    await setSpinbutton(page, 'house-small', 2)
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Ivysaur')
+    await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
+
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
+
+    const houses = page.getByTestId('house-card')
+    await expect(houses).toHaveCount(2)
+    const s1 = houses.nth(0)
+    const s2 = houses.nth(1)
+    const name1 = (await s1.getByTestId('pokemon-card').first().locator('.pokemon-name').innerText()).trim()
+    const name2 = (await s2.getByTestId('pokemon-card').first().locator('.pokemon-name').innerText()).trim()
+
+    // Both small houses are full (1/1); dropping onto the s2 *title* area is
+    // not over a resident card, so nothing moves.
+    await dragFrom(page, s1.getByTestId('pokemon-card').first().locator('.pokemon-drag-handle'), s2.locator('.house-title'))
 
     await expect(s1).toContainText(name1)
     await expect(s2).toContainText(name2)
@@ -275,6 +350,260 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     await expect(
       page.getByTestId('unhoused-pokemon-grid').getByTestId('pokemon-card'),
     ).toHaveCount(0)
+    await expect(page.getByTestId('error')).toHaveCount(0)
+  })
+
+  // AC.2 — dragging an unhoused pokemon onto a full house's resident card
+  // evicts that resident back to the unhoused area.
+  test('unhoused-origin drop evicts the resident to unhoused', async ({ page }) => {
+    test.setTimeout(90_000)
+    await page.goto('/')
+    await setSpinbutton(page, 'house-small', 2)
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Ivysaur')
+    await selectPokemon(page, 'Venusaur')
+    await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
+
+    // With two small houses and three pokemon, the solver houses two and the
+    // third lands in the warning.
+    const unhousedGrid = page.getByTestId('unhoused-pokemon-grid')
+    await expect(unhousedGrid.getByTestId('pokemon-card')).toHaveCount(1, { timeout: 30_000 })
+    const drifter = unhousedGrid.getByTestId('pokemon-card').first()
+    const drifterName = (await drifter.locator('.pokemon-name').innerText()).trim()
+
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
+
+    const houses = page.getByTestId('house-card')
+    await expect(houses).toHaveCount(2)
+    const s1 = houses.nth(0)
+    const s2 = houses.nth(1)
+    const name2 = (await s2.getByTestId('pokemon-card').first().locator('.pokemon-name').innerText()).trim()
+
+    // Drop the unhoused card onto s2's resident card: it takes the slot and
+    // the resident is evicted to the unhoused grid.
+    await dragFrom(page, drifter.locator('.pokemon-drag-handle'), s2.getByTestId('pokemon-card').first())
+
+    await expect(s2).toContainText(drifterName, { timeout: 10_000 })
+    await expect(s2).not.toContainText(name2)
+    await expect(s1).not.toContainText(drifterName)
+    // The evicted resident replaces the dragged pokemon in the unhoused grid:
+    // drifter moved into s2, name2 lands unhoused — still exactly one card.
+    await expect(unhousedGrid.getByTestId('pokemon-card')).toHaveCount(1, { timeout: 10_000 })
+    await expect(unhousedGrid).toContainText(name2)
+    await expect(unhousedGrid).not.toContainText(drifterName)
+    await expect(page.getByTestId('error')).toHaveCount(0)
+  })
+
+  // AC.4 — a locked (pinned) resident is never displaced: dropping onto its
+  // card in a full house is blocked.
+  test('locked resident blocks the swap', async ({ page }) => {
+    test.setTimeout(90_000)
+    await page.goto('/')
+    await setSpinbutton(page, 'house-small', 2)
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Ivysaur')
+    await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
+
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
+
+    const houses = page.getByTestId('house-card')
+    await expect(houses).toHaveCount(2)
+    const s1 = houses.nth(0)
+    const s2 = houses.nth(1)
+    const s1Card = s1.getByTestId('pokemon-card').first()
+    const s2Card = s2.getByTestId('pokemon-card').first()
+    const name1 = (await s1Card.locator('.pokemon-name').innerText()).trim()
+    const name2 = (await s2Card.locator('.pokemon-name').innerText()).trim()
+
+    // Lock s2's resident (durable pin).
+    await s2Card.getByTestId('progress-checkbox-pokemon').click()
+    await expect(s2Card.getByTestId('progress-checkbox-pokemon')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+
+    await dragFrom(page, s1Card.locator('.pokemon-drag-handle'), s2Card)
+
+    // The locked resident keeps its slot and nothing moved.
+    await expect(s1).toContainText(name1)
+    await expect(s2).toContainText(name2)
+    await expect(page.getByTestId('unhoused-empty-hint')).toBeVisible()
+    await expect(page.getByTestId('error')).toHaveCount(0)
+  })
+
+  // The swap affordance is painted only while the pointer is over a swappable
+  // resident card of a full house; a card-free hover in the same house keeps the
+  // denied styling instead.
+  test('highlights only the swappable resident during a full-house hover', async ({ page }) => {
+    test.setTimeout(90_000)
+    await page.goto('/')
+    await setSpinbutton(page, 'house-small', 2)
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Ivysaur')
+    await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
+
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
+
+    const houses = page.getByTestId('house-card')
+    await expect(houses).toHaveCount(2)
+    const sourceHandle = houses.nth(0).getByTestId('pokemon-card').first().locator('.pokemon-drag-handle')
+    const targetCard = houses.nth(1).getByTestId('pokemon-card').first()
+
+    // Manual gesture so we can assert mid-drag state before releasing.
+    await sourceHandle.scrollIntoViewIfNeeded()
+    const from = await sourceHandle.boundingBox()
+    if (!from) throw new Error('missing handle bounding box')
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+    await page.mouse.down()
+
+    // Over the resident card of the full target house: exactly one swap
+    // counterpart, and the house root carries the valid --swap highlight.
+    await targetCard.scrollIntoViewIfNeeded()
+    const cardBox = await targetCard.boundingBox()
+    if (!cardBox) throw new Error('missing target card bounding box')
+    await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2, { steps: 12 })
+    await expect(page.locator('.pokemon-card--swap-target')).toHaveCount(1, { timeout: 5_000 })
+    await expect(houses.nth(1)).toHaveClass(/drop-zone--swap/)
+    // The pending swap must not read as the coral "blocked" highlight.
+    const swapBorder = await houses.nth(1).evaluate((el) => getComputedStyle(el).borderTopColor)
+
+    // Same house, card-free title area: the swap affordance must clear while the
+    // house-level hover highlight stays.
+    const titleBox = await houses.nth(1).locator('.house-title').boundingBox()
+    if (!titleBox) throw new Error('missing title bounding box')
+    await page.mouse.move(titleBox.x + titleBox.width / 2, titleBox.y + titleBox.height / 2, {
+      steps: 6,
+    })
+    await expect(page.locator('.pokemon-card--swap-target')).toHaveCount(0, { timeout: 5_000 })
+    await expect(houses.nth(1)).not.toHaveClass(/drop-zone--swap/)
+    await expect(houses.nth(1)).toHaveClass(/drop-zone--over/)
+    // ...and the same full house now paints the denied (coral) border, so a
+    // blocked hover is visually distinguishable from a swappable one.
+    const denyBorder = await houses.nth(1).evaluate((el) => getComputedStyle(el).borderTopColor)
+    expect(denyBorder).not.toBe(swapBorder)
+
+    await page.mouse.up()
+    await expect(page.locator('.pokemon-card--swap-target')).toHaveCount(0)
+  })
+
+  // Dropping back onto the drag's own house is a no-op, so a housemate card there
+  // must never be advertised as a swap counterpart.
+  test('own-house hover advertises no swap', async ({ page }) => {
+    test.setTimeout(90_000)
+    await page.goto('/')
+    await setSpinbutton(page, 'house-medium', 1)
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Ivysaur')
+    await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
+
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
+
+    const house = page.getByTestId('house-card').first()
+    const cards = house.getByTestId('pokemon-card')
+    await expect(cards).toHaveCount(2, { timeout: 30_000 })
+
+    const handle = cards.nth(0).locator('.pokemon-drag-handle')
+    await handle.scrollIntoViewIfNeeded()
+    const from = await handle.boundingBox()
+    if (!from) throw new Error('missing handle bounding box')
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+    await page.mouse.down()
+
+    // Hover the housemate card inside the drag's own (full) house.
+    const housemate = cards.nth(1)
+    const to = await housemate.boundingBox()
+    if (!to) throw new Error('missing housemate bounding box')
+    await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 })
+
+    await expect(page.locator('.pokemon-card--swap-target')).toHaveCount(0)
+    await expect(house).not.toHaveClass(/drop-zone--swap/)
+
+    await page.mouse.up()
+    // Dropping there is a no-op: both residents stay put.
+    await expect(cards).toHaveCount(2)
+    await expect(page.getByTestId('error')).toHaveCount(0)
+  })
+
+  // Requirement — dropping onto a resident of a house that still has room swaps
+  // the two pokemon and leaves the vacant slot vacant (it does not merely fill
+  // the free slot).
+  test('swaps with the resident of a house that still has room', async ({ page }) => {
+    test.setTimeout(90_000)
+    await page.goto('/')
+    await setSpinbutton(page, 'house-medium', 2)
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Ivysaur')
+    await selectPokemon(page, 'Venusaur')
+    await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
+
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
+
+    const houses = page.getByTestId('house-card')
+    await expect(houses).toHaveCount(2)
+    // Two medium houses (capacity 2) with three pokemon: one house is full, the
+    // other holds a single resident with a vacant slot.
+    const counts = await Promise.all([cardCount(houses.nth(0)), cardCount(houses.nth(1))])
+    expect([...counts].sort()).toEqual([1, 2])
+    const fullIdx = counts[0]! >= counts[1]! ? 0 : 1
+    const roomIdx = fullIdx === 0 ? 1 : 0
+    const full = houses.nth(fullIdx)
+    const room = houses.nth(roomIdx)
+
+    const draggedCard = full.getByTestId('pokemon-card').first()
+    const draggedName = (await draggedCard.locator('.pokemon-name').innerText()).trim()
+    const residentCard = room.getByTestId('pokemon-card').first()
+    const residentName = (await residentCard.locator('.pokemon-name').innerText()).trim()
+
+    // Aim at the resident card itself: the two swap places.
+    await dragFrom(page, draggedCard.locator('.pokemon-drag-handle'), residentCard)
+
+    await expect(room).toContainText(draggedName, { timeout: 10_000 })
+    await expect(room).not.toContainText(residentName)
+    await expect(full).toContainText(residentName)
+    await expect(full).not.toContainText(draggedName)
+    // The vacant slot is untouched: both houses keep their previous occupancy.
+    expect(await cardCount(room)).toBe(1)
+    expect(await cardCount(full)).toBe(2)
+    await expect(page.getByTestId('error')).toHaveCount(0)
+  })
+
+  // Requirement — dropping a housed pokemon onto a specific unhoused card swaps
+  // them: that pokemon goes into the house, the dragged one goes unhoused.
+  test('drop onto an unhoused card swaps it into the house', async ({ page }) => {
+    test.setTimeout(90_000)
+    await page.goto('/')
+    await setSpinbutton(page, 'house-small', 1)
+    await selectPokemon(page, 'Bulbasaur')
+    await selectPokemon(page, 'Ivysaur')
+    await expect(page.getByTestId('house-card').first()).toBeVisible({ timeout: 30_000 })
+
+    const unhousedGrid = page.getByTestId('unhoused-pokemon-grid')
+    await expect(unhousedGrid.getByTestId('pokemon-card')).toHaveCount(1, { timeout: 30_000 })
+
+    await page.getByTestId('auto-sort-manual').click()
+    await expect(page.getByTestId('auto-sort-manual')).toHaveAttribute('aria-pressed', 'true')
+
+    const house = page.getByTestId('house-card').first()
+    const housedCard = house.getByTestId('pokemon-card').first()
+    const housedName = (await housedCard.locator('.pokemon-name').innerText()).trim()
+    const unhousedCard = unhousedGrid.getByTestId('pokemon-card').first()
+    const unhousedName = (await unhousedCard.locator('.pokemon-name').innerText()).trim()
+
+    // Aim at the unhoused card itself: the two swap places.
+    await dragFrom(page, housedCard.locator('.pokemon-drag-handle'), unhousedCard)
+
+    await expect(house).toContainText(unhousedName, { timeout: 10_000 })
+    await expect(house).not.toContainText(housedName)
+    await expect(unhousedGrid).toContainText(housedName)
+    await expect(unhousedGrid).not.toContainText(unhousedName)
+    // Still exactly one unhoused pokemon: they exchanged places.
+    await expect(unhousedGrid.getByTestId('pokemon-card')).toHaveCount(1)
+    await expect(page.getByTestId('error')).toHaveCount(0)
   })
 
   // AC.5 — a locked (pinned) pokemon shows no handle and cannot be dragged.
@@ -309,7 +638,7 @@ test.describe('Drag pokemon between houses (auto-sort off)', () => {
     // Sibling unlocked cards keep their handles.
     await expect(source.locator('.pokemon-drag-handle')).toHaveCount(counts[sourceIdx]! - 1)
 
-    await dragFrom(page, lockedCard.locator('.pokemon-name'), holder)
+    await dragFrom(page, lockedCard.locator('.pokemon-name'), holder, { expectNoDrag: true })
 
     // Nothing moved.
     await expect(source).toContainText(lockedName)

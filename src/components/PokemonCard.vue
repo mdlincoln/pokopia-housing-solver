@@ -22,12 +22,17 @@ const props = withDefaults(
     dragEnabled?: boolean
     context?: 'house' | 'unhoused'
     houseId?: string | null
+    // Visual affordance mark: this resident card is the resident that a pending
+    // full-house swap would displace. Presentational only — HomeView owns the
+    // gesture.
+    swapTarget?: boolean
   }>(),
   {
     checked: false,
     dragEnabled: false,
     context: 'house',
     houseId: null,
+    swapTarget: false,
   },
 )
 
@@ -84,6 +89,7 @@ function hideDragTooltip() {
     :class="{
       'checked-off': checked,
       'pokemon-card--draggable': draggable,
+      'pokemon-card--swap-target': swapTarget,
     }"
     :data-drag-name="name"
     :data-from-house="houseId ?? ''"

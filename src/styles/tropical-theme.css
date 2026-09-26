@@ -1642,14 +1642,26 @@ details[open] > .details-summary::before,
    auto-sort is ON, which is the only place that cursor belongs. The coral reject
    highlight below is the only full-house visual. */
 
-/* A full house is still hit-testable while a drag hovers it, but it must read
-   as an invalid target (coral reject) rather than the valid --over highlight. */
-.drop-zone--full.drop-zone--over {
+/* A full house is still hit-testable while a drag hovers it. Without a valid
+   unlocked resident card under the pointer the drop is blocked, so the hover
+   reads as an invalid target (coral reject) rather than the valid --over
+   highlight. When the hover IS a swappable resident the drop swaps instead, so
+   the coral deny is skipped there (`:not()` takes its argument's specificity, so
+   this rule still outranks `.drop-zone--over` while the swap class is absent). */
+.drop-zone--full.drop-zone--over:not(.drop-zone--swap) {
   border-color: var(--trop-coral-500) !important;
   box-shadow:
     inset 0 0 0 2px var(--trop-coral-500),
     var(--trop-shadow-soft);
   background-color: rgb(255 179 168 / 30%);
+}
+
+/* The resident card under the pointer: a pending swap would displace exactly
+   this pokemon (dashed outline distinguishable from the still-valid house ring,
+   and readable on both light and dark cards). */
+.pokemon-card--swap-target {
+  outline: 2px dashed var(--trop-ocean-500);
+  outline-offset: 2px;
 }
 
 /* Fixed ghost label that follows the pointer during a drag. pointer-events:none

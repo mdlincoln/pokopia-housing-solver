@@ -22,12 +22,17 @@ const props = withDefaults(
     suggestionsReady: boolean
     fulfilledFavorites: Set<string>
     dragEnabled?: boolean
+    // Valid full-house swap counterpart hovered inside this house (null when
+    // none). Passed through to the roster cards so the swappable resident
+    // highlights; other hovers never reach the cards.
+    dropOverOccupant?: string | null
     hasItems?: boolean
   }>(),
   {
     allPokemonNames: () => [],
     islandPokemon: () => new Set<string>(),
     dragEnabled: false,
+    dropOverOccupant: null,
     hasItems: false,
   },
 )
@@ -76,6 +81,7 @@ function onEmptyHouseInput(names: string[]) {
       :spawn-habitats="spawnHabitatsByName?.[name] ?? []"
       :drag-enabled="dragEnabled"
       :house-id="house.houseId"
+      :swap-target="name === dropOverOccupant"
       context="house"
       @toggle="onPokemonPinToggle(house.houseId, name)"
       @favorite-clicked="emit('favorite-clicked', $event)"

@@ -9,6 +9,10 @@ defineProps<{
   displayedUnhoused: string[]
   pokemonData: PokemonData
   dragOverTarget: DropTarget | null
+  // Unhoused card that a pending drop would swap into the drag's origin house
+  // (null when none). Presentational: drags that started unhoused have nothing
+  // to swap with, so HomeView never reports an occupant for them.
+  dropOverOccupant?: string | null
 }>()
 </script>
 
@@ -44,6 +48,7 @@ defineProps<{
         context="unhoused"
         :house-id="null"
         :drag-enabled="!autoSort"
+        :swap-target="name === dropOverOccupant"
       />
       <!-- While auto-sort is off the alert always renders so it is a persistent
            drop target; when empty, a dashed placeholder keeps that space

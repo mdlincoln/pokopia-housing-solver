@@ -251,6 +251,8 @@ function setAutoSort(value: boolean) {
 // --- Drag & drop (pointer events) --------------------------------------------
 const {
   dragOverTarget,
+  dragOverOccupant,
+  dragFromHouseId,
   draggingName,
   dragPos,
   onPointerDown,
@@ -261,7 +263,38 @@ const {
   isEnabled: () => !autoSort.value,
   getHouse: (houseId) => displayedHouses.value.find((h) => h.houseId === houseId),
   setPlacement: (name, target) => placementStore.set(name, target),
+  // A locked (pinned) resident is never displaced by another card's gesture.
+  // House pins seed their occupants into pinnedPokemon at pin time, so a
+  // pinned house's original residents are covered too — a pokemon added to a
+  // pinned house afterwards is not itself pinned (and renders as unlocked,
+  // matching what a drop will do).
+  isResidentLocked: (houseId, name) => pinStore.isPokemonPinned(houseId, name),
 })
+
+// Hover affordances per house: the house-level (type + houseId) highlight, plus
+// the resident card under the pointer for the full-house swap affordance. The
+// occupant is only forwarded to the house actually being hovered.
+function dropOverFor(houseId: string): boolean {
+  return (
+    dragOverTarget.value != null &&
+    dragOverTarget.value.type === 'house' &&
+    dragOverTarget.value.houseId === houseId
+  )
+}
+function hoveredCounterpartFor(houseId: string): string | null {
+  // A drop back onto the drag's own house is a no-op, so a housemate card there
+  // must not be advertised as a swap counterpart.
+  if (houseId === dragFromHouseId.value) return null
+  return dropOverFor(houseId) ? dragOverOccupant.value : null
+}
+
+// Unhoused swap affordance: dropping onto a specific unhoused card swaps it into
+// the drag's origin house — only meaningful for a drag that started in a house.
+function unhousedSwapCounterpart(): string | null {
+  if (!dragOverTarget.value || dragOverTarget.value.type !== 'unhoused') return null
+  if (dragFromHouseId.value === null) return null
+  return dragOverOccupant.value
+}
 
 onMounted(async () => {
   // Record the landing before any catalog/restore work so a visit is captured
@@ -443,6 +476,7 @@ defineExpose({
       :displayed-unhoused="displayedUnhoused"
       :pokemon-data="pokemonData"
       :drag-over-target="dragOverTarget"
+      :drop-over-occupant="unhousedSwapCounterpart()"
     />
 
     <TransitionGroup
@@ -461,11 +495,8 @@ defineExpose({
         :island-pokemon="islandPokemonSet"
         :adjacency-data="adjacencyData"
         :drag-enabled="!autoSort"
-        :drop-over="
-          dragOverTarget != null &&
-          dragOverTarget.type === 'house' &&
-          dragOverTarget.houseId === house.houseId
-        "
+        :drop-over="dropOverFor(house.houseId)"
+        :drop-over-occupant="hoveredCounterpartFor(house.houseId)"
         :auto-sort="autoSort"
         @add-pokemon="addPokemonToHouse"
         @update:auto-sort="setAutoSort"
